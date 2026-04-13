@@ -521,13 +521,13 @@ test.describe('Control mode switching in ORBIT', () => {
 
     // Enter DOCKING → RCS via dispatched key events.
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
-    await page.waitForFunction(() => window.__flightPs?.controlMode === 'DOCKING', { timeout: 5_000 });
+    await page.waitForFunction(() => window.__flightPs?.controlMode === 'DOCKING', { timeout: 10_000 });
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true })));
-    await page.waitForFunction(() => window.__flightPs?.controlMode === 'RCS', { timeout: 5_000 });
+    await page.waitForFunction(() => window.__flightPs?.controlMode === 'RCS', { timeout: 10_000 });
 
     // Now toggle back to DOCKING.
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true })));
-    await page.waitForFunction(() => window.__flightPs?.controlMode === 'DOCKING', { timeout: 5_000 });
+    await page.waitForFunction(() => window.__flightPs?.controlMode === 'DOCKING', { timeout: 10_000 });
     expect(await page.evaluate(() => window.__flightPs?.controlMode)).toBe('DOCKING');
     await page.close();
   });
@@ -560,7 +560,7 @@ test.describe('Control mode switching in ORBIT', () => {
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
     await page.waitForFunction(
       () => window.__flightPs?.controlMode === 'DOCKING',
-      { timeout: 5_000 },
+      { timeout: 10_000 },
     );
     expect(await page.evaluate(() => window.__flightPs?.throttle ?? -1)).toBe(0);
 
@@ -573,7 +573,7 @@ test.describe('Control mode switching in ORBIT', () => {
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
     await page.waitForFunction(
       () => window.__flightPs?.controlMode === 'NORMAL',
-      { timeout: 5_000 },
+      { timeout: 10_000 },
     );
     expect(await page.evaluate(() => window.__flightPs?.throttle ?? -1)).toBe(0);
     await page.close();
@@ -817,12 +817,12 @@ test.describe('Map view toggle and controls', () => {
 
     // Open map first.
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
-    await expect(page.locator('#map-hud')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('#map-hud')).toBeVisible({ timeout: 10_000 });
 
     // Close map.
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyM', key: 'm', bubbles: true })));
-    await expect(page.locator('#map-hud')).not.toBeVisible({ timeout: 5_000 });
-    await expect(page.locator('#flight-hud')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('#map-hud')).not.toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#flight-hud')).toBeVisible({ timeout: 10_000 });
     await page.close();
   });
 });

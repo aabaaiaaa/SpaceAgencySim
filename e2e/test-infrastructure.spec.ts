@@ -18,6 +18,7 @@ import {
   waitForAltitude,
   waitForObjectiveComplete,
   areAllObjectivesComplete,
+  stageAndLaunch,
 } from './helpers.js';
 import type { MissionTemplate } from './helpers.js';
 import {
@@ -342,7 +343,7 @@ test.describe('E2E Infrastructure — Objective Verification', () => {
     test.setTimeout(60_000);
     const page: Page = await setupMissionFlight(browser);
 
-    await page.keyboard.press('Space');
+    await stageAndLaunch(page);
 
     // Wait for the rocket to reach 50 m
     await waitForAltitude(page, 50, 15_000);
@@ -359,7 +360,7 @@ test.describe('E2E Infrastructure — Objective Verification', () => {
     const page: Page = await setupMissionFlight(browser);
 
     // Stage the rocket and fly to trigger the objective
-    await page.keyboard.press('Space');
+    await stageAndLaunch(page);
     await waitForAltitude(page, 50, 15_000);
 
     await waitForObjectiveComplete(page, 'test-mission-infra', 'obj-infra-1', 10_000);
@@ -507,7 +508,7 @@ test.describe('E2E Infrastructure — Time Warp API', () => {
     expect(warp).toBe(100);
 
     // Stage the rocket so it's flying (physics advances timeElapsed only when not idle-landed)
-    await page.keyboard.press('Space');
+    await stageAndLaunch(page);
 
     // Wait a short real-time period for physics to advance
     const realStartMs: number = Date.now();

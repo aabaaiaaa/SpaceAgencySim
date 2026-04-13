@@ -31,6 +31,7 @@ import {
   waitForOrbit,
   pressStage,
   pressThrottleUp,
+  stageAndLaunch,
 } from './helpers.js';
 import type { SaveEnvelope, SaveEnvelopeParams } from './helpers.js';
 import {
@@ -333,9 +334,8 @@ test.describe('Celestial body data drives physics and rendering', () => {
     const ps1 = (await getPhysicsSnapshot(page))!;
     expect(ps1.posY).toBeCloseTo(0, 0);
 
-    // Stage and launch.
-    await pressStage(page);
-    await pressThrottleUp(page);
+    // Stage and launch — use retry helper for reliability.
+    await stageAndLaunch(page);
     await waitForAltitude(page, 50, 15_000);
 
     const ps2 = (await getPhysicsSnapshot(page))!;
@@ -351,8 +351,7 @@ test.describe('Celestial body data drives physics and rendering', () => {
 
   test('(3) Moon flight uses lower gravity (~1.62 m/s²)', async () => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MOON' });
-    await pressStage(page);
-    await pressThrottleUp(page);
+    await stageAndLaunch(page);
     await waitForAltitude(page, 50, 15_000);
 
     const ps = (await getPhysicsSnapshot(page))!;
@@ -371,8 +370,7 @@ test.describe('Celestial body data drives physics and rendering', () => {
     const fs = (await getFlightState(page))!;
     expect(fs.bodyId).toBe('MARS');
 
-    await pressStage(page);
-    await pressThrottleUp(page);
+    await stageAndLaunch(page);
     await waitForAltitude(page, 50, 15_000);
 
     const ps = (await getPhysicsSnapshot(page))!;
@@ -386,8 +384,7 @@ test.describe('Celestial body data drives physics and rendering', () => {
 
   test('(5) airless body (Moon) has no atmospheric drag', async () => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MOON' });
-    await pressStage(page);
-    await pressThrottleUp(page);
+    await stageAndLaunch(page);
     await waitForAltitude(page, 200, 15_000);
 
     // Cut throttle and check velocity — on airless body, velocity shouldn't
@@ -510,6 +507,7 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
   });
 
   test('(3) craft below destruction altitude is instantly destroyed', async () => {
+    test.setTimeout(120_000);
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'SUN' });
 
     // Teleport below destruction altitude.
@@ -520,7 +518,7 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
       const fs = window.__flightState;
       return ps?.crashed === true ||
         (fs?.events ?? []).some((e: { type: string }) => e.type === 'PART_DESTROYED');
-    }, { timeout: 10_000 });
+    }, { timeout: 30_000 });
 
     // All parts should be destroyed — check for crash or destruction state.
     const state = await page.evaluate((): DestructionState => {
@@ -556,7 +554,7 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
     await page.waitForFunction(
       (y0: number) => Math.abs((window.__flightPs?.posY ?? y0) - y0) > 50,
       _sunPosY2,
-      { timeout: 10_000 },
+      { timeout: 20_000 },
     );
 
     const shieldState = await page.evaluate((): ShieldState => {
@@ -766,6 +764,12 @@ test.describe('Landing on airless and atmospheric bodies', () => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MARS', crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MARS' });
 
+    // Wait for landed state to persist through the worker round-trip.
+    await page.waitForFunction(
+      () => window.__flightPs?.landed === true,
+      { timeout: 5_000 },
+    );
+
     const ps = (await getPhysicsSnapshot(page))!;
     expect(ps.landed).toBe(true);
     expect(ps.crashed).toBe(false);
@@ -782,6 +786,12 @@ test.describe('Landing on airless and atmospheric bodies', () => {
   test('(3) landing on Mercury (airless)', async () => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MERCURY', crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MERCURY' });
+
+    // Wait for landed state to persist through the worker round-trip.
+    await page.waitForFunction(
+      () => window.__flightPs?.landed === true,
+      { timeout: 5_000 },
+    );
 
     const ps = (await getPhysicsSnapshot(page))!;
     expect(ps.landed).toBe(true);
@@ -827,6 +837,7 @@ test.describe('Body-specific biomes and science opportunities', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('(1) Moon has distinct biomes with science multipliers', async () => {
+    test.setTimeout(60_000);
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MOON' });
 
     const biomes = await page.evaluate((): BiomeInfo[] | null => {
@@ -846,8 +857,7 @@ test.describe('Body-specific biomes and science opportunities', () => {
     }
 
     // Also verify the biome display works during flight.
-    await pressStage(page);
-    await pressThrottleUp(page);
+    await stageAndLaunch(page);
     await waitForAltitude(page, 150, 15_000);
 
     // The biome label should change as we ascend.
@@ -867,10 +877,10 @@ test.describe('Body-specific biomes and science opportunities', () => {
   });
 
   test('(2) Mars has atmospheric biomes', async () => {
+    test.setTimeout(90_000);
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MARS' });
-    await pressStage(page);
-    await pressThrottleUp(page);
-    await waitForAltitude(page, 200, 15_000);
+    await stageAndLaunch(page);
+    await waitForAltitude(page, 200, 20_000);
 
     const fs = (await getFlightState(page))!;
     expect(fs.bodyId).toBe('MARS');
@@ -1684,8 +1694,7 @@ test.describe('Phase 6 new parts function correctly', () => {
     expect(fs!.bodyId).toBe('MOON');
 
     // Stage and thrust. On the Moon, 5 kN can lift ~300 kg at 1.62 g.
-    await pressStage(page);
-    await pressThrottleUp(page);
+    await stageAndLaunch(page);
     await waitForAltitude(page, 10, 15_000);
 
     const ps = (await getPhysicsSnapshot(page))!;

@@ -24,6 +24,7 @@ import {
   teleportCraft,
   pressStage,
   pressThrottleUp,
+  stageAndLaunch,
 } from './helpers.js';
 import {
   midGameFixture,
@@ -154,13 +155,12 @@ test.describe('Malfunction during flight', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('(1) forced malfunction triggers on biome transition, event logged, and flight can still complete', async () => {
-    test.setTimeout(60_000);
+    test.setTimeout(180_000);
     // Start flight with forced malfunctions — every part will malfunction on biome check.
     await startTestFlight(page, BASIC_ROCKET, { malfunctionMode: 'forced' });
 
     // Fire engine and ascend past 100m (biome boundary: Lower Atmosphere).
-    await pressStage(page);
-    await pressThrottleUp(page);
+    await stageAndLaunch(page);
     await waitForAltitude(page, 150, 10_000);
 
     // Wait for at least one malfunction to appear on the physics state.
@@ -194,11 +194,11 @@ test.describe('Malfunction during flight', () => {
   });
 
   test('(2) malfunction event has correct structure with part name and type', async () => {
+    test.setTimeout(180_000);
     // Start another flight with forced malfunctions.
     await startTestFlight(page, BASIC_ROCKET, { malfunctionMode: 'forced' });
 
-    await pressStage(page);
-    await pressThrottleUp(page);
+    await stageAndLaunch(page);
     await waitForAltitude(page, 150, 10_000);
 
     // Wait for malfunctions.

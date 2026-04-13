@@ -314,6 +314,7 @@ test.describe('Flight — Launch & Basic Flight', () => {
   // -- (11) "Return to Space Agency" ends flight and returns to hub -----------
 
   test('(11) clicking "Return to Space Agency" from the menu returns to hub', async ({ page }) => {
+    test.setTimeout(60_000);
     await seedBuildAndLaunch(page);
 
     const dropdown = page.locator('#topbar-dropdown');

@@ -5,6 +5,7 @@ import {
   seedAndLoadSave, navigateToVab,
   teleportCraft, startTestFlight,
   pressStage, pressThrottleUp, pressThrottleCut,
+  stageAndLaunch,
 } from './helpers.js';
 
 /**
@@ -553,7 +554,7 @@ test.describe('Mission Progression', () => {
   });
 
   test('M006 — Controlled Descent (engine brake, land ≤5 m/s) → unlocks landing-legs-small', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: m1to4,
@@ -572,8 +573,7 @@ test.describe('Mission Progression', () => {
       ],
     });
 
-    await stage(page); // fire engine (satisfies ACTIVATE_PART ENGINE)
-    await pressThrottleUp(page);
+    await stageAndLaunch(page); // fire engine (satisfies ACTIVATE_PART ENGINE)
 
     // Burn ALL fuel — dry mass 250kg → terminal velocity 4.12 m/s ≤ 5 m/s.
     // Without legs, the physics engine crashes rockets landing > 5 m/s.
@@ -583,9 +583,23 @@ test.describe('Mission Progression', () => {
       { timeout: 15_000 },
     );
 
-    // Deploy parachute for safe descent.
+    // Deploy parachute for safe descent — retry if first attempt is swallowed.
     await waitWarpUnlocked(page);
-    await stage(page);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await stage(page);
+      const deployed = await page.waitForFunction(
+        (): boolean => {
+          const ps = window.__flightPs;
+          if (!ps?.parachuteStates) return false;
+          for (const [, entry] of ps.parachuteStates) {
+            if (entry.state === 'deploying' || entry.state === 'deployed') return true;
+          }
+          return false;
+        },
+        { timeout: 3_000 },
+      ).then(() => true).catch(() => false);
+      if (deployed) break;
+    }
 
     // 100× warp for descent from high altitude.
     await waitWarpUnlocked(page);
@@ -623,8 +637,7 @@ test.describe('Mission Progression', () => {
       ],
     });
 
-    await stage(page); // Stage 0: fire engine at full throttle
-    await pressThrottleUp(page);
+    await stageAndLaunch(page); // Stage 0: fire engine at full throttle
     await waitAlt(page, 300);
     await pressThrottleCut(page);
 

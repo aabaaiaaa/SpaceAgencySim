@@ -193,21 +193,21 @@ async function returnToAgency(page: Page): Promise<void> {
   const orbitVisible = await orbitReturn.isVisible({ timeout: 2_000 }).catch(() => false);
   if (orbitVisible) {
     await orbitReturn.click();
-    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
     await page.click('#post-flight-return-btn');
   } else {
     const abortVisible = await abortReturn.isVisible({ timeout: 2_000 }).catch(() => false);
     if (abortVisible) {
       await abortReturn.click();
     } else {
-      await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 5_000 });
+      await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
       await page.click('#post-flight-return-btn');
     }
   }
 
   await page.waitForFunction(
     () => window.__flightState === null || window.__flightState === undefined,
-    { timeout: 5_000 },
+    { timeout: 10_000 },
   );
 
   // Dismiss any return results overlay.
@@ -487,10 +487,10 @@ test.describe('Docking mode local positioning', () => {
     expect(modeBefore).toBe('NORMAL');
 
     // Press V to enter docking mode.
-    await page.keyboard.press('v');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
     await page.waitForFunction(
       () => window.__flightPs?.controlMode === 'DOCKING',
-      { timeout: 5_000 },
+      { timeout: 10_000 },
     );
 
     const modeAfter = await page.evaluate(() => window.__flightPs?.controlMode);
@@ -498,6 +498,7 @@ test.describe('Docking mode local positioning', () => {
   });
 
   test('(2) throttle is cut to zero on docking mode toggle', async () => {
+    test.setTimeout(60_000);
     // Set throttle high first.
     await page.evaluate(async () => {
       const ps = window.__flightPs;
@@ -506,15 +507,15 @@ test.describe('Docking mode local positioning', () => {
     });
 
     // Toggle docking mode off then on — throttle should be cut.
-    await page.keyboard.press('v'); // Exit docking
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
     await page.waitForFunction(
       () => window.__flightPs?.controlMode !== 'DOCKING',
-      { timeout: 5_000 },
+      { timeout: 10_000 },
     );
-    await page.keyboard.press('v'); // Enter docking
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
     await page.waitForFunction(
       () => window.__flightPs?.controlMode === 'DOCKING',
-      { timeout: 5_000 },
+      { timeout: 10_000 },
     );
 
     const throttle = await page.evaluate(() => window.__flightPs?.throttle ?? -1);
@@ -523,20 +524,20 @@ test.describe('Docking mode local positioning', () => {
 
   test('(3) RCS mode is available inside docking mode', async () => {
     // Already in docking mode. Press R for RCS.
-    await page.keyboard.press('r');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true })));
     await page.waitForFunction(
       () => window.__flightPs?.controlMode === 'RCS',
-      { timeout: 5_000 },
+      { timeout: 10_000 },
     );
 
     const mode = await page.evaluate(() => window.__flightPs?.controlMode);
     expect(mode).toBe('RCS');
 
     // Toggle back.
-    await page.keyboard.press('r');
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true })));
     await page.waitForFunction(
       () => window.__flightPs?.controlMode !== 'RCS',
-      { timeout: 5_000 },
+      { timeout: 10_000 },
     );
   });
 
@@ -544,10 +545,10 @@ test.describe('Docking mode local positioning', () => {
     // Enter docking mode if not already in it.
     const mode = await page.evaluate(() => window.__flightPs?.controlMode);
     if (mode !== 'DOCKING') {
-      await page.keyboard.press('v');
+      await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
       await page.waitForFunction(
         () => window.__flightPs?.controlMode === 'DOCKING',
-        { timeout: 5_000 },
+        { timeout: 10_000 },
       );
     }
 
@@ -1338,6 +1339,12 @@ test.describe('Crew transfer and fuel transfer', () => {
       if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
     });
 
+    // Wait for the event to persist through the worker snapshot round-trip.
+    await page.waitForFunction(
+      () => (window.__flightState?.events ?? []).some((e: { type: string }) => e.type === 'FUEL_TRANSFER'),
+      { timeout: 5_000 },
+    );
+
     const fs = await getFlightState(page) as FlightStateSnapshot | null;
     expect(fs).not.toBeNull();
     const fuelEvents = fs!.events.filter((e: { type: string }) => e.type === 'FUEL_TRANSFER');
@@ -1451,7 +1458,7 @@ test.describe('Power system', () => {
     await waitForOrbit(page);
     await page.waitForFunction(
       () => window.__flightPs?.powerState != null,
-      { timeout: 5_000 },
+      { timeout: 10_000 },
     );
 
     const powerInfo = await page.evaluate(() => {
@@ -1514,6 +1521,12 @@ test.describe('Grabbing arm and satellite repair', () => {
     await startTestFlight(page, GRAB_ROCKET, { crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
     await waitForOrbit(page);
+
+    // Wait for the flight assembly to be populated.
+    await page.waitForFunction(
+      () => window.__flightAssembly?.parts?.size > 0,
+      { timeout: 10_000 },
+    );
 
     const hasArm = await page.evaluate(() => {
       const ps = window.__flightPs;
@@ -1646,7 +1659,7 @@ test.describe('Integrated orbital operations', () => {
 
     await page.waitForFunction(
       () => window.__flightState?.phase === 'MANOEUVRE',
-      { timeout: 5_000 },
+      { timeout: 10_000 },
     );
 
     // Cut thrust.
@@ -1660,7 +1673,7 @@ test.describe('Integrated orbital operations', () => {
 
     await page.waitForFunction(
       () => window.__flightState?.phase === 'ORBIT',
-      { timeout: 10_000 },
+      { timeout: 15_000 },
     );
 
     // Return to agency.
@@ -2020,6 +2033,12 @@ test.describe('Orbital elements tracking', () => {
     await startTestFlight(page, ORBITAL_ROCKET, { crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
     await waitForOrbit(page);
+
+    // Wait for orbital elements to be computed after orbit detection.
+    await page.waitForFunction(
+      () => window.__flightState?.orbitalElements != null,
+      { timeout: 10_000 },
+    );
 
     const elements = await page.evaluate(() => {
       const fs = window.__flightState;

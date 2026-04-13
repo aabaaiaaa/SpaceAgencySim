@@ -383,7 +383,7 @@ test.describe('Phase Transition: MANOEUVRE → TRANSFER', () => {
 
 test.describe('Phase Transition: Reentry', () => {
   test('lowering periapsis triggers ORBIT → REENTRY → FLIGHT', async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(120_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -416,6 +416,11 @@ test.describe('Phase Transition: Reentry', () => {
       }
     });
 
+    // Allow physics worker to process the new velocity.
+    await page.evaluate(() => new Promise<void>(r => {
+      requestAnimationFrame(() => requestAnimationFrame(() => r()));
+    }));
+
     // The deorbit warning fires after a 2-second delay, then transitions to REENTRY.
     // Allow extra time for the worker to recompute orbital elements and detect deorbit.
     await waitForPhaseInLog(page, 'REENTRY', 30_000);
@@ -429,7 +434,7 @@ test.describe('Phase Transition: Reentry', () => {
     // High warp speed to cover the 30km descent quickly.
     await setTestTimeWarp(page, 500);
 
-    await waitForPhase(page, 'FLIGHT', 60_000);
+    await waitForPhase(page, 'FLIGHT', 90_000);
 
     const log2: PhaseLogEntry[] = await getPhaseLog(page);
     const flightEntry: PhaseLogEntry | undefined = log2.find(

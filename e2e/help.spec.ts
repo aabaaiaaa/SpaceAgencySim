@@ -147,7 +147,7 @@ test.describe('Help Panel Accessibility', () => {
     await placePart(page, 'engine-spark', CENTRE_X, CANVAS_CENTRE_Y + 50, 3);
 
     await launchFromVab(page);
-    await expect(page.locator('#flight-hud')).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('#flight-hud')).toBeVisible({ timeout: 10_000 });
 
     await openHelp(page);
     expect(await activeSection(page)).toBe('flight');

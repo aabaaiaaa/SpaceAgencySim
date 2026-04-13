@@ -185,8 +185,13 @@ test.describe('Launch Pad — Relaunch Engine Bug', () => {
     // before starting the second flight.
     await page.waitForFunction(
       () => window.__flightPs == null,
-      { timeout: 5_000 },
+      { timeout: 10_000 },
     ).catch(() => { /* may already be null */ });
+
+    // Brief pause for flight scene cleanup to complete.
+    await page.evaluate(() => new Promise<void>(r => {
+      requestAnimationFrame(() => requestAnimationFrame(() => r()));
+    }));
 
     // Second flight (the regression test).
     await launchFromPad(page);

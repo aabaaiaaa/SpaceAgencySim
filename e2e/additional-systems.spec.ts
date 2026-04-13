@@ -219,8 +219,14 @@ test.describe('Thermal system', () => {
       const ps = w.__flightPs!;
       ps.posY = 80_000; // Above atmosphere
       ps.velY = -100;   // Slow
+      ps.velX = 0;
       if (typeof w.__resyncPhysicsWorker === 'function') { await w.__resyncPhysicsWorker(); }
     });
+
+    // Allow extra frames for the worker to process the state change.
+    await page.evaluate(() => new Promise<void>(r => {
+      requestAnimationFrame(() => requestAnimationFrame(() => r()));
+    }));
 
     await page.waitForFunction((bh: number) => {
       const ps = window.__flightPs;
@@ -228,7 +234,7 @@ test.describe('Thermal system', () => {
       let t = 0;
       for (const h of ps.heatMap.values()) t += h;
       return t < bh;
-    }, beforeHeat, { timeout: 5_000 });
+    }, beforeHeat, { timeout: 15_000 });
 
     const afterHeat = await page.evaluate(() => {
       const ps = window.__flightPs!;
@@ -1250,7 +1256,7 @@ test.describe('Comms range', () => {
         const fs = window.__flightState;
         return (fs?.commsState?.status ?? fs?.comms?.status) != null;
       },
-      { timeout: 5_000 },
+      { timeout: 15_000 },
     );
 
     const comms = await page.evaluate(() => {

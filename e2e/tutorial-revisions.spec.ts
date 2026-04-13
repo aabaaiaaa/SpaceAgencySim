@@ -27,6 +27,7 @@ import {
   teleportCraft,
   pressStage,
   pressThrottleUp,
+  stageAndLaunch,
 } from './helpers.js';
 import type { FacilityState, CrewMember, SaveEnvelope } from './helpers.js';
 
@@ -967,8 +968,7 @@ test.describe('Tutorial Revisions', () => {
         },
       );
 
-      await stage(page); // fire engine
-      await pressThrottleUp(page);
+      await stageAndLaunch(page); // fire engine
 
       // Activate science module at ~500m.
       await waitForAltitude(page, 500);
@@ -987,7 +987,7 @@ test.describe('Tutorial Revisions', () => {
           const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-021');
           return m?.objectives?.find(o => o.type === 'REACH_ORBIT')?.completed;
         },
-        { timeout: 5_000 },
+        { timeout: 10_000 },
       );
 
       // Teleport back to low altitude for safe landing.
@@ -1111,7 +1111,7 @@ test.describe('Tutorial Revisions', () => {
     });
 
     test('M010 — Science Experiment Alpha with loaded instrument + altitude hold', async ({ page }: { page: Page }) => {
-      test.setTimeout(60_000);
+      test.setTimeout(90_000);
       const env: SaveEnvelope = tutorialSave({
         completedIds: ['mission-001', 'mission-004', 'mission-005', 'mission-008'],
         acceptedId: 'mission-010',

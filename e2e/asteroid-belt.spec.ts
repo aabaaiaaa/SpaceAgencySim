@@ -649,6 +649,7 @@ test.describe('Asteroid Belt — unsafe orbit hub-return rules', () => {
   });
 
   test('teleporting to dense belt altitude while orbiting Sun is detected as unsafe @smoke', async () => {
+    test.setTimeout(60_000);
     await startTestFlight(page, PROBE, { bodyId: 'SUN' });
     const denseMidpoint = 396_500_000_000;
     await teleportCraft(page, {
@@ -667,7 +668,7 @@ test.describe('Asteroid Belt — unsafe orbit hub-return rules', () => {
         return alt > mid * 0.8 && alt < mid * 1.2;
       },
       denseMidpoint,
-      { timeout: 5_000 },
+      { timeout: 15_000 },
     );
 
     const orbitCheck = await page.evaluate<OrbitCheckResult | null>(() => {

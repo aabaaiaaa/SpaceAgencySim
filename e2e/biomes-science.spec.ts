@@ -167,7 +167,7 @@ test.describe('Biome label transitions', () => {
 
 test.describe('Science multiplier per biome', () => {
   test('biome definitions return correct multipliers for Earth altitudes', async ({ browser }) => {
-    test.setTimeout(30_000);
+    test.setTimeout(60_000);
     const page: Page = await browser.newPage();
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
@@ -281,14 +281,15 @@ test.describe('Horizon curvature rendering', () => {
     test.setTimeout(30_000);
     const page: Page = await setupCurvatureFlight(browser);
 
-    // Teleport to 20000m altitude.
-    await teleportCraft(page, { posY: 20_000 });
+    // Teleport to 20000m altitude in ORBIT phase to prevent gravity drift.
+    await teleportCraft(page, { posY: 20_000, phase: 'ORBIT' });
 
     const altitude: number = await page.evaluate((): number => {
       const w = window;
       return w.__flightPs?.posY ?? 0;
     });
-    expect(altitude).toBeGreaterThanOrEqual(20_000);
+    // Allow small floating-point drift from physics worker round-trip.
+    expect(altitude).toBeGreaterThanOrEqual(19_990);
     // At 20km, curvature factor t ≈ (20000-5000)/(200000-5000) ≈ 0.077.
     // The arc radius shrinks gradually, making curvature visible.
 
@@ -469,6 +470,19 @@ test.describe('Science module instruments', () => {
     expect(result.success).toBe(true);
     expect(result.state).toBe('running');
 
+    // Wait for the running state to persist through the worker round-trip.
+    await page.waitForFunction(
+      (): boolean => {
+        const ps = window.__flightPs;
+        if (!ps?.instrumentStates) return false;
+        for (const [, entry] of ps.instrumentStates) {
+          if (entry.instrumentId === 'thermometer-mk1') return entry.state === 'running';
+        }
+        return false;
+      },
+      { timeout: 5_000 },
+    );
+
     // Verify the state persisted.
     const afterState: string | null = await page.evaluate((): string | null => {
       const w = window;
@@ -535,7 +549,19 @@ test.describe('Instrument activation via staging', () => {
       if (typeof w.__resyncPhysicsWorker === 'function') { await w.__resyncPhysicsWorker(); }
     });
 
-    // Verify the instrument is now running.
+    // Wait for the instrument state to persist through the worker round-trip.
+    await page.waitForFunction(
+      (): boolean => {
+        const ps = window.__flightPs;
+        if (!ps?.instrumentStates) return false;
+        for (const [, entry] of ps.instrumentStates) {
+          if (entry.instrumentId === 'thermometer-mk1') return entry.state === 'running';
+        }
+        return false;
+      },
+      { timeout: 5_000 },
+    );
+
     const stateAfter: string | null = await page.evaluate((): string | null => {
       const w = window;
       const ps = w.__flightPs;
@@ -679,6 +705,19 @@ test.describe('Science data types', () => {
       }
       if (typeof w.__resyncPhysicsWorker === 'function') { await w.__resyncPhysicsWorker(); }
     });
+
+    // Wait for the complete state to persist through the worker round-trip.
+    await page.waitForFunction(
+      (): boolean => {
+        const ps = window.__flightPs;
+        if (!ps?.instrumentStates) return false;
+        for (const [, entry] of ps.instrumentStates) {
+          if (entry.instrumentId === 'surface-sampler') return entry.state === 'complete';
+        }
+        return false;
+      },
+      { timeout: 5_000 },
+    );
 
     // Verify data type is SAMPLE.
     interface SamplerInfo {

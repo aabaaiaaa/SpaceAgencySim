@@ -183,3 +183,42 @@ export async function pressThrottleUp(page: Page): Promise<void> {
 export async function pressThrottleCut(page: Page): Promise<void> {
   await dispatchKey(page, 'KeyX', 'x');
 }
+
+/**
+ * Reliably stage the rocket and set throttle to max.
+ *
+ * The flight keyboard handler may not be registered immediately after the
+ * flight scene loads, so `pressStage()` can be swallowed silently.  This
+ * helper retries staging up to 5 times, verifying the engine actually fires
+ * between attempts.  It then sets throttle to max.
+ */
+export async function stageAndLaunch(page: Page): Promise<void> {
+  // Wait for the staging system to be ready.
+  await page.waitForFunction(
+    () => (window.__flightPs?.activeParts?.size ?? 0) > 0,
+    { timeout: 5_000 },
+  );
+
+  // The flight keyboard handler is registered synchronously a few frames
+  // after the HUD mounts. startTestFlight returns as soon as the HUD is
+  // visible, so we must let the init sequence finish before dispatching
+  // keyboard events.  Five animation frames is enough to cover the gap.
+  await page.evaluate(() => new Promise<void>(resolve => {
+    let n = 0;
+    const tick = () => { if (++n >= 5) resolve(); else requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+  }));
+
+  // Set throttle first so the engine fires immediately when staged.
+  await pressThrottleUp(page);
+
+  // Retry keyboard staging.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    await pressStage(page);
+    const fired = await page.waitForFunction(
+      (): boolean => (window.__flightPs?.firingEngines?.size ?? 0) > 0,
+      { timeout: 2_000 },
+    ).then(() => true).catch(() => false);
+    if (fired) return;
+  }
+}

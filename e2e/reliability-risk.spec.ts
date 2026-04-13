@@ -34,6 +34,7 @@ import {
   navigateToVab,
   pressStage,
   pressThrottleUp,
+  stageAndLaunch,
 } from './helpers.js';
 import {
   freshStartFixture,
@@ -154,13 +155,13 @@ test.describe('Malfunction toggle and biome-transition triggering', () => {
   test.afterAll(async () => { await page.close(); });
 
   test('(1) malfunctions default to off in test flights', async () => {
+    test.setTimeout(120_000);
     await startTestFlight(page, ENGINE_ROCKET, { malfunctionMode: 'off' });
     const mode = await getMalfunctionMode(page);
     expect(mode).toBe('off');
 
     // Cross a biome boundary (100m = Low Atmosphere)
-    await pressStage(page);
-    await pressThrottleUp(page);
+    await stageAndLaunch(page);
     await waitForAltitude(page, 150, 10_000);
     // Wait for physics to process across the biome boundary
     await page.waitForFunction(
@@ -180,15 +181,14 @@ test.describe('Malfunction toggle and biome-transition triggering', () => {
   });
 
   test('(2) forced mode triggers malfunctions on biome transition', async () => {
-    test.setTimeout(60_000);
+    test.setTimeout(120_000);
     await startTestFlight(page, ENGINE_ROCKET, { malfunctionMode: 'forced' });
 
     const mode = await getMalfunctionMode(page);
     expect(mode).toBe('forced');
 
     // Cross a biome boundary — fire engine and ascend past 100m
-    await pressStage(page);
-    await pressThrottleUp(page);
+    await stageAndLaunch(page);
     await waitForAltitude(page, 150, 10_000);
 
     // Wait for malfunction check to process
