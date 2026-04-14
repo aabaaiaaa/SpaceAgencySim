@@ -15,7 +15,7 @@
  * @module core/period
  */
 
-import { AstronautStatus, CREW_SALARY_PER_PERIOD, FACILITY_UPKEEP_PER_PERIOD, FacilityId } from './constants.ts';
+import { AstronautStatus, CREW_SALARY_PER_PERIOD, FACILITY_UPKEEP_PER_PERIOD, EARTH_HUB_ID, FacilityId } from './constants.ts';
 import { expireBoardContracts, expireActiveContracts } from './contracts.ts';
 import { isBankrupt } from './finance.ts';
 import { processSatelliteNetwork } from './satellites.ts';
@@ -27,7 +27,7 @@ import { getFinancialMultipliers } from './settings.ts';
 import { processMiningSites, processSurfaceLaunchPads } from './mining.ts';
 import { processRefineries } from './refinery.ts';
 import { processRoutes } from './routes.ts';
-import { processHubMaintenance, processConstructionProjects } from './hubs.ts';
+import { getHub, processHubMaintenance, processConstructionProjects } from './hubs.ts';
 import { processCrewTransits } from './hubCrew.ts';
 import { processTouristRevenue } from './hubTourists.ts';
 
@@ -122,9 +122,10 @@ export function advancePeriod(state: GameState): PeriodSummary {
   ) * costMult);
 
   // ── 3. Facility upkeep — base cost per built facility ─────────────────
-  const builtCount = state.facilities
-    ? Object.values(state.facilities).filter((f) => f.built).length
-    : 1; // fallback for legacy saves
+  const earthHub = getHub(state, EARTH_HUB_ID);
+  const builtCount = earthHub
+    ? Object.values(earthHub.facilities).filter((f) => f.built).length
+    : 1;
   const facilityUpkeep = Math.round(FACILITY_UPKEEP_PER_PERIOD * builtCount * costMult);
 
   // ── 4. Deduct operating costs (mandatory — can go negative) ───────────

@@ -14,11 +14,12 @@
  */
 
 import {
-  FacilityId, CONTRACT_TIER_CAPS, CONTRACTS_PER_FLIGHT_MIN, CONTRACTS_PER_FLIGHT_MAX,
+  FacilityId, EARTH_HUB_ID, CONTRACT_TIER_CAPS, CONTRACTS_PER_FLIGHT_MIN, CONTRACTS_PER_FLIGHT_MAX,
   CONTRACT_BOARD_EXPIRY_FLIGHTS, CONTRACT_CANCEL_PENALTY_RATE, CONTRACT_REP_GAIN_MIN,
   CONTRACT_REP_GAIN_MAX, CONTRACT_REP_LOSS_CANCEL, CONTRACT_REP_LOSS_FAIL, CONTRACT_BONUS_REWARD_RATE,
 } from './constants.ts';
 import type { ContractCategory } from './constants.ts';
+import { getHub } from './hubs.ts';
 import { earnReward } from './finance.ts';
 import { CONTRACT_TEMPLATES, generateChainContinuation, getProgressionTier } from '../data/contracts.ts';
 import type { GameState, FlightState, Contract, ObjectiveDef } from './gameState.ts';
@@ -83,7 +84,8 @@ function _generateId(): string {
 }
 
 export function getMissionControlTier(state: GameState): number {
-  const mc = state.facilities?.[FacilityId.MISSION_CONTROL];
+  const hub = getHub(state, EARTH_HUB_ID);
+  const mc = hub?.facilities[FacilityId.MISSION_CONTROL];
   if (!mc || !mc.built) return 1;
   return mc.tier || 1;
 }

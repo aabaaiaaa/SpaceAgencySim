@@ -3,7 +3,7 @@
  *
  * Manages building new facilities on the hub and upgrading existing ones.
  * Each facility is defined in `FACILITY_DEFINITIONS` (constants.js) and
- * tracked in `state.facilities`.
+ * tracked in the hub's facilities record.
  *
  * Tutorial mode:  Building is locked — facilities are awarded via tutorial
  *                 missions.  Only upgrades are available once a building
@@ -231,7 +231,7 @@ export function canUpgradeFacility(state: GameState, facilityId: string, hubId?:
  * for the R&D Lab).
  *
  * Returns `{ success, reason }`.  On success the facility is added to
- * `state.facilities` at tier 1.
+ * the hub's facilities record at tier 1.
  */
 export function buildFacility(state: GameState, facilityId: string, hubId?: string): CommandResult {
   const check = canBuildFacility(state, facilityId, hubId);

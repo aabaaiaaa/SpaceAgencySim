@@ -227,7 +227,7 @@ export function initHubUI(container: HTMLElement, state: GameState, onNavigate: 
   setHubBodyVisuals(activeHub.bodyId, activeHub.type);
 
   // Tell the PixiJS renderer which facilities are built so it only draws those.
-  // Use the active hub's facilities (not the legacy state.facilities).
+  // Use the active hub's facilities.
   if (state.gameMode === GameMode.SANDBOX) {
     setBuiltFacilities(null); // show all in sandbox
   } else {

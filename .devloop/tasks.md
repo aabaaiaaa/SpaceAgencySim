@@ -49,31 +49,31 @@
 - **Verification**: `npx tsc --noEmit src/core/gameState.ts`
 
 ### TASK-008: Update core module references — construction.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: In `src/core/construction.ts`, find any remaining direct references to `state.facilities`. The module already has `resolveHubFacilities()` which defaults to the active hub. Ensure all public functions (`hasFacility`, `getFacilityTier`, `buildFacility`, `upgradeFacility`, etc.) use `resolveHubFacilities()` and not `state.facilities`. Remove the legacy fallback path in `resolveHubFacilities()` if it exists (e.g. `return state.facilities` as a fallback). The function should now purely resolve through `getActiveHub(state)` or `getHub(state, hubId)`.
 - **Verification**: `npx tsc --noEmit src/core/construction.ts && npx vitest run src/tests/construction.test.ts 2>/dev/null`
 
 ### TASK-009: Update core module references — missions, finance, crew
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Grep `src/core/` for `state\.facilities` (excluding `gameState.ts` and `construction.ts` which are handled separately). For each match: replace with the appropriate hub-aware alternative. Use `hasFacility(state, id)` / `getFacilityTier(state, id)` from construction.ts for facility checks. Use `getActiveHub(state).facilities` for reading the raw facilities record. Use `getHub(state, EARTH_HUB_ID).facilities` for Earth-specific checks. Key files likely include: `missions.js`, `finance.js`, `crew.js`, `satellites.js`, `comms.js`, `power.js`, `saveload.ts`. Fix each file to compile cleanly.
 - **Verification**: `npx tsc --noEmit && npx vitest run src/tests/missions.test.ts src/tests/finance.test.ts src/tests/crew.test.ts 2>/dev/null`
 
 ### TASK-010: Update UI module references — hub, vab, flight
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Grep `src/ui/` for `state\.facilities`. For each match: replace with the hub-aware alternative. UI modules should typically use `getActiveHub(state).facilities` since they render the current hub's state. Key files: `src/ui/hub.ts`, `src/ui/vab/` (parts panel, engineer panel, launch flow), `src/ui/flightController/` (map view, flight controls). Import `getActiveHub` from `src/core/hubs.ts` where needed. Earth-specific UI (mission control gating) should use `getHub(state, EARTH_HUB_ID)`.
 - **Verification**: `npx tsc --noEmit src/ui/hub.ts src/ui/vab/index.ts src/ui/flightController/index.ts 2>/dev/null`
 
 ### TASK-011: Update UI module references — missionControl, crewAdmin, logistics, topbar
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Continue the `state.facilities` grep for remaining UI modules: `src/ui/missionControl/`, `src/ui/crewAdmin.ts`, `src/ui/logistics/`, `src/ui/topbar.ts`, and any other UI files. Replace all references with hub-aware alternatives. Mission control and crew admin are Earth-specific screens — use `getHub(state, EARTH_HUB_ID).facilities` for their facility checks.
 - **Verification**: `npx tsc --noEmit src/ui/missionControl/index.ts src/ui/crewAdmin.ts src/ui/logistics/index.ts src/ui/topbar.ts 2>/dev/null`
 
 ### TASK-012: Update render module references
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Grep `src/render/` for `state\.facilities`. For each match: replace with the hub-aware alternative. Render modules should use `getActiveHub(state).facilities`. Key files: `src/render/hub.ts` (building placement), `src/render/map.ts` (tracking station tier checks). Import `getActiveHub` from `src/core/hubs.ts` where needed.
 - **Verification**: `npx tsc --noEmit src/render/hub.ts src/render/map.ts 2>/dev/null`

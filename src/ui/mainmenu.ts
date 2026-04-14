@@ -654,7 +654,7 @@ function _startNewGame(agencyName: string, selectedMode: string, sandboxOptions:
 
     // All facilities built at tier 1.
     for (const def of FACILITY_DEFINITIONS) {
-      state.facilities[def.id] = { built: true, tier: 1 };
+      state.hubs[0].facilities[def.id] = { built: true, tier: 1 };
     }
 
     // All parts unlocked.
