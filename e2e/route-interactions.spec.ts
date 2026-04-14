@@ -13,6 +13,7 @@ import {
   buildSaveEnvelope,
   seedAndLoadSave,
   ALL_FACILITIES,
+  dismissWelcomeModal,
 } from './helpers.js';
 
 // ---------------------------------------------------------------------------
@@ -230,6 +231,166 @@ test.describe('Route Interactions', () => {
     // Verify minimum: - button should be disabled at count 1
     await expect(minusBtn).toBeDisabled({ timeout: 5_000 });
     await expect(craftCount).toHaveText('1', { timeout: 5_000 });
+  });
+
+  test('multi-leg route builder creates a 2-leg route chain', async ({ page }) => {
+    const envelope = buildLogisticsSave();
+    await seedAndLoadSave(page, envelope);
+
+    // Inject mining sites on Earth and Moon plus two proven legs forming a chain:
+    // Earth -> Moon (index 0) and Moon -> Mars (index 1)
+    await page.evaluate(() => {
+      const gs = window.__gameState;
+
+      // Ensure arrays exist (save envelope may not include them)
+      if (!gs.miningSites) gs.miningSites = [];
+      if (!gs.provenLegs) gs.provenLegs = [];
+      if (!gs.routes) gs.routes = [];
+
+      // Mining site on Moon with orbital buffer so resource dropdown populates
+      gs.miningSites.push({
+        id: 'site-multileg-1',
+        name: 'Lunar Mine Multi',
+        bodyId: 'MOON',
+        coordinates: { x: 0, y: 0 },
+        controlUnit: { partId: 'base-control-unit-mk1' },
+        modules: [],
+        storage: {},
+        powerGenerated: 100,
+        powerRequired: 10,
+        orbitalBuffer: { WATER_ICE: 5000 },
+      });
+
+      // Mining site on Mars so Mars appears on the SVG map
+      gs.miningSites.push({
+        id: 'site-multileg-2',
+        name: 'Martian Mine Alpha',
+        bodyId: 'MARS',
+        coordinates: { x: 0, y: 0 },
+        controlUnit: { partId: 'base-control-unit-mk1' },
+        modules: [],
+        storage: {},
+        powerGenerated: 100,
+        powerRequired: 10,
+        orbitalBuffer: {},
+      });
+
+      // Proven leg 0: Earth -> Moon
+      gs.provenLegs.push({
+        id: 'proven-leg-multileg-1',
+        origin: { bodyId: 'EARTH', locationType: 'orbit', altitude: 200, hubId: null },
+        destination: { bodyId: 'MOON', locationType: 'orbit', altitude: 50, hubId: null },
+        craftDesignId: 'cargo-shuttle',
+        cargoCapacityKg: 2000,
+        costPerRun: 50000,
+        provenFlightId: 'flight-multileg-1',
+        dateProven: 1,
+      });
+
+      // Proven leg 1: Moon -> Mars
+      gs.provenLegs.push({
+        id: 'proven-leg-multileg-2',
+        origin: { bodyId: 'MOON', locationType: 'orbit', altitude: 50, hubId: null },
+        destination: { bodyId: 'MARS', locationType: 'orbit', altitude: 200, hubId: null },
+        craftDesignId: 'cargo-freighter',
+        cargoCapacityKg: 5000,
+        costPerRun: 120000,
+        provenFlightId: 'flight-multileg-2',
+        dateProven: 2,
+      });
+    });
+
+    await dismissWelcomeModal(page);
+    await openRoutesTab(page);
+
+    // Click "Create Route" button to enter builder mode
+    const createBtn = page.locator('.logistics-builder-create-btn');
+    await expect(createBtn).toBeVisible({ timeout: 5_000 });
+    await createBtn.click();
+
+    // Builder panel should appear
+    const builderPanel = page.locator('.logistics-builder-panel');
+    await expect(builderPanel).toBeVisible({ timeout: 5_000 });
+
+    // Select a resource type from the dropdown
+    const resourceSelect = builderPanel.locator('.logistics-builder-select');
+    await resourceSelect.selectOption({ index: 1 }); // First available resource
+
+    // Enter a route name
+    const nameInput = builderPanel.locator('.logistics-builder-input');
+    await nameInput.fill('Multi-Leg Test Route');
+
+    // Step 1: Click Earth on the SVG map to set origin.
+    // Use dispatchEvent for SVG elements since Playwright's normal click can
+    // struggle with SVG coordinate mapping in headless mode.
+    const earthCircle = page.locator('.logistics-route-map .body-earth');
+    await expect(earthCircle).toBeVisible({ timeout: 5_000 });
+    await earthCircle.dispatchEvent('click');
+
+    // Wait for re-render — proven leg lines should appear
+    await page.waitForFunction(() => {
+      const legs = document.querySelectorAll('.logistics-route-map .proven-leg-line');
+      return legs.length > 0;
+    }, { timeout: 5_000 });
+
+    // Step 2: Click the Earth->Moon proven leg (index 0, outbound from Earth)
+    const leg0 = page.locator('#route-leg-proven-0');
+    await expect(leg0).toBeVisible({ timeout: 5_000 });
+    await leg0.dispatchEvent('click');
+
+    // Wait for the first leg to appear in the builder chain
+    await page.waitForFunction(() => {
+      const items = document.querySelectorAll('.logistics-builder-leg-item');
+      return items.length >= 1;
+    }, { timeout: 5_000 });
+
+    // Step 3: Click the Moon->Mars proven leg (index 1, now outbound from Moon)
+    const leg1 = page.locator('#route-leg-proven-1');
+    await expect(leg1).toBeVisible({ timeout: 5_000 });
+    await leg1.dispatchEvent('click');
+
+    // Wait for the second leg to appear in the builder chain
+    await page.waitForFunction(() => {
+      const items = document.querySelectorAll('.logistics-builder-leg-item');
+      return items.length >= 2;
+    }, { timeout: 5_000 });
+
+    // Step 4: Click "Create Route" confirm button
+    const confirmBtn = builderPanel.locator('.logistics-builder-confirm-btn');
+    await expect(confirmBtn).toBeVisible({ timeout: 5_000 });
+    await confirmBtn.click();
+
+    // Builder should close
+    await expect(builderPanel).not.toBeVisible({ timeout: 5_000 });
+
+    // Verify the new route appears in the routes table
+    const routeTable = page.locator('.logistics-routes-table');
+    await expect(routeTable).toBeVisible({ timeout: 5_000 });
+
+    // The route name we entered should appear
+    await expect(routeTable).toContainText('Multi-Leg Test Route', { timeout: 5_000 });
+
+    // The route should show "2 legs" in the expand button
+    const routeRow = routeTable.locator('tbody tr').first();
+    const expandBtn = routeRow.locator('.logistics-expand-btn');
+    await expect(expandBtn).toContainText('2 legs', { timeout: 5_000 });
+
+    // Expand the route to verify leg details
+    await expandBtn.click();
+
+    // Two leg rows should appear
+    const legRows = page.locator('.logistics-leg-row');
+    await expect(legRows).toHaveCount(2, { timeout: 5_000 });
+
+    // First leg: EARTH -> MOON
+    const firstLeg = legRows.nth(0);
+    await expect(firstLeg).toContainText('EARTH', { timeout: 5_000 });
+    await expect(firstLeg).toContainText('MOON', { timeout: 5_000 });
+
+    // Second leg: MOON -> MARS
+    const secondLeg = legRows.nth(1);
+    await expect(secondLeg).toContainText('MOON', { timeout: 5_000 });
+    await expect(secondLeg).toContainText('MARS', { timeout: 5_000 });
   });
 
   test('route builder creates a new route from proven leg', async ({ page }) => {

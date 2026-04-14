@@ -333,25 +333,25 @@
 - **Verification**: `npx vitest run src/tests/routes.test.ts`
 
 ### TASK-051: Unit test — Mk2 storage integration
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-025
 - **Description**: This is a follow-up to TASK-025 if additional tests are needed. Verify: (1) A mining site with only Mk2 storage modules works correctly end-to-end (extraction + storage + launch pad). (2) Mixed Mk1 + Mk2 site: extraction fills Mk1 first (or proportionally — verify actual behaviour). (3) Refinery with Mk2 input/output storage — correct throughput. (4) `recomputeSiteStorage()` aggregates correctly across Mk1 and Mk2 modules.
 - **Verification**: `npx vitest run src/tests/mining.test.ts`
 
 ### TASK-052: Unit test — dynamic schematic layout
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-028
 - **Description**: In a new `src/tests/logistics-layout.test.ts`, test `computeSchematicLayout()`: (1) Minimal state (just Earth) — Sun and Earth present, correct positions. (2) State with Moon mining site — Moon appears as child of Earth. (3) State with Mars hub — Mars appears, hub node positioned relative to Mars. (4) Multiple moons (e.g. Moon + Titan) — each positioned relative to their parent. (5) Multiple hubs on one body — fanned out correctly. (6) Body with no activity not shown (except Earth). (7) ViewBox width computed correctly for varying numbers of bodies.
 - **Verification**: `npx vitest run src/tests/logistics-layout.test.ts`
 
 ### TASK-053: Unit test — incompatible save rejection
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-005
 - **Description**: In `src/tests/saveload.test.ts`, add tests: (1) Save with current `SAVE_VERSION` loads successfully. (2) Save with `SAVE_VERSION - 1` is rejected with an incompatible error. (3) Save with `SAVE_VERSION + 1` (future version) is also rejected. (4) Save with no version field is rejected. (5) Verify the error result contains a clear message.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts`
 
 ### TASK-054: Unit test — body color CSS helper
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-004
 - **Description**: In `src/tests/logistics.test.ts` (or a new file), test the body color helper function. Since unit tests run in Node.js (no DOM), the helper should fall back to the default color. Test: (1) Calling with 'earth' returns the fallback (no DOM in test env). (2) Verify the function signature accepts any bodyId string. If the helper can be tested with a mock DOM (jsdom), test that it reads CSS custom properties correctly. Otherwise, document that the fallback path is the one tested.
 - **Verification**: `npx vitest run src/tests/logistics.test.ts 2>/dev/null`
@@ -359,7 +359,7 @@
 ### E2E Test Gaps
 
 ### TASK-055: E2E — multi-leg route builder flow
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-038
 - **Description**: In `e2e/route-interactions.spec.ts` (or new file), add a test: (1) Seed a save with 2+ proven legs forming a chain, e.g. Earth→Moon and Moon→Mars. (2) Open the Logistics Center, navigate to the Routes tab. (3) Click "Create Route" to enter builder mode. (4) Select a resource type. (5) Click the Earth hub on the SVG map as origin. (6) Click the proven leg to Moon. (7) Click the proven leg to Mars. (8) Click "Confirm". (9) Verify a new route appears in the route table with 2 legs. (10) Verify the route shows the correct origin (Earth) and destination (Mars) hub names.
 - **Verification**: `npx playwright test e2e/route-interactions.spec.ts --reporter=line`

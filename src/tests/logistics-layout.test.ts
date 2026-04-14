@@ -393,6 +393,69 @@ describe('computeSchematicLayout', () => {
     expect(layout.has('hub-surface-hub-fake')).toBe(false);
   });
 
+  it('multiple moons on different parents each positioned relative to their own parent', () => {
+    const state = createGameState();
+    // Moon is a child of Earth; Titan is a child of Saturn
+    createMiningSite(state, makeMiningSite('MOON'));
+    createMiningSite(state, makeMiningSite('TITAN'));
+
+    const layout = computeSchematicLayout(state);
+
+    // All four bodies should be present
+    expect(layout.has('MOON')).toBe(true);
+    expect(layout.has('TITAN')).toBe(true);
+    expect(layout.has('EARTH')).toBe(true);
+    expect(layout.has('SATURN')).toBe(true);
+
+    const earth = layout.get('EARTH')!;
+    const saturn = layout.get('SATURN')!;
+    const moon = layout.get('MOON')!;
+    const titan = layout.get('TITAN')!;
+
+    // Moon's parent is Earth, Titan's parent is Saturn
+    expect(moon.parentId).toBe('EARTH');
+    expect(titan.parentId).toBe('SATURN');
+
+    // Each moon is centered on its parent's x (single moon per parent)
+    expect(moon.x).toBe(earth.x);
+    expect(titan.x).toBe(saturn.x);
+
+    // Both moons above their respective parents (lower y)
+    expect(moon.y).toBeLessThan(earth.y);
+    expect(titan.y).toBeLessThan(saturn.y);
+
+    // Moon y and Titan y should be the same (both at CENTER_Y - MOON_Y_OFFSET)
+    expect(moon.y).toBe(titan.y);
+  });
+
+  it('viewBox width grows with more visible bodies', () => {
+    // Baseline: just Sun + Earth
+    const stateMinimal = createGameState();
+    const layoutMinimal = computeSchematicLayout(stateMinimal);
+    const widthMinimal = getSchematicWidth(layoutMinimal);
+
+    // Add Mars via mining site -> Sun, Earth, Mars = 3 bodies
+    const stateMars = createGameState();
+    createMiningSite(stateMars, makeMiningSite('MARS'));
+    const layoutMars = computeSchematicLayout(stateMars);
+    const widthMars = getSchematicWidth(layoutMars);
+
+    // Add Jupiter too -> Sun, Earth, Mars, Jupiter = 4 bodies
+    const stateMore = createGameState();
+    createMiningSite(stateMore, makeMiningSite('MARS'));
+    createMiningSite(stateMore, makeMiningSite('JUPITER'));
+    const layoutMore = computeSchematicLayout(stateMore);
+    const widthMore = getSchematicWidth(layoutMore);
+
+    // Width should increase with each additional planet
+    expect(widthMars).toBeGreaterThan(widthMinimal);
+    expect(widthMore).toBeGreaterThan(widthMars);
+
+    // Each additional planet adds PLANET_SPACING (120) to rightmost x
+    expect(widthMars - widthMinimal).toBe(120);
+    expect(widthMore - widthMars).toBe(120);
+  });
+
   it('hub label truncated to 12 chars with "..."', () => {
     const state = createGameState();
     createMiningSite(state, makeMiningSite('MARS'));
