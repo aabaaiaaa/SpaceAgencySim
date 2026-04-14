@@ -867,6 +867,8 @@ export interface GameState {
   hubs: Hub[];
   /** ID of the currently active hub for UI context. */
   activeHubId: string;
+  /** Counter for generating sequential hub IDs. Earth hub uses EARTH_HUB_ID; this is for dynamic hubs only. */
+  nextHubId: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -1022,6 +1024,7 @@ export function createGameState(): GameState {
       online: true,
     }],
     activeHubId: EARTH_HUB_ID,
+    nextHubId: 1,
   };
 }
 

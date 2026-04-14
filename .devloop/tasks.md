@@ -1,19 +1,19 @@
 # Iteration 13 — Tasks
 
 ### TASK-001: Fix deployOutpostCore() environment scaling bug
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/core/hubs.ts` at line 268, `deployOutpostCore()` deducts the base Crew Hab money cost without multiplying by `envMultiplier`. Apply `getEnvironmentCostMultiplier(flight.bodyId)` to the money cost, matching the pattern already used in `createHub()` (line 116) and `startFacilityUpgrade()` (line 457). Add unit tests verifying: Mars deployment deducts 1.3x base cost, Moon deducts 1.0x, and deducted amount matches the construction project's recorded `moneyCost`. See requirements.md §1.
 - **Verification**: `npx vitest run src/tests/hubs-construction.test.ts` — new env scaling tests pass, existing tests still pass.
 
 ### TASK-002: Add unit tests for UI helper functions
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add targeted unit tests for testable UI helpers to improve `src/ui/**` coverage. Focus on pure logic and DOM-light functions: loading indicator (`showLoadingIndicator`/`hideLoadingIndicator` idempotency), hub management display helpers (`_formatMoney`, `_getStatusInfo`, `_addGridRow`), body color helper (`getBodyColor` with CSS var reading and fallback), and any untested schematic layout pure computation functions. See requirements.md §2.
 - **Verification**: `npx vitest run src/tests/ui-helpers.test.ts` — all new tests pass (create this file if it doesn't exist, or add to the most appropriate existing test file).
 
 ### TASK-003: Add unit tests for render helper functions
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add targeted unit tests for testable render helpers to improve `src/render/**` coverage. Focus on pure math/computation helpers and layout calculation functions that don't require a PixiJS context. Grep `src/render/` for exported functions that take data and return values (positions, sizes, colors, etc.) without touching the canvas. See requirements.md §2.
 - **Verification**: `npx vitest run src/tests/render-helpers.test.ts` — all new tests pass (create this file if it doesn't exist, or add to the most appropriate existing test file).
@@ -25,7 +25,7 @@
 - **Verification**: `npx vitest run --coverage` exits cleanly with no threshold failures. `npm run build` produces no chunk size warnings.
 
 ### TASK-005: Add nextHubId counter to GameState
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add `nextHubId: number` field to the `GameState` interface in `src/core/gameState.ts`. Initialize to `1` in `createGameState()`. Earth hub keeps its hardcoded `EARTH_HUB_ID` — the counter is only for dynamically-created hubs. Bump `SAVE_VERSION` by 1 since the state shape changed. See requirements.md §5.
 - **Verification**: `npx tsc --noEmit` passes. `npx vitest run src/tests/gameState.test.ts` — existing tests pass (may need `nextHubId` added to test factories).
@@ -43,7 +43,7 @@
 - **Verification**: `npx playwright test e2e/saveload.spec.ts` — save/load E2E tests pass with new format.
 
 ### TASK-008: Create hubManagement sub-module directory and barrel
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create the `src/ui/hubManagement/` directory structure. Move the current `src/ui/hubManagement.ts` content into sub-modules: `_panel.ts` (main panel orchestration: show/hide, build, refresh, module state variables, `_formatMoney`), `_header.ts` (header with name editing, blur-to-save, name error display), `_sections.ts` (info grid, facilities, population, economy section builders), `_dialogs.ts` (reactivate and abandon confirmation dialogs). Create barrel `src/ui/hubManagement.ts` that re-exports `showHubManagementPanel` and `hideHubManagementPanel` from the sub-modules. No external callers should need import path changes. See requirements.md §4.
 - **Verification**: `npx tsc --noEmit` passes. `npx vitest run src/tests/hubManagement.test.ts` — existing tests pass (if any). Grep confirms no import path changes needed outside `src/ui/hubManagement/`.

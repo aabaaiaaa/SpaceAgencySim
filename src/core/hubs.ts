@@ -265,7 +265,8 @@ export function deployOutpostCore(
   const crewHabCost = OFFWORLD_FACILITY_COSTS.find(
     c => c.facilityId === FacilityId.CREW_HAB,
   );
-  const moneyCost = crewHabCost?.moneyCost ?? 200_000;
+  const envMultiplier = getEnvironmentCostMultiplier(flight.bodyId);
+  const moneyCost = (crewHabCost?.moneyCost ?? 200_000) * envMultiplier;
 
   // Check and deduct monetary cost
   if (!spend(state, moneyCost)) {

@@ -234,6 +234,7 @@ export function makeGameState(overrides: Partial<GameState> = {}): GameState {
       online: true,
     }],
     activeHubId: EARTH_HUB_ID,
+    nextHubId: 1,
     ...overrides,
   };
 }

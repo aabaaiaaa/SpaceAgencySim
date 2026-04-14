@@ -96,6 +96,7 @@ export interface SaveEnvelopeParams {
   facilities?: Record<string, { built: boolean; tier: number }>;
   hubs?: HubSave[];
   activeHubId?: string;
+  nextHubId?: number;
   autoSaveEnabled?: boolean;
   debugMode?: boolean;
   welcomeShown?: boolean;
@@ -144,6 +145,7 @@ export interface SaveEnvelopeState {
   routes: Record<string, unknown>[];
   hubs: HubSave[];
   activeHubId: string;
+  nextHubId: number;
   autoSaveEnabled: boolean;
   debugMode: boolean;
   welcomeShown: boolean;
@@ -169,7 +171,7 @@ export interface SaveEnvelope {
  */
 export function buildSaveEnvelope(params: SaveEnvelopeParams = {}): SaveEnvelope {
   const {
-    version         = 4,
+    version         = 5,
     saveName        = 'E2E Test',
     money           = STARTING_MONEY,
     missions        = { available: [], accepted: [], completed: [] },
@@ -232,6 +234,7 @@ export function buildSaveEnvelope(params: SaveEnvelopeParams = {}): SaveEnvelope
     online: true,
   }];
   const activeHubId = params.activeHubId ?? 'earth';
+  const nextHubId = params.nextHubId ?? 1;
 
   return {
     saveName,
@@ -276,6 +279,7 @@ export function buildSaveEnvelope(params: SaveEnvelopeParams = {}): SaveEnvelope
       routes,
       hubs,
       activeHubId,
+      nextHubId,
       autoSaveEnabled,
       debugMode,
       welcomeShown,

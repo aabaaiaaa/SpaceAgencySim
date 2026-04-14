@@ -10,6 +10,7 @@ import {
   getAvailableFacilitiesToBuild,
   startFacilityUpgrade,
   getEnvironmentCostMultiplier,
+  deployOutpostCore,
 } from '../core/hubs.ts';
 import { OFFWORLD_FACILITY_COSTS } from '../data/hubFacilities.ts';
 import { makeConstructionProject } from './_factories.ts';
@@ -444,5 +445,51 @@ describe('processConstructionProjects — lifecycle edge cases', () => {
     // Second project should remain pending
     expect(projectPad.completedPeriod).toBeUndefined();
     expect(hub.facilities[FacilityId.LAUNCH_PAD]).toBeUndefined();
+  });
+});
+
+describe('deployOutpostCore environment scaling', () => {
+  let state: GameState;
+  beforeEach(() => { state = createGameState(); state.money = 10_000_000; });
+
+  it('Mars deployment deducts 1.3x base cost', () => {
+    const baseCost = OFFWORLD_FACILITY_COSTS.find(c => c.facilityId === FacilityId.CREW_HAB)!;
+    const envMult = getEnvironmentCostMultiplier('MARS');
+    expect(envMult).toBeCloseTo(1.3);
+
+    const moneyBefore = state.money;
+    const hub = deployOutpostCore(state, { bodyId: 'MARS', altitude: 0, inOrbit: false, landed: true }, 'Mars Test Base');
+
+    expect(hub).not.toBeNull();
+    const expectedCost = baseCost.moneyCost * envMult;
+    expect(moneyBefore - state.money).toBeCloseTo(expectedCost);
+  });
+
+  it('Moon deployment deducts 1.0x base cost', () => {
+    const baseCost = OFFWORLD_FACILITY_COSTS.find(c => c.facilityId === FacilityId.CREW_HAB)!;
+    const envMult = getEnvironmentCostMultiplier('MOON');
+    expect(envMult).toBeCloseTo(1.0);
+
+    const moneyBefore = state.money;
+    const hub = deployOutpostCore(state, { bodyId: 'MOON', altitude: 0, inOrbit: false, landed: true }, 'Moon Test Base');
+
+    expect(hub).not.toBeNull();
+    const expectedCost = baseCost.moneyCost * envMult;
+    expect(moneyBefore - state.money).toBeCloseTo(expectedCost);
+  });
+
+  it('deducted amount matches the construction project recorded moneyCost', () => {
+    const baseCost = OFFWORLD_FACILITY_COSTS.find(c => c.facilityId === FacilityId.CREW_HAB)!;
+    const envMult = getEnvironmentCostMultiplier('MARS');
+
+    const moneyBefore = state.money;
+    const hub = deployOutpostCore(state, { bodyId: 'MARS', altitude: 0, inOrbit: false, landed: true }, 'Mars Cost Check');
+
+    expect(hub).not.toBeNull();
+    const deducted = moneyBefore - state.money;
+    // The construction project on the hub is created by createHub, which also applies envMultiplier
+    const projectMoneyCost = hub!.constructionQueue[0].moneyCost;
+    expect(deducted).toBeCloseTo(baseCost.moneyCost * envMult);
+    expect(projectMoneyCost).toBeCloseTo(baseCost.moneyCost * envMult);
   });
 });
