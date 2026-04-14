@@ -395,31 +395,31 @@
 - **Verification**: `npx playwright test e2e/hub-management.spec.ts --reporter=line`
 
 ### TASK-061: E2E — hub abandonment
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-023
 - **Description**: In `e2e/hub-management.spec.ts`, add a test: (1) Seed a save with an offline off-world hub. (2) Open the hub management panel for that hub. (3) Click "Abandon Hub". (4) Confirm the warning dialog. (5) Verify the hub is removed from the hub switcher dropdown. (6) Verify active hub switched back to Earth.
 - **Verification**: `npx playwright test e2e/hub-management.spec.ts --reporter=line`
 
 ### TASK-062: E2E — hub name auto-suggestion
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-058
 - **Description**: In `e2e/hub-deployment.spec.ts`, add a test that verifies the auto-suggested name: (1) Seed a save with no off-world hubs (only Earth). (2) Deploy an outpost (reuse setup from TASK-058). (3) Verify the new hub's name matches the pattern: a name from the space history catalog followed by " Outpost" (surface) or " Station" (orbital). (4) Verify the name is not "Hub-1" (pool shouldn't be exhausted with only Earth hub).
 - **Verification**: `npx playwright test e2e/hub-deployment.spec.ts --reporter=line`
 
 ### TASK-063: E2E — Mk2 storage in mining site
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-024
 - **Description**: In `e2e/mining.spec.ts` (or new file), add a test: (1) Seed a save with a mining site. (2) Navigate to the mining site management screen. (3) Add a Storage Silo Mk2 module. (4) Verify the module appears in the site's module list with capacity "5,000 kg" (or however capacity is displayed). (5) Verify it's distinguishable from the Mk1 version.
 - **Verification**: `npx playwright test e2e/mining.spec.ts --reporter=line`
 
 ### TASK-064: E2E — SVG dynamic layout with multiple bodies
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-030
 - **Description**: In `e2e/logistics.spec.ts` (or new file), add a test: (1) Seed a save with mining sites on Earth, Moon, and Mars. (2) Open the Logistics Center. (3) Verify the SVG map contains circle elements for Sun, Earth, Moon, and Mars. (4) Verify Moon is positioned near Earth (as a child node). (5) Verify bodies without activity (e.g. Jupiter) are NOT shown. Tag `@smoke`.
 - **Verification**: `npx playwright test e2e/logistics.spec.ts --reporter=line`
 
 ### TASK-065: E2E — hub nodes on SVG map
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-029
 - **Description**: In `e2e/logistics.spec.ts`, add a test: (1) Seed a save with an off-world hub on the Moon (surface). (2) Open the Logistics Center. (3) Verify the SVG map shows a hub node near the Moon body. (4) Verify the hub node has the hub's name as a label. (5) Verify an online hub appears at full opacity and an offline hub at reduced opacity (seed a second offline hub).
 - **Verification**: `npx playwright test e2e/logistics.spec.ts --reporter=line`

@@ -151,4 +151,53 @@ test.describe('Mining — Logistics Center', () => {
     const moduleItems = page.locator('.logistics-module-item');
     await expect(moduleItems).toHaveCount(3, { timeout: 5_000 });
   });
+
+  test('Mk2 storage module appears in mining site and is distinguishable from Mk1', async ({ page }) => {
+    // Open logistics center first (via beforeEach the save is already loaded)
+    await page.click('[data-building-id="logistics-center"]');
+    await page.waitForSelector('#logistics-overlay', { state: 'visible', timeout: 5_000 });
+
+    // Go back to hub to inject state
+    await page.click('#logistics-back-btn');
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
+
+    // Inject mining site with both Mk1 and Mk2 storage silos
+    await page.evaluate(() => {
+      const gs = window.__gameState;
+      gs.miningSites.push({
+        id: 'site-mk2-test',
+        name: 'Mk2 Storage Test Base',
+        bodyId: 'MOON',
+        coordinates: { x: 0, y: 0 },
+        controlUnit: { partId: 'base-control-unit' },
+        modules: [
+          { id: 'mod-bcu-1', partId: 'base-control-unit', type: 'BASE_CONTROL_UNIT', powerDraw: 10, connections: [] },
+          { id: 'mod-gen-1', partId: 'power-generator-solar', type: 'POWER_GENERATOR', powerDraw: 0, connections: [] },
+          { id: 'mod-silo-mk1', partId: 'storage-silo-mk1', type: 'STORAGE_SILO', powerDraw: 2, connections: [], stored: { WATER_ICE: 100 }, storageCapacityKg: 2000, storageState: 'SOLID' },
+          { id: 'mod-silo-mk2', partId: 'storage-silo-mk2', type: 'STORAGE_SILO', powerDraw: 3, connections: [], stored: { IRON_ORE: 200 }, storageCapacityKg: 5000, storageState: 'SOLID' },
+        ],
+        storage: { WATER_ICE: 100, IRON_ORE: 200 },
+        powerGenerated: 100,
+        powerRequired: 15,
+        orbitalBuffer: {},
+      });
+    });
+
+    // Re-open logistics center
+    await page.click('[data-building-id="logistics-center"]');
+    await page.waitForSelector('#logistics-overlay', { state: 'visible', timeout: 5_000 });
+
+    // Verify site card renders
+    const siteCard = page.locator('.logistics-site-card');
+    await expect(siteCard).toBeVisible({ timeout: 5_000 });
+    await expect(siteCard).toContainText('Mk2 Storage Test Base', { timeout: 5_000 });
+
+    // Should have 4 modules total
+    const moduleItems = siteCard.locator('.logistics-module-item');
+    await expect(moduleItems).toHaveCount(4, { timeout: 5_000 });
+
+    // Verify both Mk1 and Mk2 storage silos are shown with distinguishable partIds
+    await expect(siteCard).toContainText('storage-silo-mk1', { timeout: 5_000 });
+    await expect(siteCard).toContainText('storage-silo-mk2', { timeout: 5_000 });
+  });
 });

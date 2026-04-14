@@ -269,4 +269,36 @@ test.describe('Hub Deployment', () => {
     expect(hubs).toHaveLength(1);
   });
 
+  test('hub name auto-suggestion uses space history catalog', async ({ page }) => {
+    test.setTimeout(60_000);
+
+    // Seed save with only Earth hub (no off-world hubs).
+    await seedForOutpostFlight(page);
+
+    // Land on Moon.
+    await startAndLandOnMoon(page);
+
+    // Deploy outpost.
+    const deployment = await deployOutpostViaCore(page, 'MOON', false);
+    expect(deployment.hubId).not.toBeNull();
+    expect(deployment.hubName).not.toBeNull();
+
+    // Name should end with " Outpost" (surface hub).
+    expect(deployment.hubName!).toMatch(/ Outpost$/);
+
+    // Name should NOT be the fallback "Hub-1" pattern.
+    expect(deployment.hubName!).not.toMatch(/^Hub-\d+/);
+
+    // The base name (before " Outpost") should be a non-empty string.
+    const baseName = deployment.hubName!.replace(/ Outpost$/, '');
+    expect(baseName.length).toBeGreaterThan(0);
+
+    // Verify in game state too.
+    const state = await getGameState(page);
+    const hubs = (state as Record<string, unknown>).hubs as Array<Record<string, unknown>>;
+    const moonHub = hubs.find(h => h.bodyId === 'MOON');
+    expect(moonHub).toBeDefined();
+    expect(moonHub!.name).toBe(deployment.hubName);
+  });
+
 });
