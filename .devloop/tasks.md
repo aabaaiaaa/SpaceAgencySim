@@ -19,7 +19,7 @@
 - **Verification**: `npx vitest run src/tests/render-helpers.test.ts` — all new tests pass (create this file if it doesn't exist, or add to the most appropriate existing test file).
 
 ### TASK-004: Update coverage thresholds and suppress chunk size warning
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-002, TASK-003
 - **Description**: After the new tests from TASK-002 and TASK-003 are in place, run `npx vitest run --coverage` and read the actual coverage percentages for `src/render/**` and `src/ui/**`. Update the 5 failing thresholds in `vite.config.ts` (lines 122-138) to be 1-2% below the measured values. Also add `chunkSizeWarningLimit: 600` to the `build` config as a sibling to `rollupOptions`. See requirements.md §2 and §3.
 - **Verification**: `npx vitest run --coverage` exits cleanly with no threshold failures. `npm run build` produces no chunk size warnings.
@@ -31,7 +31,7 @@
 - **Verification**: `npx tsc --noEmit` passes. `npx vitest run src/tests/gameState.test.ts` — existing tests pass (may need `nextHubId` added to test factories).
 
 ### TASK-006: Update createHub() to use sequential hub IDs
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-005
 - **Description**: In `src/core/hubs.ts`, update `createHub()` (currently line 91) to replace `'hub-' + Date.now() + '-' + random` with `'hub-' + state.nextHubId`, then increment `state.nextHubId`. Update unit test factories in `src/tests/_factories.ts` — `makeGameState()` should include `nextHubId`, and any factory that creates hubs should set appropriate counter values. Update any tests that assert on hub ID format (regex matching the old pattern). See requirements.md §5.
 - **Verification**: `npx vitest run src/tests/hubs-construction.test.ts src/tests/hubs.test.ts` — all pass with new deterministic IDs.
@@ -49,13 +49,13 @@
 - **Verification**: `npx tsc --noEmit` passes. `npx vitest run src/tests/hubManagement.test.ts` — existing tests pass (if any). Grep confirms no import path changes needed outside `src/ui/hubManagement/`.
 
 ### TASK-008a: Verify hub management panel split doesn't break E2E
-- **Status**: pending
+- **Status**: in-progress
 - **Dependencies**: TASK-008
 - **Description**: Run the hub management E2E tests to verify the sub-module split didn't break any UI behavior. The barrel re-export should make this transparent, but confirm with a targeted E2E run.
 - **Verification**: `npx playwright test e2e/hub-management.spec.ts` — all tests pass.
 
 ### TASK-009: Add route leg chaining validation
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/core/routes.ts`, add a `validateLegChaining(legs)` helper that returns `true` if every adjacent leg pair has matching destination→origin (`bodyId` and `locationType` match; `hubId` checked if both non-null). Apply this validation in `createRoute()` — reject route creation if legs don't chain. Apply in `processRoutes()` alongside the existing hub-existence check — mark unchained routes as `status: 'broken'`. See requirements.md §6.
 - **Verification**: `npx vitest run src/tests/routes.test.ts` — existing route tests pass (no regressions).

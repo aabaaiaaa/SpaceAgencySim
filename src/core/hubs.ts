@@ -88,7 +88,7 @@ export function createHub(
     throw new Error(`Hub name already exists: ${options.name}`);
   }
 
-  const id = 'hub-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+  const id = 'hub-' + state.nextHubId++;
 
   // Look up Crew Hab cost definition
   const crewHabCost = OFFWORLD_FACILITY_COSTS.find(

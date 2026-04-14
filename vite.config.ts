@@ -10,6 +10,7 @@ export default defineConfig({
     },
   },
   build: {
+    chunkSizeWarningLimit: 600,
     rollupOptions: {
       output: {
         manualChunks(id) {
@@ -126,14 +127,14 @@ export default defineConfig({
           functions: 92,
         },
         'src/render/**': {
-          lines: 39,
-          branches: 91,
-          functions: 56,
+          lines: 34,
+          branches: 89,
+          functions: 49,
         },
         'src/ui/**': {
-          lines: 64,
+          lines: 43,
           branches: 79,
-          functions: 87,
+          functions: 78,
         },
       },
     },

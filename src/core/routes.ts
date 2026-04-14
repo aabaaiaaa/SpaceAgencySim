@@ -94,6 +94,27 @@ export function getProvenLegsForOriginDestination(
 }
 
 // ---------------------------------------------------------------------------
+// Route leg chaining validation
+// ---------------------------------------------------------------------------
+
+/**
+ * Validate that route legs form a continuous chain — each leg's destination
+ * matches the next leg's origin.
+ */
+export function validateLegChaining(legs: RouteLeg[]): boolean {
+  if (legs.length <= 1) return true;
+  for (let i = 0; i < legs.length - 1; i++) {
+    const dest = legs[i].destination;
+    const nextOrigin = legs[i + 1].origin;
+    if (dest.bodyId !== nextOrigin.bodyId) return false;
+    if (dest.locationType !== nextOrigin.locationType) return false;
+    // Check hubId only when both are non-null
+    if (dest.hubId != null && nextOrigin.hubId != null && dest.hubId !== nextOrigin.hubId) return false;
+  }
+  return true;
+}
+
+// ---------------------------------------------------------------------------
 // Route assembly types
 // ---------------------------------------------------------------------------
 
@@ -175,6 +196,10 @@ export function createRoute(state: GameState, params: CreateRouteParams): Route 
       provenFlightId: proven.provenFlightId,
     };
   });
+
+  if (!validateLegChaining(routeLegs)) {
+    throw new Error('Route legs do not form a continuous chain');
+  }
 
   const route: Route = {
     id: generateRouteId(),
@@ -362,6 +387,11 @@ export function processRoutes(state: GameState): { revenue: number; operatingCos
       return false;
     });
     if (hasInvalidHub) {
+      route.status = 'broken';
+      continue;
+    }
+
+    if (!validateLegChaining(route.legs)) {
       route.status = 'broken';
       continue;
     }

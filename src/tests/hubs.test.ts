@@ -164,7 +164,7 @@ describe('Hub CRUD — createHub', () => {
     expect(hub.name).toBe('Lunar Base');
     expect(hub.type).toBe('surface');
     expect(hub.bodyId).toBe('MOON');
-    expect(hub.id).toMatch(/^hub-\d+-[a-z0-9]+$/);
+    expect(hub.id).toBe('hub-1');
   });
 
   it('creates an orbital hub with altitude', () => {
