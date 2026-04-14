@@ -10,6 +10,8 @@
  */
 
 import type { GameState } from '../../core/gameState.ts';
+import type { Hub } from '../../core/hubTypes.ts';
+import { EARTH_HUB_ID } from '../../core/constants.ts';
 import { getBodyDef } from '../../data/bodies.ts';
 
 // ---------------------------------------------------------------------------
@@ -180,6 +182,63 @@ export function computeSchematicLayout(state: GameState | null): SchematicLayout
         parentId: planetId,
         label: moonDef?.name ?? moonId,
       });
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Hub node placement
+  // -------------------------------------------------------------------------
+
+  if (state) {
+    // Group hubs by body, excluding the Earth hub (represented by the Earth body node)
+    const surfaceHubsByBody = new Map<string, Hub[]>();
+    const orbitalHubsByBody = new Map<string, Hub[]>();
+
+    for (const hub of state.hubs) {
+      if (hub.id === EARTH_HUB_ID) continue;
+      const parentNode = layout.get(hub.bodyId);
+      if (!parentNode) continue;
+
+      const map = hub.type === 'surface' ? surfaceHubsByBody : orbitalHubsByBody;
+      if (!map.has(hub.bodyId)) map.set(hub.bodyId, []);
+      map.get(hub.bodyId)!.push(hub);
+    }
+
+    // Position surface hubs below their parent body
+    for (const [bodyId, hubs] of surfaceHubsByBody) {
+      const parent = layout.get(bodyId)!;
+      for (let i = 0; i < hubs.length; i++) {
+        const hub = hubs[i];
+        const xOffset = (i - (hubs.length - 1) / 2) * 25;
+        const label = hub.name.length > 12 ? hub.name.slice(0, 12) + '...' : hub.name;
+        layout.set(`hub-surface-${hub.id}`, {
+          x: parent.x + xOffset,
+          y: parent.y + parent.radius + 20,
+          radius: 4,
+          type: 'surfaceHub',
+          parentId: bodyId,
+          hubId: hub.id,
+          label,
+        });
+      }
+    }
+
+    // Position orbital hubs to the upper-right of their parent body
+    for (const [bodyId, hubs] of orbitalHubsByBody) {
+      const parent = layout.get(bodyId)!;
+      for (let i = 0; i < hubs.length; i++) {
+        const hub = hubs[i];
+        const label = hub.name.length > 12 ? hub.name.slice(0, 12) + '...' : hub.name;
+        layout.set(`hub-orbital-${hub.id}`, {
+          x: parent.x + parent.radius + 15,
+          y: parent.y - 15 + i * 20,
+          radius: 5,
+          type: 'orbitalHub',
+          parentId: bodyId,
+          hubId: hub.id,
+          label,
+        });
+      }
     }
   }
 

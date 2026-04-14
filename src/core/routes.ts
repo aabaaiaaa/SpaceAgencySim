@@ -22,6 +22,8 @@ export interface ProveRouteLegParams {
   cargoCapacityKg: number;
   costPerRun: number;
   flightId: string;
+  originHubId?: string | null;
+  destinationHubId?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -40,8 +42,14 @@ export function proveRouteLeg(
 ): ProvenLeg {
   const leg: ProvenLeg = {
     id: `proven-leg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    origin: params.origin,
-    destination: params.destination,
+    origin: {
+      ...params.origin,
+      hubId: params.originHubId !== undefined ? params.originHubId : (params.origin.hubId ?? null),
+    },
+    destination: {
+      ...params.destination,
+      hubId: params.destinationHubId !== undefined ? params.destinationHubId : (params.destination.hubId ?? null),
+    },
     craftDesignId: params.craftDesignId,
     cargoCapacityKg: params.cargoCapacityKg,
     costPerRun: params.costPerRun,

@@ -8,6 +8,7 @@ import type { Hub, ConstructionProject, ResourceRequirement } from './hubTypes.t
 import { FacilityId, EARTH_HUB_ID, HUB_PROXIMITY_DOCK_RADIUS } from './constants.ts';
 import { spend } from './finance.ts';
 import { evictTourists } from './hubTourists.ts';
+import { getTransitDelay } from './hubCrew.ts';
 import {
   BODY_ENVIRONMENT,
   ENVIRONMENT_COST_MULTIPLIER,
@@ -530,6 +531,70 @@ export function reactivateHub(state: GameState, hubId: string): boolean {
 
   hub.online = true;
   return true;
+}
+
+// ---------------------------------------------------------------------------
+// Hub Abandonment
+// ---------------------------------------------------------------------------
+
+/**
+ * Abandons an offline, non-Earth hub. Evacuates crew to Earth, clears tourists,
+ * breaks routes referencing the hub, and removes it from state.hubs.
+ *
+ * Returns `{ success: true }` on success, or `{ success: false, error }` on failure.
+ */
+export function abandonHub(
+  state: GameState,
+  hubId: string,
+): { success: boolean; error?: string } {
+  // --- Preconditions ---
+  const hub = state.hubs.find(h => h.id === hubId);
+  if (!hub) {
+    return { success: false, error: 'Hub not found' };
+  }
+  if (hub.online) {
+    return { success: false, error: 'Hub must be offline to abandon' };
+  }
+  if (hubId === EARTH_HUB_ID) {
+    return { success: false, error: 'Cannot abandon Earth hub' };
+  }
+
+  // 1. Evacuate crew stationed at this hub to Earth with transit delay
+  const transitDelay = getTransitDelay(hub.bodyId);
+  for (const member of state.crew) {
+    if (member.stationedHubId === hubId) {
+      member.stationedHubId = EARTH_HUB_ID;
+      member.transitUntil = state.currentPeriod + transitDelay;
+    }
+  }
+
+  // 2. Clear tourists
+  hub.tourists = [];
+
+  // 3. Break routes that reference this hub
+  if (state.routes) {
+    for (const route of state.routes) {
+      for (const leg of route.legs) {
+        if (leg.origin.hubId === hubId || leg.destination.hubId === hubId) {
+          route.status = 'broken';
+          break;
+        }
+      }
+    }
+  }
+
+  // 4. Remove the hub from state.hubs
+  const index = state.hubs.indexOf(hub);
+  if (index !== -1) {
+    state.hubs.splice(index, 1);
+  }
+
+  // 5. If activeHubId was this hub, switch to Earth
+  if (state.activeHubId === hubId) {
+    state.activeHubId = EARTH_HUB_ID;
+  }
+
+  return { success: true };
 }
 
 // ---------------------------------------------------------------------------

@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { createGameState, createFlightState } from '../core/gameState.ts';
-import type { GameState } from '../core/gameState.ts';
+import { createGameState, createFlightState, createCrewMember } from '../core/gameState.ts';
+import type { GameState, Route } from '../core/gameState.ts';
 import { createPhysicsState } from '../core/physics.ts';
 import {
+  AstronautStatus,
   EARTH_HUB_ID,
   FACILITY_DEFINITIONS,
   FacilityId,
@@ -25,6 +26,7 @@ import {
   findNearbyOrbitalHub,
   generateHubName,
   renameHub,
+  abandonHub,
 } from '../core/hubs.ts';
 import { HUB_NAME_POOL } from '../data/hubNames.ts';
 import {
@@ -37,6 +39,7 @@ import {
   DEFAULT_IMPORT_TAX,
   OFFWORLD_FACILITY_COSTS,
 } from '../data/hubFacilities.ts';
+import { getTransitDelay } from '../core/hubCrew.ts';
 
 // ---------------------------------------------------------------------------
 // GameState hub initialization
@@ -638,5 +641,181 @@ describe('Hub renaming — renameHub', () => {
     const result = renameHub(state, 'nonexistent-hub', 'New Name');
     expect(result.success).toBe(false);
     expect(result.error).toBe('Hub not found');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hub abandonment
+// ---------------------------------------------------------------------------
+
+describe('abandonHub', () => {
+  /** Creates a state with a second offline Mars hub, crew, tourists, and a route. */
+  function setupAbandonScenario() {
+    const state = createGameState();
+    state.currentPeriod = 10;
+
+    // Create a second hub on Mars, mark it offline
+    const marsHub = createHub(state, { name: 'Mars Outpost', type: 'surface', bodyId: 'MARS' });
+    marsHub.online = false;
+
+    // Add crew stationed at Mars hub
+    const crew1 = createCrewMember({ id: 'crew-mars-1', name: 'Alice', salary: 2000 });
+    crew1.stationedHubId = marsHub.id;
+    crew1.transitUntil = null;
+    state.crew.push(crew1);
+
+    const crew2 = createCrewMember({ id: 'crew-mars-2', name: 'Bob', salary: 2000 });
+    crew2.stationedHubId = marsHub.id;
+    crew2.transitUntil = null;
+    state.crew.push(crew2);
+
+    // Add crew stationed at Earth (should not be affected)
+    const crewEarth = createCrewMember({ id: 'crew-earth-1', name: 'Carol', salary: 2000 });
+    crewEarth.stationedHubId = EARTH_HUB_ID;
+    state.crew.push(crewEarth);
+
+    // Add tourists to Mars hub
+    marsHub.tourists = [
+      { id: 'tourist-1', name: 'Tourist A', arrivalPeriod: 5, revenue: 5000, departurePeriod: 20 },
+      { id: 'tourist-2', name: 'Tourist B', arrivalPeriod: 7, revenue: 3000, departurePeriod: 25 },
+    ];
+
+    // Add a route with a leg referencing the Mars hub
+    const route: Route = {
+      id: 'route-1',
+      name: 'Mars Supply',
+      status: 'active',
+      resourceType: 'WATER_ICE' as any,
+      legs: [{
+        id: 'leg-1',
+        origin: { bodyId: 'EARTH', locationType: 'orbit', hubId: null },
+        destination: { bodyId: 'MARS', locationType: 'surface', hubId: marsHub.id },
+        craftDesignId: 'craft-1',
+        craftCount: 1,
+        cargoCapacityKg: 1000,
+        costPerRun: 50000,
+        provenFlightId: 'flight-1',
+      }],
+      throughputPerPeriod: 500,
+      totalCostPerPeriod: 50000,
+    };
+
+    // Add a route that does NOT reference the Mars hub (should not be affected)
+    const unrelatedRoute: Route = {
+      id: 'route-2',
+      name: 'Moon Supply',
+      status: 'active',
+      resourceType: 'REGOLITH' as any,
+      legs: [{
+        id: 'leg-2',
+        origin: { bodyId: 'EARTH', locationType: 'orbit', hubId: null },
+        destination: { bodyId: 'MOON', locationType: 'surface', hubId: null },
+        craftDesignId: 'craft-2',
+        craftCount: 1,
+        cargoCapacityKg: 500,
+        costPerRun: 20000,
+        provenFlightId: 'flight-2',
+      }],
+      throughputPerPeriod: 250,
+      totalCostPerPeriod: 20000,
+    };
+
+    state.routes = [route, unrelatedRoute];
+
+    return { state, marsHub, crew1, crew2, crewEarth };
+  }
+
+  it('returns error when hub does not exist', () => {
+    const state = createGameState();
+    const result = abandonHub(state, 'nonexistent-hub');
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Hub not found');
+  });
+
+  it('returns error when hub is online (not offline)', () => {
+    const state = createGameState();
+    const hub = createHub(state, { name: 'Mars Base', type: 'surface', bodyId: 'MARS' });
+    hub.online = true;
+    const result = abandonHub(state, hub.id);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Hub must be offline to abandon');
+  });
+
+  it('returns error when trying to abandon Earth hub', () => {
+    const state = createGameState();
+    // Force Earth hub offline for this test
+    state.hubs[0].online = false;
+    const result = abandonHub(state, EARTH_HUB_ID);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Cannot abandon Earth hub');
+  });
+
+  it('evacuates crew stationed at the hub to Earth with correct transitUntil', () => {
+    const { state, marsHub, crew1, crew2, crewEarth } = setupAbandonScenario();
+    const marsTransitDelay = getTransitDelay('MARS');
+
+    const result = abandonHub(state, marsHub.id);
+    expect(result.success).toBe(true);
+
+    // Mars crew should be evacuated to Earth with transit delay
+    expect(crew1.stationedHubId).toBe(EARTH_HUB_ID);
+    expect(crew1.transitUntil).toBe(state.currentPeriod + marsTransitDelay);
+    expect(crew2.stationedHubId).toBe(EARTH_HUB_ID);
+    expect(crew2.transitUntil).toBe(state.currentPeriod + marsTransitDelay);
+
+    // Earth crew should not be affected
+    expect(crewEarth.stationedHubId).toBe(EARTH_HUB_ID);
+    expect(crewEarth.transitUntil).toBeNull();
+  });
+
+  it('clears tourists from the abandoned hub', () => {
+    const { state, marsHub } = setupAbandonScenario();
+    expect(marsHub.tourists).toHaveLength(2);
+
+    const result = abandonHub(state, marsHub.id);
+    expect(result.success).toBe(true);
+    expect(marsHub.tourists).toHaveLength(0);
+  });
+
+  it('breaks routes with legs referencing the abandoned hub', () => {
+    const { state, marsHub } = setupAbandonScenario();
+    expect(state.routes[0].status).toBe('active');
+    expect(state.routes[1].status).toBe('active');
+
+    abandonHub(state, marsHub.id);
+
+    // Route with Mars hub reference should be broken
+    expect(state.routes[0].status).toBe('broken');
+    // Unrelated route should remain active
+    expect(state.routes[1].status).toBe('active');
+  });
+
+  it('removes the hub from state.hubs', () => {
+    const { state, marsHub } = setupAbandonScenario();
+    const initialCount = state.hubs.length;
+
+    abandonHub(state, marsHub.id);
+
+    expect(state.hubs).toHaveLength(initialCount - 1);
+    expect(state.hubs.find(h => h.id === marsHub.id)).toBeUndefined();
+  });
+
+  it('switches activeHubId to EARTH_HUB_ID if it was the abandoned hub', () => {
+    const { state, marsHub } = setupAbandonScenario();
+    state.activeHubId = marsHub.id;
+
+    abandonHub(state, marsHub.id);
+
+    expect(state.activeHubId).toBe(EARTH_HUB_ID);
+  });
+
+  it('does not change activeHubId if it was not the abandoned hub', () => {
+    const { state, marsHub } = setupAbandonScenario();
+    // activeHubId is EARTH_HUB_ID by default
+    expect(state.activeHubId).toBe(EARTH_HUB_ID);
+
+    abandonHub(state, marsHub.id);
+
+    expect(state.activeHubId).toBe(EARTH_HUB_ID);
   });
 });

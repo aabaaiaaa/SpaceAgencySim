@@ -26,13 +26,13 @@ import type { ProveRouteLegParams } from '../core/routes.ts';
 // ---------------------------------------------------------------------------
 
 function surface(bodyId: string): RouteLocation {
-  return { bodyId, locationType: 'surface' };
+  return { bodyId, locationType: 'surface', hubId: null };
 }
 
 function orbit(bodyId: string, altitude?: number): RouteLocation {
   return altitude !== undefined
-    ? { bodyId, locationType: 'orbit', altitude }
-    : { bodyId, locationType: 'orbit' };
+    ? { bodyId, locationType: 'orbit', altitude, hubId: null }
+    : { bodyId, locationType: 'orbit', hubId: null };
 }
 
 function makeParams(overrides?: Partial<ProveRouteLegParams>): ProveRouteLegParams {
@@ -96,6 +96,37 @@ describe('proveRouteLeg', () => {
     expect(leg.cargoCapacityKg).toBe(800);
     expect(leg.costPerRun).toBe(25_000);
     expect(leg.provenFlightId).toBe('flight-lunar');
+  });
+
+  it('stores hubId on origin and destination when provided', () => {
+    const state = createGameState();
+    const leg = proveRouteLeg(state, {
+      ...makeParams(),
+      origin: { bodyId: 'MOON', locationType: 'surface', hubId: null },
+      destination: { bodyId: 'EARTH', locationType: 'orbit', hubId: null },
+      originHubId: 'hub-moon-1',
+      destinationHubId: 'hub-earth-1',
+    });
+    expect(leg.origin.hubId).toBe('hub-moon-1');
+    expect(leg.destination.hubId).toBe('hub-earth-1');
+  });
+
+  it('stores null hubId when no hubs provided', () => {
+    const state = createGameState();
+    const leg = proveRouteLeg(state, makeParams());
+    expect(leg.origin.hubId).toBeNull();
+    expect(leg.destination.hubId).toBeNull();
+  });
+
+  it('preserves hubId from origin/destination when params not provided', () => {
+    const state = createGameState();
+    const leg = proveRouteLeg(state, {
+      ...makeParams(),
+      origin: { bodyId: 'MOON', locationType: 'surface', hubId: 'existing-hub' },
+      destination: { bodyId: 'EARTH', locationType: 'orbit', hubId: null },
+    });
+    expect(leg.origin.hubId).toBe('existing-hub');
+    expect(leg.destination.hubId).toBeNull();
   });
 
   it('supports multiple proven legs for the same route with different craft', () => {

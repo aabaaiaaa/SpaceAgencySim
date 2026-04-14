@@ -180,8 +180,8 @@ describe('getTransferCost', () => {
       resourceType: ResourceType.WATER_ICE,
       legs: [{
         id: 'leg-1',
-        origin: { bodyId: 'EARTH', locationType: 'orbit' },
-        destination: { bodyId: 'MOON', locationType: 'orbit' },
+        origin: { bodyId: 'EARTH', locationType: 'orbit', hubId: null },
+        destination: { bodyId: 'MOON', locationType: 'orbit', hubId: null },
         craftDesignId: 'design-1',
         craftCount: 1,
         cargoCapacityKg: 1000,
@@ -211,8 +211,8 @@ describe('getTransferCost', () => {
       resourceType: ResourceType.WATER_ICE,
       legs: [{
         id: 'leg-p',
-        origin: { bodyId: 'EARTH', locationType: 'orbit' },
-        destination: { bodyId: 'MOON', locationType: 'orbit' },
+        origin: { bodyId: 'EARTH', locationType: 'orbit', hubId: null },
+        destination: { bodyId: 'MOON', locationType: 'orbit', hubId: null },
         craftDesignId: 'design-1',
         craftCount: 1,
         cargoCapacityKg: 1000,
@@ -311,8 +311,8 @@ describe('requestCrewTransfer', () => {
       resourceType: ResourceType.WATER_ICE,
       legs: [{
         id: 'leg-em',
-        origin: { bodyId: 'EARTH', locationType: 'orbit' },
-        destination: { bodyId: 'MOON', locationType: 'orbit' },
+        origin: { bodyId: 'EARTH', locationType: 'orbit', hubId: null },
+        destination: { bodyId: 'MOON', locationType: 'orbit', hubId: null },
         craftDesignId: 'd1',
         craftCount: 1,
         cargoCapacityKg: 500,

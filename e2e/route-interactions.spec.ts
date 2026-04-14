@@ -49,8 +49,8 @@ async function injectRouteState(page: import('@playwright/test').Page) {
 
     gs.provenLegs.push({
       id: 'proven-leg-e2e-1',
-      origin: { bodyId: 'MOON', locationType: 'orbit', altitude: 50 },
-      destination: { bodyId: 'EARTH', locationType: 'orbit', altitude: 200 },
+      origin: { bodyId: 'MOON', locationType: 'orbit', altitude: 50, hubId: null },
+      destination: { bodyId: 'EARTH', locationType: 'orbit', altitude: 200, hubId: null },
       craftDesignId: 'cargo-shuttle',
       cargoCapacityKg: 2000,
       costPerRun: 50000,
@@ -65,8 +65,8 @@ async function injectRouteState(page: import('@playwright/test').Page) {
       resourceType: 'WATER_ICE',
       legs: [{
         id: 'leg-e2e-1',
-        origin: { bodyId: 'MOON', locationType: 'orbit', altitude: 50 },
-        destination: { bodyId: 'EARTH', locationType: 'orbit', altitude: 200 },
+        origin: { bodyId: 'MOON', locationType: 'orbit', altitude: 50, hubId: null },
+        destination: { bodyId: 'EARTH', locationType: 'orbit', altitude: 200, hubId: null },
         craftDesignId: 'cargo-shuttle',
         craftCount: 1,
         cargoCapacityKg: 2000,
@@ -255,8 +255,8 @@ test.describe('Route Interactions', () => {
 
       gs.provenLegs.push({
         id: 'proven-leg-builder-1',
-        origin: { bodyId: 'MOON', locationType: 'orbit', altitude: 50 },
-        destination: { bodyId: 'EARTH', locationType: 'orbit', altitude: 200 },
+        origin: { bodyId: 'MOON', locationType: 'orbit', altitude: 50, hubId: null },
+        destination: { bodyId: 'EARTH', locationType: 'orbit', altitude: 200, hubId: null },
         craftDesignId: 'cargo-shuttle',
         cargoCapacityKg: 2000,
         costPerRun: 50000,

@@ -119,7 +119,7 @@
 - **Verification**: `npx vitest run src/tests/hubs.test.ts`
 
 ### TASK-019: Hub abandonment logic
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-018
 - **Description**: In `src/core/hubs.ts`, add `abandonHub(state: GameState, hubId: string): { success: boolean; error?: string }`. Preconditions: hub exists, hub.online === false, hubId !== EARTH_HUB_ID. Return error string if precondition fails. On success: (1) Set all crew with `stationedHubId === hubId` to `stationedHubId = EARTH_HUB_ID` with appropriate `transitUntil` (use existing transit delay calculation from hubCrew.ts). (2) Clear `hub.tourists` array. (3) For all routes in `state.routes`, check each leg — if any leg's origin or destination `hubId` matches the abandoned hub, set `route.status = 'broken'`. (4) Remove the hub from `state.hubs` array. (5) If `state.activeHubId === hubId`, set to EARTH_HUB_ID. Write unit tests: precondition failures, crew evacuation with transit, tourist eviction, route breakage, hub removal, activeHubId switch.
 - **Verification**: `npx vitest run src/tests/hubs.test.ts`
@@ -181,7 +181,7 @@
 - **Verification**: `npx vitest run src/tests/logistics-layout.test.ts 2>/dev/null || npx vitest run src/tests/logistics.test.ts 2>/dev/null`
 
 ### TASK-028: Add hub nodes to schematic layout
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-027, TASK-015
 - **Description**: Extend `computeSchematicLayout()` in `_schematicLayout.ts` to include hubs as nodes. For each hub in `state.hubs`: (1) Skip Earth hub (it's represented by the Earth body node). (2) Find the hub's parent body node in the layout. (3) Surface hubs: position as small square (radius 4) below the parent body, y = parent.y + parent.radius + 20. If multiple surface hubs on one body, fan horizontally with 25px spacing. Type = 'surfaceHub'. (4) Orbital hubs: position as small diamond (radius 5) to the upper-right of parent body, x = parent.x + parent.radius + 15, y = parent.y - 15. If multiple orbital hubs, fan vertically with 20px spacing. Type = 'orbitalHub'. (5) Set `hubId` field on hub nodes. (6) Set `parentId` to the body's ID. (7) Set `label` to hub name (truncated to 12 chars + "..."). Write unit tests verifying hub node positions relative to their parent body.
 - **Verification**: `npx vitest run src/tests/logistics-layout.test.ts 2>/dev/null || npx vitest run src/tests/logistics.test.ts 2>/dev/null`
@@ -205,7 +205,7 @@
 - **Verification**: `npx tsc --noEmit src/ui/logistics/_routeMap.ts`
 
 ### TASK-032: SVG animated flow dots on active routes
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-031
 - **Description**: In `_routeMap.ts` and `logistics.css`, add animated flow indicators on active route legs. For each active route leg: (1) Create 3 `<circle>` elements (r=2.5, fill matching route color) inside the SVG. (2) Use CSS `offset-path` with `path()` matching the Bezier curve, or use `<animateMotion>` SVG element referencing the route path by ID. (3) Animate `offset-distance` from 0% to 100% over ~3 seconds, infinite loop. (4) Stagger the 3 dots at 0s, 1s, 2s delay. (5) Flow direction: origin to destination. Add the CSS keyframes in `logistics.css`: `@keyframes flowDot { from { offset-distance: 0% } to { offset-distance: 100% } }`. If using `<animateMotion>`, define it inline on each circle. Only show dots on active routes (not paused/broken/proven legs).
 - **Verification**: `npx tsc --noEmit src/ui/logistics/_routeMap.ts`
@@ -221,7 +221,7 @@
 - **Verification**: `npx tsc --noEmit src/core/gameState.ts`
 
 ### TASK-034: Update proven leg creation with hubId
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-033
 - **Description**: In `src/core/routes.ts`, update `proveRouteLeg()`: (1) Accept hub IDs for origin and destination (either as new parameters or derived from the flight state + hub lookup using `getHubsOnBody()` and altitude/surface matching). (2) Set `hubId` on the origin and destination `RouteLocation` objects. If no hub exists at the location, set `hubId: null`. (3) Update the `ProveRouteLegParams` type to include optional hub IDs. (4) Update all callers of `proveRouteLeg()` to pass hub information (search for calls in flight controller or post-flight processing). Write unit tests: prove leg with hubs, prove leg without hubs (null), verify hubId is stored correctly.
 - **Verification**: `npx vitest run src/tests/routes.test.ts`
@@ -239,7 +239,7 @@
 - **Verification**: `npx vitest run src/tests/routes.test.ts`
 
 ### TASK-037: Fix all remaining RouteLocation creation sites
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-033
 - **Description**: Grep the entire codebase for places where `RouteLocation` objects are created (object literals with `bodyId` and `locationType` fields). Add `hubId: null` (or the appropriate hub ID) to each. Key files: `src/core/routes.ts` (already handled in TASK-034/035), `src/ui/logistics/_routeBuilder.ts`, any E2E or unit test factories that create proven legs or routes. This is a mechanical task — find every creation site and add the missing field.
 - **Verification**: `npx tsc --noEmit`

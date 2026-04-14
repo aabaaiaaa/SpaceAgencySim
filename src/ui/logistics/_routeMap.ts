@@ -257,6 +257,20 @@ export function renderRouteMap(): SVGSVGElement {
         });
 
         svg.appendChild(path);
+
+        // Animated flow dots on active routes
+        if (route.status === 'active') {
+          const pathD = bezierPath(originPos.x, originPos.y, destPos.x, destPos.y, activeLegCounter);
+          for (let dotIdx = 0; dotIdx < 3; dotIdx++) {
+            const dot = document.createElementNS(svgNS, 'circle');
+            dot.setAttribute('r', '2.5');
+            dot.setAttribute('fill', '#64B4FF');
+            dot.setAttribute('class', 'flow-dot');
+            dot.setAttribute('style', `offset-path: path('${pathD}'); animation-delay: ${dotIdx}s;`);
+            svg.appendChild(dot);
+          }
+        }
+
         activeLegCounter++;
       }
     }

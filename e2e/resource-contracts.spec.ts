@@ -255,8 +255,8 @@ test.describe('Resource contracts — automation chain', () => {
         resourceType: 'WATER_ICE',
         legs: [{
           id: 'leg-1',
-          origin: { bodyId: 'MOON', locationType: 'orbit', altitude: 50 },
-          destination: { bodyId: 'EARTH', locationType: 'orbit', altitude: 200 },
+          origin: { bodyId: 'MOON', locationType: 'orbit', altitude: 50, hubId: null },
+          destination: { bodyId: 'EARTH', locationType: 'orbit', altitude: 200, hubId: null },
           craftDesignId: 'shuttle-1',
           craftCount: 1,
           cargoCapacityKg: 2000,
@@ -314,8 +314,8 @@ test.describe('Resource contracts — automation chain', () => {
           resourceType: 'WATER_ICE',
           legs: [{
             id: `leg-${i}`,
-            origin: { bodyId: 'MOON', locationType: 'orbit', altitude: 50 },
-            destination: { bodyId: 'EARTH', locationType: 'orbit', altitude: 200 },
+            origin: { bodyId: 'MOON', locationType: 'orbit', altitude: 50, hubId: null },
+            destination: { bodyId: 'EARTH', locationType: 'orbit', altitude: 200, hubId: null },
             craftDesignId: 'shuttle-1',
             craftCount: 1,
             cargoCapacityKg: 2000,

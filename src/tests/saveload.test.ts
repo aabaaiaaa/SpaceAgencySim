@@ -1657,8 +1657,8 @@ describe('Save/load round-trip for mining/route fields', () => {
     const state = createGameState();
     state.provenLegs.push({
       id: 'leg-1',
-      origin: { bodyId: 'MOON', locationType: 'surface' },
-      destination: { bodyId: 'MOON', locationType: 'orbit', altitude: 50000 },
+      origin: { bodyId: 'MOON', locationType: 'surface', hubId: null },
+      destination: { bodyId: 'MOON', locationType: 'orbit', altitude: 50000, hubId: null },
       craftDesignId: 'design-1',
       cargoCapacityKg: 500,
       costPerRun: 10000,
@@ -1682,8 +1682,8 @@ describe('Save/load round-trip for mining/route fields', () => {
       resourceType: ResourceType.WATER_ICE,
       legs: [{
         id: 'rleg-1',
-        origin: { bodyId: 'MOON', locationType: 'surface' },
-        destination: { bodyId: 'EARTH', locationType: 'orbit', altitude: 200000 },
+        origin: { bodyId: 'MOON', locationType: 'surface', hubId: null },
+        destination: { bodyId: 'EARTH', locationType: 'orbit', altitude: 200000, hubId: null },
         craftDesignId: 'design-1',
         craftCount: 2,
         cargoCapacityKg: 500,
