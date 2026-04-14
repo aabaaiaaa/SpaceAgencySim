@@ -316,3 +316,133 @@ describe('processConstructionProjects — upgrades', () => {
     expect(hub.facilities[FacilityId.CREW_HAB].tier).toBe(1);
   });
 });
+
+describe('processConstructionProjects — lifecycle edge cases', () => {
+  let state: GameState;
+  beforeEach(() => { state = createGameState(); });
+
+  it('zero resources required completes immediately on next process call', () => {
+    const hub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    // Clear the auto-queued Crew Hab project so we control the queue
+    hub.constructionQueue = [];
+
+    const project = makeConstructionProject({
+      facilityId: FacilityId.VAB,
+      resourcesRequired: [],
+      resourcesDelivered: [],
+      moneyCost: 50_000,
+      startedPeriod: 0,
+    });
+    hub.constructionQueue.push(project);
+
+    processConstructionProjects(state);
+
+    expect(project.completedPeriod).toBe(state.currentPeriod);
+    expect(hub.facilities[FacilityId.VAB]).toBeDefined();
+    expect(hub.facilities[FacilityId.VAB].built).toBe(true);
+    expect(hub.facilities[FacilityId.VAB].tier).toBe(1);
+  });
+
+  it('all resources already delivered completes on process', () => {
+    const hub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    hub.constructionQueue = [];
+
+    const project = makeConstructionProject({
+      facilityId: FacilityId.VAB,
+      resourcesRequired: [
+        { resourceId: 'IRON_ORE' as ResourceType, amount: 500 },
+        { resourceId: 'WATER_ICE' as ResourceType, amount: 200 },
+      ],
+      resourcesDelivered: [
+        { resourceId: 'IRON_ORE' as ResourceType, amount: 500 },
+        { resourceId: 'WATER_ICE' as ResourceType, amount: 200 },
+      ],
+      moneyCost: 100_000,
+      startedPeriod: 0,
+    });
+    hub.constructionQueue.push(project);
+
+    processConstructionProjects(state);
+
+    expect(project.completedPeriod).toBe(state.currentPeriod);
+    expect(hub.facilities[FacilityId.VAB]).toBeDefined();
+    expect(hub.facilities[FacilityId.VAB].built).toBe(true);
+    expect(hub.facilities[FacilityId.VAB].tier).toBe(1);
+  });
+
+  it('partial delivery does not complete, resources tracked correctly', () => {
+    const hub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    hub.constructionQueue = [];
+
+    const project = makeConstructionProject({
+      facilityId: FacilityId.VAB,
+      resourcesRequired: [
+        { resourceId: 'IRON_ORE' as ResourceType, amount: 500 },
+        { resourceId: 'WATER_ICE' as ResourceType, amount: 200 },
+      ],
+      resourcesDelivered: [
+        { resourceId: 'IRON_ORE' as ResourceType, amount: 0 },
+        { resourceId: 'WATER_ICE' as ResourceType, amount: 0 },
+      ],
+      moneyCost: 100_000,
+      startedPeriod: 0,
+    });
+    hub.constructionQueue.push(project);
+
+    // Deliver partial amounts
+    deliverResources(project, 'IRON_ORE', 300);
+    deliverResources(project, 'WATER_ICE', 50);
+
+    processConstructionProjects(state);
+
+    expect(project.completedPeriod).toBeUndefined();
+    expect(hub.facilities[FacilityId.VAB]).toBeUndefined();
+    // Verify delivered amounts are tracked correctly
+    expect(project.resourcesDelivered[0].amount).toBe(300);
+    expect(project.resourcesDelivered[1].amount).toBe(50);
+  });
+
+  it('multiple projects in queue process in FIFO order', () => {
+    const hub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    hub.constructionQueue = [];
+
+    // First project: VAB — fully delivered (should complete)
+    const projectVab = makeConstructionProject({
+      facilityId: FacilityId.VAB,
+      resourcesRequired: [
+        { resourceId: 'IRON_ORE' as ResourceType, amount: 500 },
+      ],
+      resourcesDelivered: [
+        { resourceId: 'IRON_ORE' as ResourceType, amount: 500 },
+      ],
+      moneyCost: 100_000,
+      startedPeriod: 0,
+    });
+
+    // Second project: LAUNCH_PAD — not fully delivered (should remain pending)
+    const projectPad = makeConstructionProject({
+      facilityId: FacilityId.LAUNCH_PAD,
+      resourcesRequired: [
+        { resourceId: 'IRON_ORE' as ResourceType, amount: 1000 },
+      ],
+      resourcesDelivered: [
+        { resourceId: 'IRON_ORE' as ResourceType, amount: 200 },
+      ],
+      moneyCost: 200_000,
+      startedPeriod: 0,
+    });
+
+    hub.constructionQueue.push(projectVab, projectPad);
+
+    processConstructionProjects(state);
+
+    // First project should be completed
+    expect(projectVab.completedPeriod).toBe(state.currentPeriod);
+    expect(hub.facilities[FacilityId.VAB]).toBeDefined();
+    expect(hub.facilities[FacilityId.VAB].built).toBe(true);
+
+    // Second project should remain pending
+    expect(projectPad.completedPeriod).toBeUndefined();
+    expect(hub.facilities[FacilityId.LAUNCH_PAD]).toBeUndefined();
+  });
+});

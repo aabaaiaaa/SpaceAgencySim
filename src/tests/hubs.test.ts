@@ -506,6 +506,28 @@ describe('generateHubName', () => {
     expect(generatedBaseNames.has('Apollo')).toBe(false);
   });
 
+  it('excludes multiple used names from selection', () => {
+    // Add 3 hubs using distinct names from the pool
+    const usedNames = ['Apollo', 'Gemini', 'Vostok'];
+    for (const name of usedNames) {
+      state.hubs.push({
+        ...state.hubs[0],
+        id: `hub-${name.toLowerCase()}`,
+        name: `${name} Outpost`,
+      });
+    }
+
+    // Generate many names and verify none of the 3 used names are picked
+    const generatedBaseNames = new Set<string>();
+    for (let i = 0; i < 300; i++) {
+      const name = generateHubName(state, 'surface');
+      generatedBaseNames.add(name.replace(/ Outpost$/, ''));
+    }
+    for (const used of usedNames) {
+      expect(generatedBaseNames.has(used)).toBe(false);
+    }
+  });
+
   it('excludes names regardless of suffix type', () => {
     // "Apollo Station" should prevent "Apollo" from being used for any hub type
     state.hubs.push({

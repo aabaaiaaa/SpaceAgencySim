@@ -143,7 +143,7 @@
 - **Verification**: `npx tsc --noEmit src/ui/hubManagement.ts`
 
 ### TASK-023: Wire hub management panel to hub switcher
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-022
 - **Description**: In `src/ui/hubSwitcher.ts`, add an info/gear icon button next to the hub dropdown. On click, call `showHubManagementPanel(state, state.activeHubId)`. The icon should be a small gear or (i) icon styled to match the hub switcher's existing visual style. When the management panel closes, the hub switcher should refresh its dropdown options (in case a hub was renamed or abandoned).
 - **Verification**: `npx tsc --noEmit src/ui/hubSwitcher.ts`
@@ -309,25 +309,25 @@
 - **Verification**: `npx vitest run src/tests/hubs-tourists.test.ts`
 
 ### TASK-047: Unit test — construction project lifecycle edge cases
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-015
 - **Description**: In `src/tests/hubs-construction.test.ts`, add tests: (1) Construction project with zero resources required — verify it completes immediately on next `processConstructionProjects()` call. (2) Project with all resources already delivered — verify it completes. (3) Project with partial delivery — verify it doesn't complete, resources are tracked correctly. (4) Multiple projects in queue — verify they process in order (FIFO).
 - **Verification**: `npx vitest run src/tests/hubs-construction.test.ts`
 
 ### TASK-048: Unit test — hub name generation
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-017
 - **Description**: In `src/tests/hubs.test.ts`, add dedicated tests for `generateHubName()`: (1) Returns a name from the pool. (2) Surface hub gets " Outpost" suffix. (3) Orbital hub gets " Station" suffix. (4) Name not already used by existing hubs. (5) When 3 names are used, those 3 are excluded from selection. (6) Fallback to "Hub-N" when pool is exhausted (create a state with hubs using every name in the pool).
 - **Verification**: `npx vitest run src/tests/hubs.test.ts`
 
 ### TASK-049: Unit test — hub rename and abandonment
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-019
 - **Description**: In `src/tests/hubs.test.ts`, add tests for: **Rename:** (1) Valid rename succeeds, name updated. (2) Duplicate name (case-insensitive) rejected. (3) Empty name rejected. (4) Name > 40 chars rejected. (5) Earth hub can be renamed. **Abandon:** (1) Cannot abandon online hub. (2) Cannot abandon Earth hub. (3) Offline hub abandonment: crew evacuated with transit delay. (4) Tourists evicted. (5) Routes with matching hubId marked broken. (6) Hub removed from state.hubs. (7) activeHubId switches to Earth if abandoned hub was active.
 - **Verification**: `npx vitest run src/tests/hubs.test.ts`
 
 ### TASK-050: Unit test — RouteLocation hubId integration
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-036
 - **Description**: In `src/tests/routes.test.ts`, add tests for hub-to-hub routing: (1) `proveRouteLeg()` with hub IDs — verify hubId stored on origin and destination. (2) `proveRouteLeg()` without hubs — verify hubId is null. (3) `createRoute()` with hub targets — verify leg hubIds match. (4) `createRoute()` with invalid hubId — verify rejection. (5) `processRoutes()` delivers to correct destination — off-world hub deposits to orbital buffer, Earth hub sells at market. (6) Route broken when referencing abandoned hub (hubId not in state.hubs).
 - **Verification**: `npx vitest run src/tests/routes.test.ts`

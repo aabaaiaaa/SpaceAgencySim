@@ -10,9 +10,12 @@
 
 import type { GameState } from '../core/gameState.ts';
 import { setActiveHub } from '../core/hubs.ts';
+import { showHubManagementPanel } from './hubManagement.ts';
 
 let _selectEl: HTMLSelectElement | null = null;
 let _container: HTMLElement | null = null;
+let _gearBtn: HTMLButtonElement | null = null;
+let _stateRef: GameState | null = null;
 
 /**
  * Create and mount the hub switcher dropdown inside the given container.
@@ -31,10 +34,27 @@ export function initHubSwitcher(
   wrapper.id = 'hub-switcher-wrapper';
   wrapper.style.cssText = 'position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:20;';
 
+  _stateRef = state;
+
   _selectEl = document.createElement('select');
   _selectEl.id = 'hub-switcher';
 
+  _gearBtn = document.createElement('button');
+  _gearBtn.id = 'hub-switcher-gear';
+  _gearBtn.textContent = '\u2699';
+  _gearBtn.title = 'Manage hub';
+  _gearBtn.setAttribute('aria-label', 'Manage hub');
+  _gearBtn.style.cssText =
+    'margin-left:4px;background:none;border:1px solid #888;border-radius:4px;' +
+    'color:#fff;font-size:16px;cursor:pointer;padding:2px 6px;vertical-align:middle;';
+  _gearBtn.addEventListener('click', () => {
+    if (_stateRef) {
+      showHubManagementPanel(_stateRef, _stateRef.activeHubId);
+    }
+  });
+
   wrapper.appendChild(_selectEl);
+  wrapper.appendChild(_gearBtn);
   container.appendChild(wrapper);
   _container = wrapper;
 
@@ -55,6 +75,8 @@ export function initHubSwitcher(
 export function renderHubSwitcher(state: GameState): void {
   if (!_selectEl) return;
 
+  _stateRef = state;
+
   _selectEl.innerHTML = '';
 
   for (const hub of state.hubs) {
@@ -74,10 +96,8 @@ export function renderHubSwitcher(state: GameState): void {
     _selectEl.appendChild(opt);
   }
 
-  // Hide if only one hub
-  if (_container) {
-    _container.style.display = state.hubs.length <= 1 ? 'none' : '';
-  }
+  // Hide dropdown when only one hub, but keep gear button visible
+  _selectEl.style.display = state.hubs.length <= 1 ? 'none' : '';
 }
 
 /**
@@ -89,4 +109,6 @@ export function destroyHubSwitcher(): void {
     _container = null;
   }
   _selectEl = null;
+  _gearBtn = null;
+  _stateRef = null;
 }
