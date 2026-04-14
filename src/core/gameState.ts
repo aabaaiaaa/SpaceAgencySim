@@ -861,6 +861,8 @@ export interface GameState {
   provenLegs: ProvenLeg[];
   /** Automated resource transport routes. */
   routes: Route[];
+  /** Recovered parts available for reuse (wear-tracked inventory). */
+  partInventory: InventoryPart[];
   /** All player hubs (Earth HQ + off-world bases and stations). */
   hubs: Hub[];
   /** ID of the currently active hub for UI context. */
@@ -1000,6 +1002,9 @@ export function createGameState(): GameState {
     miningSites: [],
     provenLegs: [],
     routes: [],
+
+    // Part inventory — recovered parts with wear tracking.
+    partInventory: [],
 
     // Hub system — Earth HQ is always the first hub.
     hubs: [{

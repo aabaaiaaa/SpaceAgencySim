@@ -34,7 +34,7 @@ describe('Outpost Core deployment', () => {
   let state: GameState;
   beforeEach(() => { state = createGameState(); });
 
-  it('surface deployment creates a surface hub', () => {
+  it('surface deployment creates a surface hub @smoke', () => {
     state.money = 1_000_000;
     const hub = deployOutpostCore(state, { bodyId: 'MOON', altitude: 0, inOrbit: false, landed: true }, 'Lunar Base');
     expect(hub).not.toBeNull();

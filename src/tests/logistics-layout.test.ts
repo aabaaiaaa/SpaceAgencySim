@@ -8,7 +8,7 @@
 import { describe, it, expect } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
 import { createMiningSite } from '../core/mining.ts';
-import { EARTH_HUB_ID } from '../core/constants.ts';
+import { EARTH_HUB_ID, ResourceType } from '../core/constants.ts';
 import { computeSchematicLayout, getSchematicWidth } from '../ui/logistics/_schematicLayout.ts';
 
 // ---------------------------------------------------------------------------
@@ -183,7 +183,7 @@ describe('computeSchematicLayout', () => {
       id: 'route-1',
       name: 'Earth to Mars',
       status: 'active',
-      resourceType: 'WATER_ICE' as any,
+      resourceType: ResourceType.WATER_ICE,
       legs: [{
         id: 'leg-1',
         origin: { bodyId: 'EARTH', locationType: 'orbit', hubId: null },

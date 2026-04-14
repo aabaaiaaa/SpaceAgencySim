@@ -256,8 +256,8 @@ export function initHubUI(container: HTMLElement, state: GameState, onNavigate: 
 
   // Preload commonly-navigated screens during idle time to prime the module cache.
   const preload = () => {
-    import('./vab.ts');
-    import('./missionControl.ts');
+    void import('./vab.ts');
+    void import('./missionControl.ts');
   };
   if (typeof requestIdleCallback === 'function') {
     requestIdleCallback(preload);

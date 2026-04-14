@@ -9,6 +9,7 @@ import {
   FacilityId,
   FlightPhase,
   BODY_RADIUS,
+  ResourceType,
 } from '../core/constants.ts';
 import type { CelestialBody } from '../core/constants.ts';
 import { getSurfaceGravity } from '../data/bodies.ts';
@@ -158,7 +159,7 @@ describe('Hub CRUD — createHub', () => {
   let state: GameState;
   beforeEach(() => { state = createGameState(); });
 
-  it('creates a surface hub on Moon', () => {
+  it('creates a surface hub on Moon @smoke', () => {
     const hub = createHub(state, { name: 'Lunar Base', type: 'surface', bodyId: 'MOON' });
     expect(hub.name).toBe('Lunar Base');
     expect(hub.type).toBe('surface');
@@ -483,7 +484,7 @@ describe('generateHubName', () => {
     expect(name).toMatch(/ Station$/);
   });
 
-  it('uses a name from HUB_NAME_POOL', () => {
+  it('uses a name from HUB_NAME_POOL @smoke', () => {
     const name = generateHubName(state, 'surface');
     const baseName = name.replace(/ Outpost$/, '');
     expect(HUB_NAME_POOL).toContain(baseName);
@@ -710,7 +711,7 @@ describe('abandonHub', () => {
       id: 'route-1',
       name: 'Mars Supply',
       status: 'active',
-      resourceType: 'WATER_ICE' as any,
+      resourceType: ResourceType.WATER_ICE,
       legs: [{
         id: 'leg-1',
         origin: { bodyId: 'EARTH', locationType: 'orbit', hubId: null },
@@ -730,7 +731,7 @@ describe('abandonHub', () => {
       id: 'route-2',
       name: 'Moon Supply',
       status: 'active',
-      resourceType: 'REGOLITH' as any,
+      resourceType: ResourceType.REGOLITH,
       legs: [{
         id: 'leg-2',
         origin: { bodyId: 'EARTH', locationType: 'orbit', hubId: null },

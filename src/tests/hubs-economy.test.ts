@@ -65,7 +65,7 @@ describe('processHubMaintenance', () => {
     expect(state.money).toBe(initialMoney - expectedCost);
   });
 
-  it('takes hub offline when money insufficient', () => {
+  it('takes hub offline when money insufficient @smoke', () => {
     const hub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
     hub.online = true;
     hub.facilities[FacilityId.CREW_HAB] = { built: true, tier: 1 };

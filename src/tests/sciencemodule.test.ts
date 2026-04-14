@@ -100,7 +100,7 @@ function makeGameState(overrides: TestGameStateOverrides = {}): GameState {
     crew: [],
     facilities: {},
     ...overrides,
-  } as GameState;
+  } as unknown as GameState;
 }
 
 function makeGameStateWithRdLab(tier: number): GameState {

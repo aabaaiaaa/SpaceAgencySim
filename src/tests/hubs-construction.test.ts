@@ -91,7 +91,7 @@ describe('processConstructionProjects', () => {
   let state: GameState;
   beforeEach(() => { state = createGameState(); });
 
-  it('marks completed projects and adds facility at tier 1', () => {
+  it('marks completed projects and adds facility at tier 1 @smoke', () => {
     const hub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
     // Fully deliver the Crew Hab resources
     for (const req of hub.constructionQueue[0].resourcesRequired) {

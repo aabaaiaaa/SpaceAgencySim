@@ -219,7 +219,7 @@ import { warpToTarget } from '../core/orbit.ts';
 function setUpFCState(overrides: Partial<FCState> = {}): void {
   resetFCState();
   const s = getFCState();
-  s.state = makeGameState({ orbitalObjects: [], facilities: {} });
+  s.state = makeGameState({ orbitalObjects: [] });
   setPhysicsState(makePhysicsState({
     posX: 0, posY: 200_000, velX: 7800, velY: 0,
     angle: 0, throttle: 0,

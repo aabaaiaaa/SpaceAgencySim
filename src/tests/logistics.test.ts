@@ -49,17 +49,17 @@ describe('getBodyColor()', () => {
 
 describe('formatLocation()', () => {
   it('formats a surface location', () => {
-    const loc: RouteLocation = { bodyId: 'MOON', locationType: 'surface' };
+    const loc: RouteLocation = { bodyId: 'MOON', locationType: 'surface', hubId: null };
     expect(formatLocation(loc)).toBe('MOON (surface)');
   });
 
   it('formats an orbit location with altitude', () => {
-    const loc: RouteLocation = { bodyId: 'MARS', locationType: 'orbit', altitude: 200 };
+    const loc: RouteLocation = { bodyId: 'MARS', locationType: 'orbit', altitude: 200, hubId: null };
     expect(formatLocation(loc)).toBe('MARS (orbit, 200km)');
   });
 
   it('formats an orbit location without altitude', () => {
-    const loc: RouteLocation = { bodyId: 'EARTH', locationType: 'orbit' };
+    const loc: RouteLocation = { bodyId: 'EARTH', locationType: 'orbit', hubId: null };
     expect(formatLocation(loc)).toBe('EARTH (orbit)');
   });
 

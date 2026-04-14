@@ -27,7 +27,7 @@ describe('Off-world VAB import tax multipliers', () => {
 });
 
 describe('Part cost with import tax', () => {
-  it('part cost at off-world hub is base cost times multiplier', () => {
+  it('part cost at off-world hub is base cost times multiplier @smoke', () => {
     // Use an actual part from the catalog
     const testPart = getPartById('engine-spark');
     expect(testPart).toBeDefined();

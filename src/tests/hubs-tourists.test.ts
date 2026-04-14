@@ -172,7 +172,7 @@ describe('processTouristRevenue', () => {
     state = createGameState();
   });
 
-  it('credits revenue for each tourist per period', () => {
+  it('credits revenue for each tourist per period @smoke', () => {
     const hub = makeHub({
       facilities: { [FacilityId.CREW_HAB]: { built: true, tier: 1 } },
       tourists: [makeTourist({ revenue: 3_000 }), makeTourist({ revenue: 7_000 })],

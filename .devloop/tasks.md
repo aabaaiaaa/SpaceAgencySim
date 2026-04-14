@@ -461,19 +461,19 @@
 ## Phase I: Final Verification & Cleanup
 
 ### TASK-071: Update test-map.json for new files
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-052, TASK-069, TASK-070
 - **Description**: Update `test-map.json` to map new source files to their relevant test files. Add entries for: `src/data/hubNames.ts` → `hubs.test.ts`, `src/ui/hubManagement.ts` → `hub-management.spec.ts`, `src/ui/logistics/_schematicLayout.ts` → `logistics-layout.test.ts`, `src/ui/loadingIndicator.ts` → `navigation.spec.ts`. Also add entries for any new E2E spec files. Review existing entries and update any that changed due to the Earth hub migration.
 - **Verification**: `node scripts/run-affected.mjs --dry-run 2>&1 | head -20`
 
 ### TASK-072: Tag smoke tests in new test files
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-055, TASK-056, TASK-057, TASK-058, TASK-059, TASK-060, TASK-061, TASK-062, TASK-063, TASK-064, TASK-065, TASK-066, TASK-067, TASK-068, TASK-069, TASK-070
 - **Description**: Review all new test files created in this iteration. Ensure 1-2 representative tests per file are tagged with `@smoke` in their description. Priority for smoke tags: hub management panel display, hub abandonment, multi-leg route builder, SVG dynamic layout, code-splitting navigation, off-world pipeline integration. Check that existing smoke tests in modified files still make sense.
 - **Verification**: `npx vitest run --testNamePattern "@smoke" 2>&1 | tail -5`
 
 ### TASK-073: Full typecheck and lint pass
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-015, TASK-037, TASK-043
 - **Description**: Run `npx tsc --noEmit` across the full project. Fix any remaining TypeScript errors. Run `npx eslint src/` and fix any errors (warnings in coverage/ are OK to ignore). This is the final quality gate before the E2E test verification.
 - **Verification**: `npx tsc --noEmit && npx eslint src/ --max-warnings=10`

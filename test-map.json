@@ -144,6 +144,52 @@
         "e2e/crew.spec.ts"
       ]
     },
+    "core/hubCrew": {
+      "sources": [
+        "src/core/hubCrew.ts"
+      ],
+      "unit": [
+        "src/tests/hubs-crew.test.ts"
+      ],
+      "e2e": [
+        "e2e/hub-economy.spec.ts"
+      ]
+    },
+    "core/hubTourists": {
+      "sources": [
+        "src/core/hubTourists.ts"
+      ],
+      "unit": [
+        "src/tests/hubs-tourists.test.ts"
+      ],
+      "e2e": [
+        "e2e/hub-economy.spec.ts"
+      ]
+    },
+    "core/hubTypes": {
+      "sources": [
+        "src/core/hubTypes.ts"
+      ],
+      "unit": [
+        "src/tests/hubs.test.ts"
+      ],
+      "e2e": []
+    },
+    "core/hubs": {
+      "sources": [
+        "src/core/hubs.ts"
+      ],
+      "unit": [
+        "src/tests/hubs.test.ts",
+        "src/tests/hubs-construction.test.ts",
+        "src/tests/hubs-integration.test.ts"
+      ],
+      "e2e": [
+        "e2e/hubs-establishment.spec.ts",
+        "e2e/hub-deployment.spec.ts",
+        "e2e/hub-economy.spec.ts"
+      ]
+    },
     "core/designLibrary": {
       "sources": [
         "src/core/designLibrary.ts"
@@ -686,6 +732,27 @@
         "e2e/agency-depth.spec.ts"
       ]
     },
+    "data/hubFacilities": {
+      "sources": [
+        "src/data/hubFacilities.ts"
+      ],
+      "unit": [
+        "src/tests/hubs.test.ts",
+        "src/tests/hubs-construction.test.ts"
+      ],
+      "e2e": [
+        "e2e/hubs-establishment.spec.ts"
+      ]
+    },
+    "data/hubNames": {
+      "sources": [
+        "src/data/hubNames.ts"
+      ],
+      "unit": [
+        "src/tests/hubs.test.ts"
+      ],
+      "e2e": []
+    },
     "data/instruments": {
       "sources": [
         "src/data/instruments.ts"
@@ -860,8 +927,28 @@
       ],
       "unit": [],
       "e2e": [
+        "e2e/hub-management.spec.ts",
         "e2e/hub-navigation.spec.ts",
         "e2e/newgame.spec.ts"
+      ]
+    },
+    "ui/hubManagement": {
+      "sources": [
+        "src/ui/hubManagement.ts"
+      ],
+      "unit": [],
+      "e2e": [
+        "e2e/hub-management.spec.ts"
+      ]
+    },
+    "ui/hubSwitcher": {
+      "sources": [
+        "src/ui/hubSwitcher.ts"
+      ],
+      "unit": [],
+      "e2e": [
+        "e2e/hubs-switcher.spec.ts",
+        "e2e/hub-navigation.spec.ts"
       ]
     },
     "ui/launchPad": {
@@ -873,6 +960,15 @@
         "e2e/launchpad-relaunch.spec.ts",
         "e2e/launchpad.spec.ts",
         "e2e/relaunch.spec.ts"
+      ]
+    },
+    "ui/loadingIndicator": {
+      "sources": [
+        "src/ui/loadingIndicator.ts"
+      ],
+      "unit": [],
+      "e2e": [
+        "e2e/navigation.spec.ts"
       ]
     },
     "ui/mainmenu": {
@@ -1113,7 +1209,8 @@
         "src/tests/routes.test.ts"
       ],
       "e2e": [
-        "e2e/mining.spec.ts"
+        "e2e/mining.spec.ts",
+        "e2e/route-interactions.spec.ts"
       ]
     },
     "data/resources": {
@@ -1129,11 +1226,26 @@
     },
     "ui/logistics": {
       "sources": [
-        "src/ui/logistics/index.ts"
+        "src/ui/logistics/index.ts",
+        "src/ui/logistics/_schematicLayout.ts"
       ],
-      "unit": [],
+      "unit": [
+        "src/tests/logistics-layout.test.ts"
+      ],
       "e2e": [
+        "e2e/logistics.spec.ts",
         "e2e/mining.spec.ts"
+      ]
+    },
+    "ui/logistics/schematicLayout": {
+      "sources": [
+        "src/ui/logistics/_schematicLayout.ts"
+      ],
+      "unit": [
+        "src/tests/logistics-layout.test.ts"
+      ],
+      "e2e": [
+        "e2e/logistics.spec.ts"
       ]
     },
     "tests/_factories": {
