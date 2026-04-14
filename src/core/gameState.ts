@@ -801,11 +801,6 @@ export interface GameState {
   sandboxSettings: SandboxSettings | null;
   /** Difficulty options changeable in-game from the hub settings menu. */
   difficultySettings: DifficultySettings;
-  /**
-   * Map of facility ID → state.
-   * Only facilities that have been built appear here.
-   */
-  facilities: Record<string, FacilityState>;
   /** Procedurally generated contract system state. */
   contracts: {
     /** Available contracts visible on the board (pool). */
@@ -830,8 +825,6 @@ export interface GameState {
   techTree: TechTreeState;
   /** Deployed satellite network state. */
   satelliteNetwork: SatelliteNetworkState;
-  /** Recovered parts available for reuse. */
-  partInventory: InventoryPart[];
   /** Current weather conditions at the launch site. */
   weather: WeatherState | null;
   /** Items deployed on celestial body surfaces (flags, samples, instruments, beacons). */
@@ -940,12 +933,6 @@ export function createGameState(): GameState {
     // Difficulty options — changeable in-game from the hub settings menu.
     difficultySettings: { ...DEFAULT_DIFFICULTY_SETTINGS },
 
-    // Starter facilities are pre-built; the rest are added by
-    // buildFacility() (non-tutorial) or awarded via tutorial missions.
-    // NOTE: This is the same object reference as hubs[0].facilities (Earth HQ)
-    // so that legacy code writing to state.facilities stays in sync with the hub system.
-    facilities: starterFacilities,
-
     // Procedurally generated contract system.
     contracts: {
       board: [],      // Available contracts visible on the board (pool).
@@ -970,9 +957,6 @@ export function createGameState(): GameState {
     satelliteNetwork: {
       satellites: [],
     },
-
-    // Part inventory — recovered parts available for reuse in the VAB.
-    partInventory: [],
 
     // Weather conditions at the launch site (null until first hub visit).
     weather: null,

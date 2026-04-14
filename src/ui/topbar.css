@@ -398,6 +398,37 @@
   color: var(--color-warning, #e6a030);
   border: 1px solid rgba(230, 160, 50, 0.4);
 }
+.save-slot-incompatible {
+  opacity: 0.5;
+  cursor: default;
+}
+.save-slot-incompatible:hover {
+  background: transparent;
+  border-color: rgba(100, 160, 220, 0.16);
+}
+.save-slot-incompatible .save-slot-info strong {
+  color: #667788;
+}
+.save-slot-incompatible .save-slot-info span {
+  color: #556677;
+}
+
+/* Load error toast */
+.topbar-load-error-toast {
+  position: fixed;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(200, 60, 60, 0.9);
+  color: #fff;
+  padding: 10px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 0.85rem;
+  font-weight: 600;
+  z-index: 20000;
+  pointer-events: none;
+  transition: opacity 0.4s;
+}
 
 /* ══════════════════════════════════════════════════════════════════
    Confirmation dialog

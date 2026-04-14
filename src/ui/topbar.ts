@@ -1022,8 +1022,9 @@ function _doLoadGame(): void {
 
     if (slot) {
       hasAnySave = true;
+      const isIncompatible: boolean = slot.version !== SAVE_VERSION;
       const name: HTMLElement = document.createElement('strong');
-      name.textContent = slot.saveName || `Slot ${i + 1}`;
+      name.textContent = (slot.saveName || `Slot ${i + 1}`) + (isIncompatible ? ' (Incompatible)' : '');
 
       const detail: HTMLSpanElement = document.createElement('span');
       const ts: string = new Date(slot.timestamp).toLocaleString();
@@ -1032,7 +1033,8 @@ function _doLoadGame(): void {
       info.appendChild(name);
       info.appendChild(detail);
 
-      if (slot.version !== SAVE_VERSION) {
+      if (isIncompatible) {
+        card.classList.add('save-slot-incompatible');
         const versionWarn: HTMLSpanElement = document.createElement('span');
         versionWarn.className = 'save-version-warning';
         versionWarn.dataset.testid = 'version-warning';
@@ -1053,9 +1055,12 @@ function _doLoadGame(): void {
 
     const tag: HTMLSpanElement = document.createElement('span');
     tag.className = 'save-slot-action-tag';
-    if (slot) {
+    if (slot && slot.version === SAVE_VERSION) {
       tag.textContent = 'Load';
       tag.classList.add('load-action');
+    } else if (slot) {
+      tag.textContent = 'Incompatible';
+      tag.style.opacity = '0.4';
     } else {
       tag.textContent = '\u2014';
       tag.style.opacity = '0.3';
@@ -1064,16 +1069,17 @@ function _doLoadGame(): void {
     card.appendChild(info);
     card.appendChild(tag);
 
-    if (slot) {
+    if (slot && slot.version === SAVE_VERSION) {
       const slotIndex: number = i;
       card.style.cursor = 'pointer';
       card.addEventListener('click', () => {
         _confirmAndLoad(slotIndex, backdrop);
       });
-    } else {
+    } else if (!slot) {
       card.style.opacity = '0.5';
       card.style.cursor = 'default';
     }
+    // incompatible slots: cursor/opacity handled by .save-slot-incompatible CSS
 
     modal.appendChild(card);
   }
@@ -1131,6 +1137,7 @@ function _confirmAndLoad(slotIndex: number, loadBackdrop: HTMLElement): void {
       }
     }).catch((err: unknown) => {
       logger.error('topbar', 'Load failed', { error: String(err) });
+      _showLoadErrorToast('This save was created with an older version and is not compatible.');
     });
   });
 
@@ -1141,6 +1148,22 @@ function _confirmAndLoad(slotIndex: number, loadBackdrop: HTMLElement): void {
   backdrop.addEventListener('click', () => backdrop.remove());
   backdrop.appendChild(modal);
   document.body.appendChild(backdrop);
+}
+
+// ---------------------------------------------------------------------------
+// Load error toast
+// ---------------------------------------------------------------------------
+
+/**
+ * Show a brief error toast when a save load fails.
+ */
+function _showLoadErrorToast(msg: string): void {
+  const toast: HTMLDivElement = document.createElement('div');
+  toast.className = 'topbar-load-error-toast';
+  toast.textContent = msg;
+  document.body.appendChild(toast);
+  setTimeout(() => { toast.style.opacity = '0'; }, 3000);
+  setTimeout(() => { toast.remove(); }, 3500);
 }
 
 // ---------------------------------------------------------------------------

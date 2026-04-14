@@ -14,6 +14,7 @@ import {
   getLogisticsState,
   triggerRender,
 } from './_state.ts';
+import { computeSchematicLayout } from './_schematicLayout.ts';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -48,18 +49,6 @@ export function formatLocation(loc: RouteLocation): string {
 // Route Map SVG
 // ---------------------------------------------------------------------------
 
-/** Schematic body positions (x, y) within the 800x200 viewBox. */
-const bodyPositions: Record<string, { x: number; y: number; label: string; radius: number }> = {
-  SUN:     { x: 60,  y: 100, label: 'Sun',     radius: 20 },
-  EARTH:   { x: 220, y: 100, label: 'Earth',   radius: 14 },
-  MOON:    { x: 280, y: 60,  label: 'Moon',    radius: 8 },
-  MARS:    { x: 400, y: 100, label: 'Mars',    radius: 12 },
-  CERES:   { x: 510, y: 100, label: 'Ceres',   radius: 7 },
-  JUPITER: { x: 620, y: 80,  label: 'Jupiter', radius: 18 },
-  SATURN:  { x: 700, y: 120, label: 'Saturn',  radius: 16 },
-  TITAN:   { x: 740, y: 60,  label: 'Titan',   radius: 7 },
-};
-
 /**
  * Build an SVG schematic of the solar system showing bodies that are
  * relevant to the player's logistics network (mining sites, route
@@ -67,6 +56,7 @@ const bodyPositions: Record<string, { x: number; y: number; label: string; radiu
  */
 export function renderRouteMap(): SVGSVGElement {
   const ls = getLogisticsState();
+  const layout = computeSchematicLayout(ls.state);
   const svgNS = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(svgNS, 'svg');
   svg.setAttribute('class', 'logistics-route-map');
@@ -91,14 +81,14 @@ export function renderRouteMap(): SVGSVGElement {
   }
 
   // Render visible bodies
-  for (const [bodyId, pos] of Object.entries(bodyPositions)) {
+  for (const [bodyId, node] of layout) {
     if (!visibleBodies.has(bodyId)) continue;
 
     // Circle
     const circle = document.createElementNS(svgNS, 'circle');
-    circle.setAttribute('cx', String(pos.x));
-    circle.setAttribute('cy', String(pos.y));
-    circle.setAttribute('r', String(pos.radius));
+    circle.setAttribute('cx', String(node.x));
+    circle.setAttribute('cy', String(node.y));
+    circle.setAttribute('r', String(node.radius));
     circle.setAttribute('class', `body-node body-${bodyId.toLowerCase()}`);
     circle.setAttribute('fill', getBodyColor(bodyId));
     circle.setAttribute('stroke', '#666');
@@ -125,21 +115,21 @@ export function renderRouteMap(): SVGSVGElement {
 
     // Label below
     const label = document.createElementNS(svgNS, 'text');
-    label.setAttribute('x', String(pos.x));
-    label.setAttribute('y', String(pos.y + pos.radius + 16));
+    label.setAttribute('x', String(node.x));
+    label.setAttribute('y', String(node.y + node.radius + 16));
     label.setAttribute('text-anchor', 'middle');
     label.setAttribute('class', 'body-label');
     label.setAttribute('fill', '#ccc');
     label.setAttribute('font-size', '11');
-    label.textContent = pos.label;
+    label.textContent = node.label;
     svg.appendChild(label);
   }
 
   // --- Proven leg dashed lines ---
   if (ls.state) {
     for (const leg of ls.state.provenLegs) {
-      const originPos = bodyPositions[leg.origin.bodyId];
-      const destPos = bodyPositions[leg.destination.bodyId];
+      const originPos = layout.get(leg.origin.bodyId);
+      const destPos = layout.get(leg.destination.bodyId);
       if (!originPos || !destPos) continue;
 
       const line = document.createElementNS(svgNS, 'line');
@@ -195,8 +185,8 @@ export function renderRouteMap(): SVGSVGElement {
     // --- Active route solid lines ---
     for (const route of ls.state.routes) {
       for (const leg of route.legs) {
-        const originPos = bodyPositions[leg.origin.bodyId];
-        const destPos = bodyPositions[leg.destination.bodyId];
+        const originPos = layout.get(leg.origin.bodyId);
+        const destPos = layout.get(leg.destination.bodyId);
         if (!originPos || !destPos) continue;
 
         const line = document.createElementNS(svgNS, 'line');

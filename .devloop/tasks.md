@@ -33,7 +33,7 @@
 - **Verification**: `npx vitest run src/tests/saveload.test.ts 2>/dev/null; npx tsc --noEmit src/core/saveload.ts`
 
 ### TASK-006: Incompatible save UI handling
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-005
 - **Description**: Find the save/load UI (likely in `src/ui/topbar.ts` or a sub-module). When rendering save slot list, if a slot's save version doesn't match `SAVE_VERSION`: (1) Show the slot's name but grayed out (add a CSS class like `save-slot-incompatible`). (2) Append "(Incompatible)" text. (3) Disable the Load button for that slot. (4) If the user somehow triggers a load of an incompatible save, show a notification: "This save was created with an older version and is not compatible." Add the CSS for the grayed-out state.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts 2>/dev/null; npx tsc --noEmit src/ui/topbar.ts`
@@ -43,7 +43,7 @@
 ## Phase B: Earth Hub Full Migration
 
 ### TASK-007: Remove `facilities` field from GameState interface
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-005
 - **Description**: In `src/core/gameState.ts`: (1) Remove the `facilities` property from the `GameState` interface/type. (2) In `createGameState()`, remove the line that assigns `facilities: starterFacilities` (or however it's assigned). The Earth hub in `state.hubs[0]` already has facilities — that is now the sole source. (3) If `partInventory` exists as a top-level GameState field that aliases the Earth hub's inventory, remove it too. (4) This will cause TypeScript errors across the codebase — that's expected. Subsequent tasks fix them.
 - **Verification**: `npx tsc --noEmit src/core/gameState.ts`
@@ -101,7 +101,7 @@
 ## Phase C: Hub UX Polish
 
 ### TASK-016: Create hub name catalog
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create new file `src/data/hubNames.ts`. Export a `HUB_NAME_POOL` constant — a frozen array of ~80-100 string names from space history. Categories to include: mission names (Apollo, Gemini, Vostok, Artemis, Pioneer, Voyager, Mercury, Viking, Cassini, Rosetta, Juno, Horizon, Discovery, Endeavour, Challenger, Columbia, Surveyor, Mariner, Ranger, Luna, Venera, Hayabusa, Dawn, Messenger, Magellan, Galileo, Ulysses, Stardust, Genesis), rocket names (Saturn, Falcon, Soyuz, Atlas, Titan, Delta, Ariane, Vega, Proton, Energia, Electron, Antares, Vulcan, Starship, Angara, Diamant, Europa, Scout, Minotaur), figure names (Gagarin, Glenn, Ride, Tereshkova, Armstrong, Aldrin, Shepard, Leonov, Yang, Chawla, Jemison, Hubble, Kepler, Tsiolkovsky, Goddard, Korolev, Oberth, Copernicus, Tycho, Collins, Lovell, Cernan, Bean, Conrad, Schmitt), station names (Mir, Skylab, Tiangong, Salyut, Freedom, Unity, Harmony, Destiny, Zarya, Zvezda, Kibo, Columbus). Use `Object.freeze()` on the array. Export type `HubNamePool`.
 - **Verification**: `npx tsc --noEmit src/data/hubNames.ts`
@@ -153,7 +153,7 @@
 ## Phase D: Mk2 Storage Modules
 
 ### TASK-024: Add Mk2 storage part definitions
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/data/parts.ts`, add three new entries to the `PARTS` array. Storage Silo Mk2: id `storage-silo-mk2`, name `Storage Silo Mk2`, type MINING_MODULE, mass 800, cost 30000, width 40, height 40, properties { miningModuleType: STORAGE_SILO, powerDraw: 3, storageCapacityKg: 5000, storageState: 'SOLID', dragCoefficient: 0.28, heatTolerance: 1800, crashThreshold: 10 }, snap points matching storage-silo-mk1. Pressure Vessel Mk2: id `pressure-vessel-mk2`, mass 600, cost 45000, width 40, height 50, properties { miningModuleType: PRESSURE_VESSEL, powerDraw: 8, storageCapacityKg: 2500, storageState: 'GAS', dragCoefficient: 0.20, heatTolerance: 1500, crashThreshold: 8 }. Fluid Tank Mk2: id `fluid-tank-mk2`, mass 700, cost 55000, width 40, height 50, properties { miningModuleType: FLUID_TANK, powerDraw: 12, storageCapacityKg: 3750, storageState: 'LIQUID', dragCoefficient: 0.20, heatTolerance: 1200, crashThreshold: 6 }. Copy snap points and animation states from the corresponding Mk1 parts.
 - **Verification**: `npx tsc --noEmit src/data/parts.ts`
@@ -169,7 +169,7 @@
 ## Phase E: SVG Map Dynamic Layout & Hub Nodes
 
 ### TASK-026: Extract schematic layout into separate module
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create `src/ui/logistics/_schematicLayout.ts`. Move the body positioning logic out of `_routeMap.ts` into this new module. Export a function `computeSchematicLayout(state: GameState): SchematicLayout` where `SchematicLayout` is a Map or Record mapping node IDs to `{ x: number; y: number; radius: number; type: 'body' | 'surfaceHub' | 'orbitalHub'; parentId?: string; hubId?: string; label: string }`. For now, this can just reproduce the existing hardcoded positions as a starting point — the dynamic algorithm comes in TASK-027. Also export the `SchematicLayout` type. Update `_routeMap.ts` to import and use this layout instead of its hardcoded positions.
 - **Verification**: `npx tsc --noEmit src/ui/logistics/_schematicLayout.ts && npx tsc --noEmit src/ui/logistics/_routeMap.ts`
