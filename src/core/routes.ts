@@ -101,6 +101,7 @@ export interface CreateRouteParams {
   name: string;
   resourceType: ResourceType;
   provenLegIds: string[];   // IDs of ProvenLeg entries to chain into the route
+  hubOverrides?: Record<string, { originHubId?: string | null; destinationHubId?: string | null }>;
 }
 
 // ---------------------------------------------------------------------------
@@ -138,10 +139,35 @@ export function createRoute(state: GameState, params: CreateRouteParams): Route 
   const routeLegs: RouteLeg[] = params.provenLegIds.map((plId) => {
     const proven = state.provenLegs.find((pl) => pl.id === plId);
     if (!proven) throw new Error(`ProvenLeg not found: ${plId}`);
+
+    // Apply hub overrides if provided
+    const override = params.hubOverrides?.[plId];
+    const origin = { ...proven.origin };
+    const destination = { ...proven.destination };
+
+    if (override?.originHubId !== undefined) {
+      origin.hubId = override.originHubId;
+    }
+    if (override?.destinationHubId !== undefined) {
+      destination.hubId = override.destinationHubId;
+    }
+
+    // Validate hub references
+    if (origin.hubId !== null && origin.hubId !== undefined) {
+      if (!state.hubs.some(h => h.id === origin.hubId)) {
+        throw new Error(`Hub not found for route origin: ${origin.hubId}`);
+      }
+    }
+    if (destination.hubId !== null && destination.hubId !== undefined) {
+      if (!state.hubs.some(h => h.id === destination.hubId)) {
+        throw new Error(`Hub not found for route destination: ${destination.hubId}`);
+      }
+    }
+
     return {
       id: generateRouteLegId(),
-      origin: proven.origin,
-      destination: proven.destination,
+      origin,
+      destination,
       craftDesignId: proven.craftDesignId,
       craftCount: 1,
       cargoCapacityKg: proven.cargoCapacityKg,

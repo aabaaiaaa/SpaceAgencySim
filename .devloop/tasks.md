@@ -125,7 +125,7 @@
 - **Verification**: `npx vitest run src/tests/hubs.test.ts`
 
 ### TASK-020: Hub management info helper
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-019
 - **Description**: In `src/core/hubs.ts`, add a `getHubManagementInfo(state: GameState, hubId: string): HubManagementInfo` function (define the `HubManagementInfo` interface in `hubTypes.ts`). Fields: id, name, bodyId, bodyName (from bodies data), type, online, established, facilities (array of {id, name, tier, underConstruction}), crewCount, crewNames (array), touristCount, maintenanceCostPerPeriod (from calculateHubMaintenance), totalInvestment (sum of all construction project moneyCost values at this hub — both completed and in-progress), canRename (always true), canReactivate (!online && id !== EARTH_HUB_ID), canAbandon (!online && id !== EARTH_HUB_ID). Write unit tests verifying each field is computed correctly for Earth hub and an off-world hub.
 - **Verification**: `npx vitest run src/tests/hubs.test.ts`
@@ -187,7 +187,7 @@
 - **Verification**: `npx vitest run src/tests/logistics-layout.test.ts 2>/dev/null || npx vitest run src/tests/logistics.test.ts 2>/dev/null`
 
 ### TASK-029: Render hub nodes on SVG map
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-028
 - **Description**: In `src/ui/logistics/_routeMap.ts`, update the SVG rendering to draw hub nodes from the layout. For each node with type 'surfaceHub': draw a small filled `<rect>` (6x6) at the node position, with a thin line connecting to the parent body. For each 'orbitalHub': draw a rotated `<rect>` (diamond shape, 8x8, transform rotate 45deg) with a dashed connecting line. Colors: use the parent body's CSS color. Online hubs: full opacity, solid border. Offline: 40% opacity, dashed border. Under construction: 60% opacity, dashed border. Draw hub name label in 8px text below/beside the icon. Hub nodes should have `cursor: pointer` and `data-hub-id` attributes for click handling.
 - **Verification**: `npx tsc --noEmit src/ui/logistics/_routeMap.ts`
@@ -227,7 +227,7 @@
 - **Verification**: `npx vitest run src/tests/routes.test.ts`
 
 ### TASK-035: Update route creation with hub targets
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-034
 - **Description**: In `src/core/routes.ts`, update `createRoute()`: (1) Route legs inherit `hubId` from their proven legs. (2) Add optional `hubId` overrides in `CreateRouteParams` so the route builder can assign specific hubs. (3) Validation: if a leg references a `hubId` that doesn't exist in `state.hubs`, reject route creation with an error. (4) Update `calculateRouteThroughput()` if it needs hub context (likely unchanged). Write unit tests: create route with hub targets, hub override on leg, invalid hubId rejected.
 - **Verification**: `npx vitest run src/tests/routes.test.ts`
@@ -261,13 +261,13 @@
 ## Phase G: Code-Splitting
 
 ### TASK-040: Audit screen entry points for code-splitting readiness
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Audit each screen module's imports for circular dependencies or side effects that would prevent lazy loading. Check: `src/ui/vab/index.ts`, `src/ui/flightController/index.ts`, `src/ui/logistics/index.ts`, `src/ui/missionControl/index.ts`, `src/ui/crewAdmin.ts`, `src/render/vab.js`, `src/render/flight.js`, `src/render/map.ts`. For each, verify: (a) the module doesn't have import side effects (top-level DOM manipulation or event listener registration that runs on import), (b) no circular imports between the screen and the main entry point. Document any issues found. Fix any side effects by moving them inside the screen's `show*()` function (lazy initialization). This task is research + minor fixes only.
 - **Verification**: `npx tsc --noEmit`
 
 ### TASK-041: Create loading indicator component
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create `src/ui/loadingIndicator.ts`. Export `showLoadingIndicator()` and `hideLoadingIndicator()`. The indicator is a full-screen overlay (position: fixed, z-index above game canvas but below dialogs) with a centered "Loading..." text. Dark semi-transparent background matching the game's theme. The text should use the game's standard font. Keep it minimal — no spinner animation needed, just text. Add corresponding CSS in the main stylesheet or inline.
 - **Verification**: `npx tsc --noEmit src/ui/loadingIndicator.ts`

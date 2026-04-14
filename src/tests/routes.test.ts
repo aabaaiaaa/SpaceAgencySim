@@ -14,6 +14,7 @@ import {
 } from '../core/routes.ts';
 import type { SafeOrbitRange } from '../core/routes.ts';
 import { createMiningSite } from '../core/mining.ts';
+import { createHub } from '../core/hubs.ts';
 import { advancePeriod } from '../core/period.ts';
 import { ResourceType } from '../core/constants.ts';
 import { RESOURCES_BY_ID } from '../data/resources.ts';
@@ -823,6 +824,171 @@ describe('getSafeOrbitRange', () => {
     // Only leg at MOON has undefined altitude — no defined altitudes to collect
     const range = getSafeOrbitRange(state, 'MOON', 75);
     expect(range).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// createRoute — hub-targeted route creation
+// ---------------------------------------------------------------------------
+
+describe('createRoute with hub targets', () => {
+  it('inherits hubIds from proven legs', () => {
+    const state = createGameState();
+
+    // Create hubs so validation passes
+    const moonHub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    const earthHub = createHub(state, { name: 'Earth Station', type: 'orbital', bodyId: 'EARTH', altitude: 200 });
+
+    // Prove a leg with hubIds set
+    const pl = proveRouteLeg(state, {
+      origin: surface('MOON'),
+      destination: orbit('EARTH', 200),
+      craftDesignId: 'shuttle',
+      cargoCapacityKg: 1000,
+      costPerRun: 50_000,
+      flightId: 'f-hub-1',
+      originHubId: moonHub.id,
+      destinationHubId: earthHub.id,
+    });
+
+    const route = createRoute(state, {
+      name: 'Hub Route',
+      resourceType: ResourceType.WATER_ICE,
+      provenLegIds: [pl.id],
+    });
+
+    expect(route.legs[0].origin.hubId).toBe(moonHub.id);
+    expect(route.legs[0].destination.hubId).toBe(earthHub.id);
+  });
+
+  it('applies hubOverrides to route legs', () => {
+    const state = createGameState();
+
+    // Create hubs
+    const moonHub = createHub(state, { name: 'Moon Outpost', type: 'surface', bodyId: 'MOON' });
+    const earthHub = createHub(state, { name: 'Earth Dock', type: 'orbital', bodyId: 'EARTH', altitude: 200 });
+
+    // Prove a leg with null hubIds
+    const pl = proveRouteLeg(state, {
+      origin: surface('MOON'),
+      destination: orbit('EARTH', 200),
+      craftDesignId: 'shuttle',
+      cargoCapacityKg: 1000,
+      costPerRun: 50_000,
+      flightId: 'f-hub-2',
+    });
+
+    // Create route with overrides
+    const route = createRoute(state, {
+      name: 'Override Route',
+      resourceType: ResourceType.REGOLITH,
+      provenLegIds: [pl.id],
+      hubOverrides: {
+        [pl.id]: { originHubId: moonHub.id, destinationHubId: earthHub.id },
+      },
+    });
+
+    expect(route.legs[0].origin.hubId).toBe(moonHub.id);
+    expect(route.legs[0].destination.hubId).toBe(earthHub.id);
+  });
+
+  it('rejects invalid originHubId in hubOverrides', () => {
+    const state = createGameState();
+
+    const pl = proveRouteLeg(state, {
+      origin: surface('MOON'),
+      destination: orbit('EARTH', 200),
+      craftDesignId: 'shuttle',
+      cargoCapacityKg: 1000,
+      costPerRun: 50_000,
+      flightId: 'f-hub-3',
+    });
+
+    expect(() =>
+      createRoute(state, {
+        name: 'Bad Hub Route',
+        resourceType: ResourceType.WATER_ICE,
+        provenLegIds: [pl.id],
+        hubOverrides: {
+          [pl.id]: { originHubId: 'nonexistent-hub-id' },
+        },
+      }),
+    ).toThrow('Hub not found for route origin: nonexistent-hub-id');
+  });
+
+  it('rejects invalid destinationHubId in hubOverrides', () => {
+    const state = createGameState();
+
+    const pl = proveRouteLeg(state, {
+      origin: surface('MOON'),
+      destination: orbit('EARTH', 200),
+      craftDesignId: 'shuttle',
+      cargoCapacityKg: 1000,
+      costPerRun: 50_000,
+      flightId: 'f-hub-4',
+    });
+
+    expect(() =>
+      createRoute(state, {
+        name: 'Bad Dest Route',
+        resourceType: ResourceType.WATER_ICE,
+        provenLegIds: [pl.id],
+        hubOverrides: {
+          [pl.id]: { destinationHubId: 'ghost-hub' },
+        },
+      }),
+    ).toThrow('Hub not found for route destination: ghost-hub');
+  });
+
+  it('works with no overrides and null hubIds (existing behaviour preserved)', () => {
+    const state = createGameState();
+
+    const pl = proveRouteLeg(state, {
+      origin: surface('MOON'),
+      destination: orbit('EARTH', 200),
+      craftDesignId: 'shuttle',
+      cargoCapacityKg: 1000,
+      costPerRun: 50_000,
+      flightId: 'f-hub-5',
+    });
+
+    const route = createRoute(state, {
+      name: 'No Hub Route',
+      resourceType: ResourceType.IRON_ORE,
+      provenLegIds: [pl.id],
+    });
+
+    expect(route.legs[0].origin.hubId).toBeNull();
+    expect(route.legs[0].destination.hubId).toBeNull();
+  });
+
+  it('allows null hubOverride to clear an inherited hubId', () => {
+    const state = createGameState();
+
+    const moonHub = createHub(state, { name: 'Moon Clear', type: 'surface', bodyId: 'MOON' });
+
+    // Prove a leg with a hubId on origin
+    const pl = proveRouteLeg(state, {
+      origin: surface('MOON'),
+      destination: orbit('EARTH', 200),
+      craftDesignId: 'shuttle',
+      cargoCapacityKg: 1000,
+      costPerRun: 50_000,
+      flightId: 'f-hub-6',
+      originHubId: moonHub.id,
+    });
+
+    // Override origin hubId to null
+    const route = createRoute(state, {
+      name: 'Cleared Hub Route',
+      resourceType: ResourceType.WATER_ICE,
+      provenLegIds: [pl.id],
+      hubOverrides: {
+        [pl.id]: { originHubId: null },
+      },
+    });
+
+    expect(route.legs[0].origin.hubId).toBeNull();
   });
 });
 

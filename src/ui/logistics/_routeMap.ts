@@ -158,6 +158,84 @@ export function renderRouteMap(): SVGSVGElement {
     svg.appendChild(label);
   }
 
+  // --- Hub nodes ---
+  for (const [, node] of layout) {
+    if (node.type !== 'surfaceHub' && node.type !== 'orbitalHub') continue;
+
+    const parentNode = node.parentId ? layout.get(node.parentId) : null;
+    const bodyColor = getBodyColor(node.parentId ?? '');
+
+    // Hub status: online / under-construction / offline
+    const hub = ls.state?.hubs.find(h => h.id === node.hubId);
+    let opacity = '1';
+    let dashArray = 'none';
+    if (hub) {
+      const isBuilding = hub.constructionQueue.some(p => p.completedPeriod === undefined);
+      if (!hub.online && !isBuilding) { opacity = '0.4'; dashArray = '2,2'; }
+      else if (!hub.online && isBuilding) { opacity = '0.6'; dashArray = '2,2'; }
+    }
+
+    // Connecting line to parent body
+    if (parentNode) {
+      const line = document.createElementNS(svgNS, 'line');
+      line.setAttribute('x1', String(parentNode.x));
+      line.setAttribute('y1', String(parentNode.y));
+      line.setAttribute('x2', String(node.x));
+      line.setAttribute('y2', String(node.y));
+      line.setAttribute('stroke', bodyColor);
+      line.setAttribute('stroke-width', '1');
+      line.setAttribute('opacity', '0.6');
+      if (node.type === 'orbitalHub') {
+        line.setAttribute('stroke-dasharray', '3,2');
+      }
+      svg.appendChild(line);
+    }
+
+    // Hub icon
+    if (node.type === 'surfaceHub') {
+      const rect = document.createElementNS(svgNS, 'rect');
+      rect.setAttribute('x', String(node.x - 3));
+      rect.setAttribute('y', String(node.y - 3));
+      rect.setAttribute('width', '6');
+      rect.setAttribute('height', '6');
+      rect.setAttribute('fill', bodyColor);
+      rect.setAttribute('stroke', bodyColor);
+      rect.setAttribute('stroke-width', '1');
+      rect.setAttribute('opacity', opacity);
+      if (dashArray !== 'none') rect.setAttribute('stroke-dasharray', dashArray);
+      rect.style.cursor = 'pointer';
+      rect.setAttribute('data-hub-id', node.hubId ?? '');
+      svg.appendChild(rect);
+    } else {
+      // orbitalHub — diamond shape (rotated square)
+      const rect = document.createElementNS(svgNS, 'rect');
+      rect.setAttribute('x', String(node.x - 4));
+      rect.setAttribute('y', String(node.y - 4));
+      rect.setAttribute('width', '8');
+      rect.setAttribute('height', '8');
+      rect.setAttribute('fill', bodyColor);
+      rect.setAttribute('stroke', bodyColor);
+      rect.setAttribute('stroke-width', '1');
+      rect.setAttribute('transform', `rotate(45, ${node.x}, ${node.y})`);
+      rect.setAttribute('opacity', opacity);
+      if (dashArray !== 'none') rect.setAttribute('stroke-dasharray', dashArray);
+      rect.style.cursor = 'pointer';
+      rect.setAttribute('data-hub-id', node.hubId ?? '');
+      svg.appendChild(rect);
+    }
+
+    // Hub name label
+    const hubLabel = document.createElementNS(svgNS, 'text');
+    hubLabel.setAttribute('x', String(node.x));
+    hubLabel.setAttribute('y', String(node.y + (node.type === 'surfaceHub' ? 14 : 16)));
+    hubLabel.setAttribute('text-anchor', 'middle');
+    hubLabel.setAttribute('fill', '#aaa');
+    hubLabel.setAttribute('font-size', '8');
+    hubLabel.setAttribute('opacity', opacity);
+    hubLabel.textContent = node.label;
+    svg.appendChild(hubLabel);
+  }
+
   // --- Proven leg Bezier curves ---
   if (ls.state) {
     let provenIndex = 0;

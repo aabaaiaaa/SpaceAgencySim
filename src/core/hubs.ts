@@ -4,11 +4,12 @@
  */
 
 import type { GameState } from './gameState.ts';
-import type { Hub, ConstructionProject, ResourceRequirement } from './hubTypes.ts';
-import { FacilityId, EARTH_HUB_ID, HUB_PROXIMITY_DOCK_RADIUS } from './constants.ts';
+import type { Hub, ConstructionProject, ResourceRequirement, HubManagementInfo } from './hubTypes.ts';
+import { FacilityId, EARTH_HUB_ID, HUB_PROXIMITY_DOCK_RADIUS, FACILITY_DEFINITIONS } from './constants.ts';
 import { spend } from './finance.ts';
 import { evictTourists } from './hubTourists.ts';
-import { getTransitDelay } from './hubCrew.ts';
+import { getTransitDelay, getCrewAtHub } from './hubCrew.ts';
+import { getBodyDef } from '../data/bodies.ts';
 import {
   BODY_ENVIRONMENT,
   ENVIRONMENT_COST_MULTIPLIER,
@@ -636,4 +637,68 @@ export function findNearbyOrbitalHub(
     const hubAltitude = h.altitude ?? 200_000;
     return Math.abs(hubAltitude - altitude) <= HUB_PROXIMITY_DOCK_RADIUS;
   });
+}
+
+// ---------------------------------------------------------------------------
+// Hub Management Info
+// ---------------------------------------------------------------------------
+
+/**
+ * Aggregates hub data into a single HubManagementInfo object for UI consumption.
+ * Throws if the hub is not found.
+ */
+export function getHubManagementInfo(state: GameState, hubId: string): HubManagementInfo {
+  const hub = state.hubs.find(h => h.id === hubId);
+  if (!hub) {
+    throw new Error(`Hub not found: ${hubId}`);
+  }
+
+  const bodyDef = getBodyDef(hub.bodyId);
+  const bodyName = bodyDef?.name ?? hub.bodyId;
+
+  // Build in-progress facility IDs set (projects without a completedPeriod)
+  const inProgressIds = new Set(
+    hub.constructionQueue
+      .filter(p => p.completedPeriod === undefined)
+      .map(p => p.facilityId),
+  );
+
+  // Build facilities list from hub.facilities entries
+  const facilities: HubManagementInfo['facilities'] = [];
+  for (const [facilityId, fState] of Object.entries(hub.facilities)) {
+    if (!fState.built) continue;
+    const def = FACILITY_DEFINITIONS.find(d => d.id === facilityId);
+    const name = def?.name ?? facilityId;
+    facilities.push({
+      id: facilityId,
+      name,
+      tier: fState.tier,
+      underConstruction: inProgressIds.has(facilityId),
+    });
+  }
+
+  // Crew at this hub
+  const crew = getCrewAtHub(state, hubId);
+
+  // Total investment: sum of all construction project money costs
+  const totalInvestment = hub.constructionQueue.reduce((sum, p) => sum + p.moneyCost, 0);
+
+  return {
+    id: hub.id,
+    name: hub.name,
+    bodyId: hub.bodyId,
+    bodyName,
+    type: hub.type,
+    online: hub.online,
+    established: hub.established,
+    facilities,
+    crewCount: crew.length,
+    crewNames: crew.map(c => c.name),
+    touristCount: hub.tourists.length,
+    maintenanceCostPerPeriod: calculateHubMaintenance(hub),
+    totalInvestment,
+    canRename: true,
+    canReactivate: !hub.online && hub.id !== EARTH_HUB_ID,
+    canAbandon: !hub.online && hub.id !== EARTH_HUB_ID,
+  };
 }

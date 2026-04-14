@@ -35,6 +35,26 @@ export interface Tourist {
   revenue: number;
 }
 
+/** Aggregated hub information for management UI panels. */
+export interface HubManagementInfo {
+  id: string;
+  name: string;
+  bodyId: string;
+  bodyName: string;
+  type: HubType;
+  online: boolean;
+  established: number;
+  facilities: { id: string; name: string; tier: number; underConstruction: boolean }[];
+  crewCount: number;
+  crewNames: string[];
+  touristCount: number;
+  maintenanceCostPerPeriod: number;
+  totalInvestment: number;
+  canRename: boolean;
+  canReactivate: boolean;
+  canAbandon: boolean;
+}
+
 /** An off-world hub (base or station) established by the player. */
 export interface Hub {
   id: string;

@@ -27,6 +27,7 @@ import {
   generateHubName,
   renameHub,
   abandonHub,
+  getHubManagementInfo,
 } from '../core/hubs.ts';
 import { HUB_NAME_POOL } from '../data/hubNames.ts';
 import {
@@ -817,5 +818,151 @@ describe('abandonHub', () => {
     abandonHub(state, marsHub.id);
 
     expect(state.activeHubId).toBe(EARTH_HUB_ID);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hub management info
+// ---------------------------------------------------------------------------
+
+describe('getHubManagementInfo', () => {
+  let state: GameState;
+  beforeEach(() => { state = createGameState(); });
+
+  it('returns correct info for Earth hub', () => {
+    const info = getHubManagementInfo(state, EARTH_HUB_ID);
+    expect(info.id).toBe(EARTH_HUB_ID);
+    expect(info.name).toBe('Earth HQ');
+    expect(info.bodyId).toBe('EARTH');
+    expect(info.bodyName).toBe('Earth');
+    expect(info.type).toBe('surface');
+    expect(info.online).toBe(true);
+    expect(info.canRename).toBe(true);
+    expect(info.canReactivate).toBe(false);
+    expect(info.canAbandon).toBe(false);
+    expect(info.established).toBe(0);
+    expect(info.touristCount).toBe(0);
+    expect(info.maintenanceCostPerPeriod).toBe(0);
+  });
+
+  it('Earth hub facilities list matches starter facilities', () => {
+    const info = getHubManagementInfo(state, EARTH_HUB_ID);
+    const starterDefs = FACILITY_DEFINITIONS.filter(f => f.starter);
+
+    expect(info.facilities).toHaveLength(starterDefs.length);
+    for (const def of starterDefs) {
+      const entry = info.facilities.find(f => f.id === def.id);
+      expect(entry).toBeDefined();
+      expect(entry!.name).toBe(def.name);
+      expect(entry!.tier).toBe(1);
+      expect(entry!.underConstruction).toBe(false);
+    }
+  });
+
+  it('off-world hub with construction queue returns correct totalInvestment and underConstruction flags', () => {
+    const hub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    // createHub queues a Crew Hab project; manually add a second project
+    hub.constructionQueue.push({
+      facilityId: FacilityId.LAUNCH_PAD,
+      resourcesRequired: [],
+      resourcesDelivered: [],
+      moneyCost: 75_000,
+      startedPeriod: 1,
+    });
+
+    const info = getHubManagementInfo(state, hub.id);
+
+    // totalInvestment = sum of all constructionQueue moneyCosts
+    const expectedTotal = hub.constructionQueue.reduce((sum, p) => sum + p.moneyCost, 0);
+    expect(info.totalInvestment).toBe(expectedTotal);
+
+    // Hub has no built facilities yet, so facilities list is empty
+    // but underConstruction is tracked via constructionQueue for in-progress items
+    expect(info.facilities).toHaveLength(0);
+  });
+
+  it('off-world hub with built facility under upgrade shows underConstruction true', () => {
+    const hub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    // Manually add a built facility
+    hub.facilities[FacilityId.CREW_HAB] = { built: true, tier: 1 };
+    // Add an in-progress upgrade project for it (no completedPeriod)
+    hub.constructionQueue.push({
+      facilityId: FacilityId.CREW_HAB,
+      resourcesRequired: [],
+      resourcesDelivered: [],
+      moneyCost: 50_000,
+      startedPeriod: 2,
+    });
+
+    const info = getHubManagementInfo(state, hub.id);
+    const crewHabEntry = info.facilities.find(f => f.id === FacilityId.CREW_HAB);
+    expect(crewHabEntry).toBeDefined();
+    expect(crewHabEntry!.underConstruction).toBe(true);
+  });
+
+  it('offline off-world hub has canReactivate and canAbandon true', () => {
+    const hub = createHub(state, { name: 'Mars Outpost', type: 'surface', bodyId: 'MARS' });
+    hub.online = false;
+
+    const info = getHubManagementInfo(state, hub.id);
+    expect(info.online).toBe(false);
+    expect(info.canReactivate).toBe(true);
+    expect(info.canAbandon).toBe(true);
+  });
+
+  it('online off-world hub has canReactivate and canAbandon false', () => {
+    const hub = createHub(state, { name: 'Mars Outpost', type: 'surface', bodyId: 'MARS' });
+    hub.online = true;
+
+    const info = getHubManagementInfo(state, hub.id);
+    expect(info.canReactivate).toBe(false);
+    expect(info.canAbandon).toBe(false);
+  });
+
+  it('crew count and names are correct when crew are stationed at the hub', () => {
+    const hub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    hub.online = true;
+
+    const crew1 = createCrewMember({ id: 'crew-1', name: 'Alice', salary: 2000 });
+    crew1.stationedHubId = hub.id;
+    crew1.status = AstronautStatus.ACTIVE;
+    crew1.transitUntil = null;
+    state.crew.push(crew1);
+
+    const crew2 = createCrewMember({ id: 'crew-2', name: 'Bob', salary: 2000 });
+    crew2.stationedHubId = hub.id;
+    crew2.status = AstronautStatus.ACTIVE;
+    crew2.transitUntil = null;
+    state.crew.push(crew2);
+
+    // Crew stationed at Earth should not appear
+    const crew3 = createCrewMember({ id: 'crew-3', name: 'Carol', salary: 2000 });
+    crew3.stationedHubId = EARTH_HUB_ID;
+    crew3.status = AstronautStatus.ACTIVE;
+    crew3.transitUntil = null;
+    state.crew.push(crew3);
+
+    const info = getHubManagementInfo(state, hub.id);
+    expect(info.crewCount).toBe(2);
+    expect(info.crewNames).toContain('Alice');
+    expect(info.crewNames).toContain('Bob');
+    expect(info.crewNames).not.toContain('Carol');
+  });
+
+  it('tourist count is correct', () => {
+    const hub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    hub.online = true;
+    hub.tourists = [
+      { id: 't1', name: 'Tourist A', arrivalPeriod: 1, departurePeriod: 5, revenue: 10_000 },
+      { id: 't2', name: 'Tourist B', arrivalPeriod: 2, departurePeriod: 6, revenue: 8_000 },
+      { id: 't3', name: 'Tourist C', arrivalPeriod: 3, departurePeriod: 7, revenue: 12_000 },
+    ];
+
+    const info = getHubManagementInfo(state, hub.id);
+    expect(info.touristCount).toBe(3);
+  });
+
+  it('throws for non-existent hub ID', () => {
+    expect(() => getHubManagementInfo(state, 'nonexistent-hub')).toThrow('Hub not found');
   });
 });
