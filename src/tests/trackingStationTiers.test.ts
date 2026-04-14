@@ -37,7 +37,7 @@ import type { GameState } from '../core/gameState.ts';
 function makeState(tier: number = 0): GameState {
   const state = createGameState();
   if (tier > 0) {
-    state.facilities[FacilityId.TRACKING_STATION] = { built: true, tier };
+    state.hubs[0].facilities[FacilityId.TRACKING_STATION] = { built: true, tier };
   }
   return state;
 }

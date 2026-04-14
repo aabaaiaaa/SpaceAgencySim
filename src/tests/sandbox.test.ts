@@ -52,10 +52,9 @@ function sandboxState(): GameState {
   state.sandboxSettings = { malfunctionsEnabled: false, weatherEnabled: false };
 
   // All facilities built at tier 1 — write to the active hub's facilities
-  // (hasFacility/canBuildFacility read from hub.facilities, not state.facilities).
+  // (hasFacility/canBuildFacility read from hub.facilities).
   const hubFacilities = getActiveHub(state).facilities;
   for (const def of FACILITY_DEFINITIONS) {
-    state.facilities[def.id] = { built: true, tier: 1 };
     hubFacilities[def.id] = { built: true, tier: 1 };
   }
 
@@ -132,14 +131,14 @@ describe('sandbox construction', () => {
 
   it('canBuildFacility allows building in sandbox (non-pre-built scenario)', () => {
     // Remove a facility to test the sandbox bypass.
-    delete state.facilities[FacilityId.CREW_ADMIN];
+    delete state.hubs[0].facilities[FacilityId.CREW_ADMIN];
     delete getActiveHub(state).facilities[FacilityId.CREW_ADMIN];
     const check = canBuildFacility(state, FacilityId.CREW_ADMIN);
     expect(check.allowed).toBe(true);
   });
 
   it('buildFacility does not deduct money in sandbox', () => {
-    delete state.facilities[FacilityId.CREW_ADMIN];
+    delete state.hubs[0].facilities[FacilityId.CREW_ADMIN];
     delete getActiveHub(state).facilities[FacilityId.CREW_ADMIN];
     const moneyBefore = state.money;
     const result = buildFacility(state, FacilityId.CREW_ADMIN);

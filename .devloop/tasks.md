@@ -79,13 +79,13 @@
 - **Verification**: `npx tsc --noEmit src/render/hub.ts src/render/map.ts 2>/dev/null`
 
 ### TASK-013: Update unit test references to state.facilities
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007, TASK-008, TASK-009
 - **Description**: Grep `src/tests/` for `state\.facilities`. Many tests create game state and set `state.facilities` directly. Update all test files to set facilities through the hub system instead: either use `makeEarthHub()` with facility overrides, or set `state.hubs[0].facilities[...]` directly. Update `makeGameState()` or equivalent factory in `_factories.ts` to no longer set a top-level `facilities` field.
 - **Verification**: `npx vitest run src/tests/ --reporter=verbose 2>&1 | tail -20`
 
 ### TASK-014: Update E2E test factories for hub migration
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: In `e2e/helpers/_saveFactory.ts` and `e2e/helpers/_factories.ts`: (1) Update `buildSaveEnvelope()` to not include a top-level `facilities` field. Facilities must be set through the hubs array. (2) Update any E2E factory helpers that set `state.facilities` to use hubs instead. (3) Ensure `buildSaveEnvelope()` includes the correct `SAVE_VERSION`. (4) Remove any migration compatibility shims or legacy format helpers.
 - **Verification**: `npx playwright test e2e/hub.spec.ts --reporter=line 2>/dev/null`
@@ -107,7 +107,7 @@
 - **Verification**: `npx tsc --noEmit src/data/hubNames.ts`
 
 ### TASK-017: Hub name generation function
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016
 - **Description**: In `src/core/hubs.ts`, add `generateHubName(state: GameState, hubType: HubType): string`. Import `HUB_NAME_POOL` from `src/data/hubNames.ts`. Logic: (1) Get existing hub names — extract base names by stripping " Outpost" and " Station" suffixes. (2) Filter `HUB_NAME_POOL` to names not in the used set. (3) Pick a random name from the filtered pool. (4) Append " Outpost" for surface hubs or " Station" for orbital hubs. (5) If pool is exhausted, return `"Hub-${state.hubs.length}"` with the appropriate suffix. Update `deployOutpostCore()` to call `generateHubName()` for the default name. Write unit tests in `src/tests/hubs.test.ts`: verify name generated, verify used names excluded, verify suffix matches hub type, verify fallback when pool exhausted (mock a state with all names used).
 - **Verification**: `npx vitest run src/tests/hubs.test.ts`
@@ -159,7 +159,7 @@
 - **Verification**: `npx tsc --noEmit src/data/parts.ts`
 
 ### TASK-025: Mk2 storage unit tests
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-024
 - **Description**: Add tests in `src/tests/mining.test.ts` (or a new `src/tests/mk2-storage.test.ts`): (1) Verify each Mk2 part definition exists in the parts catalog with correct id, name, and properties. (2) Verify `addModuleToSite()` correctly initializes a Mk2 storage module with the higher capacity (5000 for silo, 2500 for pressure vessel, 3750 for fluid tank). (3) Verify extraction distributes resources proportionally across mixed Mk1 + Mk2 connected storage (e.g. a drill connected to both a 2000kg Mk1 silo and a 5000kg Mk2 silo distributes ~29% / ~71%). (4) Verify per-module capacity limits are respected — filling a Mk2 silo stops at 5000kg.
 - **Verification**: `npx vitest run src/tests/mining.test.ts`
@@ -175,7 +175,7 @@
 - **Verification**: `npx tsc --noEmit src/ui/logistics/_schematicLayout.ts && npx tsc --noEmit src/ui/logistics/_routeMap.ts`
 
 ### TASK-027: Implement dynamic body layout algorithm
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-026
 - **Description**: In `src/ui/logistics/_schematicLayout.ts`, replace the hardcoded positions with a dynamic algorithm. (1) Import body data from `src/data/bodies.js` to get parent-child hierarchy and orbit order. (2) Determine visible bodies: Earth (always), plus any body with a mining site in `state.miningSites`, a hub in `state.hubs`, or an endpoint in `state.routes` or `state.provenLegs`. (3) Sort visible top-level bodies (parent = Sun) by orbit order. (4) Assign horizontal positions: Sun at x=60, each visible planet at `60 + (index+1) * 120`. (5) For each planet, find visible moons. Position moons vertically above the parent at y=parent.y - 50, staggered horizontally if multiple moons. (6) Body radius proportional to actual body size — Sun=20, gas giants=16-18, rocky planets=10-14, moons=6-8. (7) Compute total layout width as `rightmostX + 80`. Write unit tests: verify Sun always present, Earth always present, Moon positioned as child of Earth, Mars appears when it has a mining site, invisible bodies excluded.
 - **Verification**: `npx vitest run src/tests/logistics-layout.test.ts 2>/dev/null || npx vitest run src/tests/logistics.test.ts 2>/dev/null`

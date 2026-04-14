@@ -62,7 +62,7 @@ import { makeFlightState as makeFlightStateFactory } from './_factories.js';
 function freshState(): GameState {
   const state = createGameState();
   // Build the Satellite Ops facility so deployment works.
-  state.facilities[FacilityId.SATELLITE_OPS] = { built: true, tier: 1 };
+  state.hubs[0].facilities[FacilityId.SATELLITE_OPS] = { built: true, tier: 1 };
   return state;
 }
 
@@ -133,7 +133,7 @@ describe('Satellite Network — deploySatellite()', () => {
   });
 
   it('should fail without Satellite Ops facility', () => {
-    delete state.facilities[FacilityId.SATELLITE_OPS];
+    delete state.hubs[0].facilities[FacilityId.SATELLITE_OPS];
     const result = deploySatHelper(state, 'satellite-comm', LEO_ELEMENTS);
     expect(result.success).toBe(false);
     expect(result.reason).toContain('not built');
@@ -479,7 +479,7 @@ describe('Satellite Network — advancePeriod integration', () => {
   });
 
   it('includes lease income in period summary', () => {
-    state.facilities[FacilityId.SATELLITE_OPS].tier = 2;
+    state.hubs[0].facilities[FacilityId.SATELLITE_OPS].tier = 2;
     state.satelliteNetwork.satellites[0].leased = true; // comm satellite
     const summary = advancePeriod(state);
     expect(summary.satelliteLeaseIncome).toBe(SATELLITE_LEASE_INCOME[SatelliteType.COMMUNICATION]);
@@ -495,7 +495,7 @@ describe('Satellite Network — leasing', () => {
   let satId: string;
   beforeEach(() => {
     state = freshState();
-    state.facilities[FacilityId.SATELLITE_OPS].tier = 2;
+    state.hubs[0].facilities[FacilityId.SATELLITE_OPS].tier = 2;
     const result = deploySatHelper(state, 'satellite-comm', LEO_ELEMENTS);
     satId = result.satelliteId!;
   });
@@ -514,7 +514,7 @@ describe('Satellite Network — leasing', () => {
   });
 
   it('setSatelliteLease fails on Tier 1', () => {
-    state.facilities[FacilityId.SATELLITE_OPS].tier = 1;
+    state.hubs[0].facilities[FacilityId.SATELLITE_OPS].tier = 1;
     const result = setSatelliteLease(state, satId, true);
     expect(result.success).toBe(false);
     expect(result.reason).toContain('Tier 2');
@@ -604,7 +604,7 @@ describe('Satellite Network — repositioning', () => {
   let satId: string;
   beforeEach(() => {
     state = freshState();
-    state.facilities[FacilityId.SATELLITE_OPS].tier = 3;
+    state.hubs[0].facilities[FacilityId.SATELLITE_OPS].tier = 3;
     state.money = 1_000_000;
     const result = deploySatHelper(state, 'satellite-comm', LEO_ELEMENTS);
     satId = result.satelliteId!;
@@ -628,7 +628,7 @@ describe('Satellite Network — repositioning', () => {
   });
 
   it('repositionSatellite fails on Tier 2', () => {
-    state.facilities[FacilityId.SATELLITE_OPS].tier = 2;
+    state.hubs[0].facilities[FacilityId.SATELLITE_OPS].tier = 2;
     const result = repositionSatellite(state, satId, 'MEO');
     expect(result.success).toBe(false);
     expect(result.reason).toContain('Tier 3');
@@ -703,7 +703,7 @@ describe('Satellite Network — getNetworkSummary with tiers', () => {
   let state: GameState;
   beforeEach(() => {
     state = freshState();
-    state.facilities[FacilityId.SATELLITE_OPS].tier = 2;
+    state.hubs[0].facilities[FacilityId.SATELLITE_OPS].tier = 2;
     deploySatHelper(state, 'satellite-comm', LEO_ELEMENTS);
   });
 

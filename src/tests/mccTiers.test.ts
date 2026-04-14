@@ -25,7 +25,7 @@ type GeneratedContract = ReturnType<typeof generateContracts>[number];
 
 function makeState(mccTier: number = 1, progressionMissions: number = 2): GameState {
   const state: GameState = createGameState();
-  state.facilities[FacilityId.MISSION_CONTROL] = { built: true, tier: mccTier };
+  state.hubs[0].facilities[FacilityId.MISSION_CONTROL] = { built: true, tier: mccTier };
 
   // Populate completed missions for progression tier calculation.
   state.missions.completed = [];
@@ -298,16 +298,14 @@ describe('getMissionControlTier() — tier values', () => {
   it('returns the correct tier for each upgrade level', () => {
     for (const tier of [1, 2, 3] as const) {
       const state: GameState = createGameState();
-      state.facilities[FacilityId.MISSION_CONTROL] = { built: true, tier };
+      state.hubs[0].facilities[FacilityId.MISSION_CONTROL] = { built: true, tier };
       expect(getMissionControlTier(state)).toBe(tier);
     }
   });
 
   it('returns 1 when facilities object is missing', () => {
     const state: GameState = createGameState();
-    // @ts-expect-error -- testing defensive handling of missing facilities
-    delete state.facilities;
-    state.facilities = {};
+    state.hubs[0].facilities = {};
     expect(getMissionControlTier(state)).toBe(1);
   });
 });

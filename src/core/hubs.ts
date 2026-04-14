@@ -19,6 +19,7 @@ import {
   ORBITAL_HUB_FACILITIES,
   EARTH_ONLY_FACILITIES,
 } from '../data/hubFacilities.ts';
+import { HUB_NAME_POOL } from '../data/hubNames.ts';
 import type { EnvironmentCategory } from '../data/hubFacilities.ts';
 
 // ---------------------------------------------------------------------------
@@ -163,6 +164,36 @@ export function getImportTaxMultiplier(bodyId: string): number {
 }
 
 // ---------------------------------------------------------------------------
+// Hub Name Generation
+// ---------------------------------------------------------------------------
+
+/**
+ * Generates a random hub name from the HUB_NAME_POOL that hasn't been used yet.
+ * Appends " Outpost" for surface hubs or " Station" for orbital hubs.
+ * Falls back to "Hub-N" naming when the pool is exhausted.
+ */
+export function generateHubName(state: GameState, hubType: 'surface' | 'orbital'): string {
+  const suffix = hubType === 'surface' ? ' Outpost' : ' Station';
+
+  // Extract base names from existing hubs by stripping known suffixes
+  const usedBaseNames = new Set(
+    state.hubs.map(h => h.name.replace(/ (Outpost|Station)$/, '')),
+  );
+
+  // Filter pool to unused names
+  const available = HUB_NAME_POOL.filter(name => !usedBaseNames.has(name));
+
+  if (available.length === 0) {
+    // Pool exhausted — fallback naming
+    return `Hub-${state.hubs.length}${suffix}`;
+  }
+
+  // Pick a random name from available pool
+  const baseName = available[Math.floor(Math.random() * available.length)];
+  return baseName + suffix;
+}
+
+// ---------------------------------------------------------------------------
 // Outpost Deployment
 // ---------------------------------------------------------------------------
 
@@ -176,7 +207,7 @@ export function getImportTaxMultiplier(bodyId: string): number {
 export function deployOutpostCore(
   state: GameState,
   flight: { bodyId: string; altitude: number; inOrbit: boolean; landed?: boolean },
-  name: string,
+  name?: string,
 ): Hub | null {
   // Look up Crew Hab cost
   const crewHabCost = OFFWORLD_FACILITY_COSTS.find(
@@ -189,11 +220,15 @@ export function deployOutpostCore(
     return null; // Insufficient funds
   }
 
+  // Determine hub type and generate name if not provided
+  const hubType = flight.inOrbit ? 'orbital' : 'surface';
+  const hubName = name ?? generateHubName(state, hubType);
+
   // Determine hub type based on flight state
   if (flight.inOrbit) {
     // Orbital hub
     return createHub(state, {
-      name,
+      name: hubName,
       type: 'orbital',
       bodyId: flight.bodyId,
       altitude: flight.altitude,
@@ -201,7 +236,7 @@ export function deployOutpostCore(
   } else {
     // Surface hub (landed)
     return createHub(state, {
-      name,
+      name: hubName,
       type: 'surface',
       bodyId: flight.bodyId,
     });

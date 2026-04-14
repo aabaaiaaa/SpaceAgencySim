@@ -165,13 +165,13 @@ describe('getMissionControlTier()', () => {
 
   it('returns correct tier when MC is upgraded', () => {
     const state = freshState();
-    state.facilities[FacilityId.MISSION_CONTROL] = { built: true, tier: 2 };
+    state.hubs[0].facilities[FacilityId.MISSION_CONTROL] = { built: true, tier: 2 };
     expect(getMissionControlTier(state)).toBe(2);
   });
 
   it('returns 1 when MC is not built', () => {
     const state = freshState();
-    delete state.facilities[FacilityId.MISSION_CONTROL];
+    delete state.hubs[0].facilities[FacilityId.MISSION_CONTROL];
     expect(getMissionControlTier(state)).toBe(1);
   });
 });
@@ -190,7 +190,7 @@ describe('getContractCaps()', () => {
 
   it('returns tier 2 caps when MC is tier 2', () => {
     const state = freshState();
-    state.facilities[FacilityId.MISSION_CONTROL] = { built: true, tier: 2 };
+    state.hubs[0].facilities[FacilityId.MISSION_CONTROL] = { built: true, tier: 2 };
     const caps = getContractCaps(state);
     expect(caps.pool).toBe(CONTRACT_TIER_CAPS[2].pool);
     expect(caps.active).toBe(CONTRACT_TIER_CAPS[2].active);
@@ -198,7 +198,7 @@ describe('getContractCaps()', () => {
 
   it('returns tier 3 caps when MC is tier 3', () => {
     const state = freshState();
-    state.facilities[FacilityId.MISSION_CONTROL] = { built: true, tier: 3 };
+    state.hubs[0].facilities[FacilityId.MISSION_CONTROL] = { built: true, tier: 3 };
     const caps = getContractCaps(state);
     expect(caps.pool).toBe(CONTRACT_TIER_CAPS[3].pool);
     expect(caps.active).toBe(CONTRACT_TIER_CAPS[3].active);

@@ -30,7 +30,7 @@ import type { FlightState } from '../core/gameState.ts';
 
 function makeState(padTier: number = 1): GameState {
   const state = createGameState();
-  state.facilities[FacilityId.LAUNCH_PAD] = { built: true, tier: padTier };
+  state.hubs[0].facilities[FacilityId.LAUNCH_PAD] = { built: true, tier: padTier };
   return state;
 }
 

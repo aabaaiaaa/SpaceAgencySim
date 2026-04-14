@@ -140,7 +140,7 @@ function stubAssemblyNoArm(): RocketAssembly {
 
 function stubGameStateWithSatellite(): GameState {
   const state = createGameState();
-  state.facilities[FacilityId.SATELLITE_OPS] = { built: true, tier: 1 };
+  state.hubs[0].facilities[FacilityId.SATELLITE_OPS] = { built: true, tier: 1 };
   state.satelliteNetwork = {
     satellites: [
       {

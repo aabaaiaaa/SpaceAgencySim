@@ -226,7 +226,7 @@ describe('buildFacility', () => {
     expect(result.success).toBe(true);
     expect(hasFacility(state, FacilityId.CREW_ADMIN)).toBe(true);
     expect(state.money).toBe(405_000); // 500k − 100k×0.95 = 405k
-    expect(state.facilities[FacilityId.CREW_ADMIN].tier).toBe(1);
+    expect(state.hubs[0].facilities[FacilityId.CREW_ADMIN].tier).toBe(1);
   });
 
   it('builds a free facility without deducting cash', () => {
@@ -314,7 +314,7 @@ describe('awardFacility', () => {
     const result = awardFacility(state, FacilityId.CREW_ADMIN);
     expect(result.success).toBe(true);
     expect(hasFacility(state, FacilityId.CREW_ADMIN)).toBe(true);
-    expect(state.facilities[FacilityId.CREW_ADMIN].tier).toBe(1);
+    expect(state.hubs[0].facilities[FacilityId.CREW_ADMIN].tier).toBe(1);
   });
 
   it('does not deduct cash', () => {

@@ -39,9 +39,9 @@ import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.ts';
 
 function makeState(vabTier: number = 1): GameState {
   const state = createGameState();
-  state.facilities[FacilityId.VAB] = { built: true, tier: vabTier };
+  state.hubs[0].facilities[FacilityId.VAB] = { built: true, tier: vabTier };
   // Give launch pad tier 3 so mass limits don't interfere.
-  state.facilities[FacilityId.LAUNCH_PAD] = { built: true, tier: 3 };
+  state.hubs[0].facilities[FacilityId.LAUNCH_PAD] = { built: true, tier: 3 };
   return state;
 }
 

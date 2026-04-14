@@ -4,6 +4,7 @@ import { createMiningSite, findNearestSite, addModuleToSite, toggleConnection, g
 import { MiningModuleType, ResourceType } from '../core/constants.ts';
 import { processRefineries, setRefineryRecipe } from '../core/refinery.ts';
 import { advancePeriod } from '../core/period.ts';
+import { getPartById } from '../data/parts.ts';
 
 describe('GameState mining/route fields', () => {
   it('createGameState() initializes miningSites as empty array', () => {
@@ -1012,5 +1013,215 @@ describe('orbital buffer accumulation', () => {
     // the orbital buffer has no maximum.
     expect(orbitalWaterIce).toBe(1000);
     expect(orbitalWaterIce).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Mk2 storage modules
+// ---------------------------------------------------------------------------
+
+describe('Mk2 storage modules', () => {
+  describe('part definitions', () => {
+    it('Storage Silo Mk2 exists with correct capacity and storage state', () => {
+      const part = getPartById('storage-silo-mk2');
+      expect(part).toBeDefined();
+      expect(part!.name).toBe('Storage Silo Mk2');
+      expect(part!.properties.storageCapacityKg).toBe(5000);
+      expect(part!.properties.storageState).toBe('SOLID');
+    });
+
+    it('Pressure Vessel Mk2 exists with correct capacity and storage state', () => {
+      const part = getPartById('pressure-vessel-mk2');
+      expect(part).toBeDefined();
+      expect(part!.name).toBe('Pressure Vessel Mk2');
+      expect(part!.properties.storageCapacityKg).toBe(2500);
+      expect(part!.properties.storageState).toBe('GAS');
+    });
+
+    it('Fluid Tank Mk2 exists with correct capacity and storage state', () => {
+      const part = getPartById('fluid-tank-mk2');
+      expect(part).toBeDefined();
+      expect(part!.name).toBe('Fluid Tank Mk2');
+      expect(part!.properties.storageCapacityKg).toBe(3750);
+      expect(part!.properties.storageState).toBe('LIQUID');
+    });
+  });
+
+  describe('addModuleToSite initializes Mk2 storage with correct capacity', () => {
+    function makeSite() {
+      const state = createGameState();
+      return createMiningSite(state, {
+        name: 'Mk2 Test Site',
+        bodyId: 'MOON',
+        coordinates: { x: 0, y: 0 },
+        controlUnitPartId: 'base-control-unit-mk1',
+      });
+    }
+
+    it('Storage Silo Mk2 gets storageCapacityKg = 5000', () => {
+      const site = makeSite();
+      const mod = addModuleToSite(site, {
+        partId: 'storage-silo-mk2',
+        type: MiningModuleType.STORAGE_SILO,
+        powerDraw: 3,
+      });
+
+      expect(mod.storageCapacityKg).toBe(5000);
+      expect(mod.stored).toEqual({});
+      expect(mod.storageState).toBe('SOLID');
+    });
+
+    it('Pressure Vessel Mk2 gets storageCapacityKg = 2500', () => {
+      const site = makeSite();
+      const mod = addModuleToSite(site, {
+        partId: 'pressure-vessel-mk2',
+        type: MiningModuleType.PRESSURE_VESSEL,
+        powerDraw: 8,
+      });
+
+      expect(mod.storageCapacityKg).toBe(2500);
+      expect(mod.stored).toEqual({});
+      expect(mod.storageState).toBe('GAS');
+    });
+
+    it('Fluid Tank Mk2 gets storageCapacityKg = 3750', () => {
+      const site = makeSite();
+      const mod = addModuleToSite(site, {
+        partId: 'fluid-tank-mk2',
+        type: MiningModuleType.FLUID_TANK,
+        powerDraw: 8,
+      });
+
+      expect(mod.storageCapacityKg).toBe(3750);
+      expect(mod.stored).toEqual({});
+      expect(mod.storageState).toBe('LIQUID');
+    });
+  });
+
+  describe('extraction distributes proportionally across mixed Mk1+Mk2 storage', () => {
+    it('distributes to Mk1 silo (2000kg) and Mk2 silo (5000kg) in ~29/71 ratio', () => {
+      const state = createGameState();
+
+      const site = createMiningSite(state, {
+        name: 'Mixed Storage Site',
+        bodyId: 'MOON',
+        coordinates: { x: 0, y: 0 },
+        controlUnitPartId: 'base-control-unit-mk1',
+      });
+
+      // Power generator: 100W output
+      addModuleToSite(site, {
+        partId: 'power-generator-solar-mk1',
+        type: MiningModuleType.POWER_GENERATOR,
+        powerDraw: 0,
+        powerOutput: 100,
+      });
+
+      // Mining drill: 25W draw
+      const drill = addModuleToSite(site, {
+        partId: 'mining-drill-mk1',
+        type: MiningModuleType.MINING_DRILL,
+        powerDraw: 25,
+      });
+
+      // Mk1 storage silo: 2W draw, 2000 kg capacity
+      const siloMk1 = addModuleToSite(site, {
+        partId: 'storage-silo-mk1',
+        type: MiningModuleType.STORAGE_SILO,
+        powerDraw: 2,
+      });
+
+      // Mk2 storage silo: 3W draw, 5000 kg capacity
+      const siloMk2 = addModuleToSite(site, {
+        partId: 'storage-silo-mk2',
+        type: MiningModuleType.STORAGE_SILO,
+        powerDraw: 3,
+      });
+
+      // Connect drill to both silos
+      toggleConnection(site, drill.id, siloMk1.id);
+      toggleConnection(site, drill.id, siloMk2.id);
+
+      // Verify capacities initialized correctly
+      expect(siloMk1.storageCapacityKg).toBe(2000);
+      expect(siloMk2.storageCapacityKg).toBe(5000);
+
+      // Run extraction — efficiency = 100/30 → clamped to 1.0
+      processMiningSites(state);
+
+      // MOON has WATER_ICE at 50 kg/period and REGOLITH at 200 kg/period (both SOLID)
+      // Total extracted = 250 kg, distributed proportionally by remaining capacity:
+      // Mk1 share = 2000/7000 = 2/7 ≈ 28.57%
+      // Mk2 share = 5000/7000 = 5/7 ≈ 71.43%
+      const mk1Total = Object.values(siloMk1.stored!).reduce((sum, v) => sum + (v ?? 0), 0);
+      const mk2Total = Object.values(siloMk2.stored!).reduce((sum, v) => sum + (v ?? 0), 0);
+      const totalExtracted = mk1Total + mk2Total;
+
+      expect(totalExtracted).toBeGreaterThan(0);
+
+      const mk1Ratio = mk1Total / totalExtracted;
+      const mk2Ratio = mk2Total / totalExtracted;
+
+      // Expected ratios: 2/7 ≈ 0.2857 and 5/7 ≈ 0.7143
+      expect(mk1Ratio).toBeCloseTo(2 / 7, 2);
+      expect(mk2Ratio).toBeCloseTo(5 / 7, 2);
+    });
+  });
+
+  describe('per-module capacity limits', () => {
+    it('Mk2 silo stops accepting resources at 5000kg capacity @smoke', () => {
+      const state = createGameState();
+
+      const site = createMiningSite(state, {
+        name: 'Mk2 Capacity Limit Site',
+        bodyId: 'MOON',
+        coordinates: { x: 0, y: 0 },
+        controlUnitPartId: 'base-control-unit-mk1',
+      });
+
+      // Power generator: 100W output
+      addModuleToSite(site, {
+        partId: 'power-generator-solar-mk1',
+        type: MiningModuleType.POWER_GENERATOR,
+        powerDraw: 0,
+        powerOutput: 100,
+      });
+
+      // Mining drill: 25W draw
+      const drill = addModuleToSite(site, {
+        partId: 'mining-drill-mk1',
+        type: MiningModuleType.MINING_DRILL,
+        powerDraw: 25,
+      });
+
+      // Mk2 storage silo: 3W draw, 5000 kg capacity
+      const siloMk2 = addModuleToSite(site, {
+        partId: 'storage-silo-mk2',
+        type: MiningModuleType.STORAGE_SILO,
+        powerDraw: 3,
+      });
+
+      // Connect drill to silo
+      toggleConnection(site, drill.id, siloMk2.id);
+
+      // Pre-fill the Mk2 silo to near capacity (4980 kg out of 5000 kg)
+      siloMk2.stored = { [ResourceType.WATER_ICE]: 4980 };
+      recomputeSiteStorage(site);
+
+      // Run extraction — MOON extracts 50 kg WATER_ICE + 200 kg REGOLITH = 250 kg total
+      // Only 20 kg remaining capacity, so extraction should be capped
+      processMiningSites(state);
+
+      // Total stored in the silo should not exceed 5000 kg capacity
+      const totalStored = Object.values(siloMk2.stored!).reduce((sum, v) => sum + (v ?? 0), 0);
+      expect(totalStored).toBeLessThanOrEqual(siloMk2.storageCapacityKg!);
+      expect(siloMk2.storageCapacityKg).toBe(5000);
+
+      // Verify site.storage matches module stored values
+      for (const [resource, amount] of Object.entries(site.storage)) {
+        const moduleTotal = siloMk2.stored![resource as ResourceType] ?? 0;
+        expect(moduleTotal).toBeCloseTo(amount as number, 5);
+      }
+    });
   });
 });

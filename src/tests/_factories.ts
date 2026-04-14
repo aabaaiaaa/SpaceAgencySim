@@ -183,11 +183,6 @@ export function makeGameState(overrides: Partial<GameState> = {}): GameState {
     gameMode: GameMode.TUTORIAL,
     sandboxSettings: null,
     difficultySettings: { ...DEFAULT_DIFFICULTY_SETTINGS } as DifficultySettings,
-    facilities: Object.fromEntries(
-      FACILITY_DEFINITIONS
-        .filter((f) => f.starter)
-        .map((f) => [f.id, { built: true, tier: 1 }]),
-    ),
     contracts: {
       board: [],
       active: [],

@@ -26,7 +26,7 @@ import { deploySatellite } from '../core/satellites.ts';
 
 function freshState(): GameState {
   const state = createGameState();
-  state.facilities[FacilityId.SATELLITE_OPS] = { built: true, tier: 1 };
+  state.hubs[0].facilities[FacilityId.SATELLITE_OPS] = { built: true, tier: 1 };
   return state;
 }
 
@@ -162,7 +162,7 @@ describe('comms — direct link (Earth orbit)', () => {
 describe('comms — Tracking Station T3 extends range', () => {
   it('extends range to lunar distance when T3 is built', () => {
     const state = freshState();
-    state.facilities[FacilityId.TRACKING_STATION] = { built: true, tier: 3 };
+    state.hubs[0].facilities[FacilityId.TRACKING_STATION] = { built: true, tier: 3 };
     const fs = flightAt('EARTH', FlightPhase.ORBIT);
     // Altitude that exceeds direct range but within T3 range.
     const midAlt = COMMS_DIRECT_RANGE; // distance = R + COMMS_DIRECT_RANGE > direct but < T3
@@ -173,7 +173,7 @@ describe('comms — Tracking Station T3 extends range', () => {
 
   it('does not extend range if only Tier 2', () => {
     const state = freshState();
-    state.facilities[FacilityId.TRACKING_STATION] = { built: true, tier: 2 };
+    state.hubs[0].facilities[FacilityId.TRACKING_STATION] = { built: true, tier: 2 };
     const fs = flightAt('EARTH', FlightPhase.ORBIT);
     const midAlt = COMMS_DIRECT_RANGE; // beyond direct range
     const result = evaluateComms(state, fs, { altitude: midAlt, posX: 0, posY: 0 });
@@ -192,7 +192,7 @@ describe('comms — local comm-sat network', () => {
     deployCommSats(state, 'MOON', 3, MOON_ELEMENTS);
     const fs = flightAt('MOON', FlightPhase.ORBIT);
     // Moon comm-sats + Tracking Station T3 for Earth link.
-    state.facilities[FacilityId.TRACKING_STATION] = { built: true, tier: 3 };
+    state.hubs[0].facilities[FacilityId.TRACKING_STATION] = { built: true, tier: 3 };
     const result = evaluateComms(state, fs, { altitude: 50_000, posX: 0, posY: 0 });
     expect(result.status).toBe(CommsStatus.CONNECTED);
     expect(result.linkType).toBe(CommsLinkType.LOCAL_NETWORK);
@@ -215,7 +215,7 @@ describe('comms — relay chain', () => {
 
   it('connects via relay chain from Mars through Earth relay sats', () => {
     // Increase sat ops capacity to accommodate all deployments.
-    state.facilities[FacilityId.SATELLITE_OPS] = { built: true, tier: 3 };
+    state.hubs[0].facilities[FacilityId.SATELLITE_OPS] = { built: true, tier: 3 };
     // Deploy relay sats at both Earth and Mars.
     deployRelaySats(state, 'EARTH', 1);
     deployRelaySats(state, 'MARS', 1);
@@ -310,7 +310,7 @@ describe('comms — getCommsCoverageInfo', () => {
 
   it('extends direct range with Tracking Station T3', () => {
     const state = freshState();
-    state.facilities[FacilityId.TRACKING_STATION] = { built: true, tier: 3 };
+    state.hubs[0].facilities[FacilityId.TRACKING_STATION] = { built: true, tier: 3 };
     const info = getCommsCoverageInfo(state, 'EARTH');
     expect(info.directRange).toBe(COMMS_TRACKING_T3_RANGE);
   });

@@ -3,7 +3,6 @@
  */
 
 import { STARTING_MONEY, STARTER_FACILITIES } from './_constants.js';
-import type { FacilityState } from './_constants.js';
 import type { CrewMember, HubSave } from './_factories.js';
 
 // ---------------------------------------------------------------------------
@@ -77,7 +76,6 @@ export interface SaveEnvelopeParams {
   gameMode?: string | null;
   sandboxSettings?: Record<string, unknown> | null;
   difficultySettings?: DifficultySettings;
-  facilities?: Readonly<Record<string, FacilityState>>;
   contracts?: ContractsState;
   reputation?: number;
   sciencePoints?: number;
@@ -122,7 +120,6 @@ export interface SaveEnvelopeState {
   gameMode: string | null;
   sandboxSettings: Record<string, unknown> | null;
   difficultySettings: DifficultySettings;
-  facilities: Record<string, FacilityState>;
   contracts: ContractsState;
   reputation: number;
   sciencePoints: number;
@@ -162,7 +159,7 @@ export interface SaveEnvelope {
  */
 export function buildSaveEnvelope(params: SaveEnvelopeParams = {}): SaveEnvelope {
   const {
-    version         = 3,
+    version         = 4,
     saveName        = 'E2E Test',
     money           = STARTING_MONEY,
     missions        = { available: [], accepted: [], completed: [] },
@@ -184,7 +181,6 @@ export function buildSaveEnvelope(params: SaveEnvelopeParams = {}): SaveEnvelope
     gameMode        = null,
     sandboxSettings = null,
     difficultySettings = { malfunctionFrequency: 'normal', weatherSeverity: 'normal', financialPressure: 'normal', injuryDuration: 'normal' },
-    facilities      = STARTER_FACILITIES,
     contracts       = { board: [], active: [], completed: [], failed: [] },
     reputation      = 50,
     sciencePoints   = 0,
@@ -202,19 +198,15 @@ export function buildSaveEnvelope(params: SaveEnvelopeParams = {}): SaveEnvelope
     debugMode          = false,
   } = params;
 
-  // Build the shared facilities object so state.facilities and
-  // hubs[0].facilities are the same reference, matching createInitialState().
-  const sharedFacilities = { ...facilities };
-
-  // Default hubs uses the resolved `facilities` value so existing callers
-  // that only override `facilities` automatically get a matching Earth hub.
+  // Default hubs — Earth HQ with starter facilities.
+  // Callers who need custom facilities should pass a full `hubs` array.
   const hubs = params.hubs ?? [{
     id: 'earth',
     name: 'Earth HQ',
     type: 'surface' as const,
     bodyId: 'EARTH',
     coordinates: { x: 0, y: 0 },
-    facilities: sharedFacilities,
+    facilities: { ...STARTER_FACILITIES },
     tourists: [],
     partInventory: [],
     constructionQueue: [],
@@ -249,7 +241,6 @@ export function buildSaveEnvelope(params: SaveEnvelopeParams = {}): SaveEnvelope
       gameMode,
       sandboxSettings,
       difficultySettings,
-      facilities: sharedFacilities,
       contracts,
       reputation,
       sciencePoints,

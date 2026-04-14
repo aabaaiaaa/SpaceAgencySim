@@ -23,7 +23,9 @@ import {
   getImportTaxMultiplier,
   getSurfaceHubsForRecovery,
   findNearbyOrbitalHub,
+  generateHubName,
 } from '../core/hubs.ts';
+import { HUB_NAME_POOL } from '../data/hubNames.ts';
 import {
   hasFacility,
   getFacilityTier,
@@ -83,10 +85,6 @@ describe('GameState hub fields', () => {
     expect(Object.keys(earth.facilities)).toHaveLength(starterIds.length);
   });
 
-  it('Earth hub facilities match top-level state.facilities', () => {
-    const earth = state.hubs[0];
-    expect(earth.facilities).toEqual(state.facilities);
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -457,5 +455,91 @@ describe('Orbital hub proximity detection', () => {
     // Exactly 1000m away = exactly at boundary
     const found = findNearbyOrbitalHub(state, 'EARTH', 201_000);
     expect(found).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hub name generation
+// ---------------------------------------------------------------------------
+
+describe('generateHubName', () => {
+  let state: GameState;
+  beforeEach(() => { state = createGameState(); });
+
+  it('generates a name with Outpost suffix for surface hubs', () => {
+    const name = generateHubName(state, 'surface');
+    expect(name).toMatch(/ Outpost$/);
+  });
+
+  it('generates a name with Station suffix for orbital hubs', () => {
+    const name = generateHubName(state, 'orbital');
+    expect(name).toMatch(/ Station$/);
+  });
+
+  it('uses a name from HUB_NAME_POOL', () => {
+    const name = generateHubName(state, 'surface');
+    const baseName = name.replace(/ Outpost$/, '');
+    expect(HUB_NAME_POOL).toContain(baseName);
+  });
+
+  it('excludes names already used by existing hubs', () => {
+    // Add hubs using specific names from the pool
+    state.hubs.push({
+      ...state.hubs[0],
+      id: 'hub-test-1',
+      name: 'Apollo Outpost',
+    });
+
+    // Generate many names and verify Apollo is never picked
+    const generatedBaseNames = new Set<string>();
+    for (let i = 0; i < 200; i++) {
+      const name = generateHubName(state, 'surface');
+      generatedBaseNames.add(name.replace(/ Outpost$/, ''));
+    }
+    expect(generatedBaseNames.has('Apollo')).toBe(false);
+  });
+
+  it('excludes names regardless of suffix type', () => {
+    // "Apollo Station" should prevent "Apollo" from being used for any hub type
+    state.hubs.push({
+      ...state.hubs[0],
+      id: 'hub-test-1',
+      name: 'Apollo Station',
+    });
+
+    const generatedBaseNames = new Set<string>();
+    for (let i = 0; i < 200; i++) {
+      const name = generateHubName(state, 'surface');
+      generatedBaseNames.add(name.replace(/ Outpost$/, ''));
+    }
+    expect(generatedBaseNames.has('Apollo')).toBe(false);
+  });
+
+  it('falls back to Hub-N naming when pool is exhausted', () => {
+    // Fill state.hubs with every name from the pool
+    for (const poolName of HUB_NAME_POOL) {
+      state.hubs.push({
+        ...state.hubs[0],
+        id: `hub-${poolName.toLowerCase()}`,
+        name: `${poolName} Outpost`,
+      });
+    }
+
+    const name = generateHubName(state, 'surface');
+    const expectedCount = state.hubs.length; // Earth HQ + all pool names
+    expect(name).toBe(`Hub-${expectedCount} Outpost`);
+  });
+
+  it('fallback includes Station suffix for orbital hubs', () => {
+    for (const poolName of HUB_NAME_POOL) {
+      state.hubs.push({
+        ...state.hubs[0],
+        id: `hub-${poolName.toLowerCase()}`,
+        name: `${poolName} Station`,
+      });
+    }
+
+    const name = generateHubName(state, 'orbital');
+    expect(name).toMatch(/^Hub-\d+ Station$/);
   });
 });
