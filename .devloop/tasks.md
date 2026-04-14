@@ -365,31 +365,31 @@
 - **Verification**: `npx playwright test e2e/route-interactions.spec.ts --reporter=line`
 
 ### TASK-056: E2E — hub maintenance causing offline
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-015
 - **Description**: In a new `e2e/hub-economy.spec.ts`, add a test: (1) Seed a save with an off-world hub (online, with maintenance cost > 0), crew stationed there, and player money set to $0. (2) Navigate to trigger period advance (or use a helper to advance period). (3) Verify the hub status in the hub switcher shows "Offline". (4) Verify crew were evacuated (check crew admin or hub management panel). Tag one test `@smoke`.
 - **Verification**: `npx playwright test e2e/hub-economy.spec.ts --reporter=line`
 
 ### TASK-057: E2E — tourist revenue in period summary
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-015
 - **Description**: In `e2e/hub-economy.spec.ts`, add a test: (1) Seed a save with a hub that has tourists generating revenue (e.g. 2 tourists at $5000/period each). (2) Record player money. (3) Advance one period. (4) Check the period summary display for tourist revenue line. (5) Verify player money increased by the expected tourist revenue amount (minus any costs).
 - **Verification**: `npx playwright test e2e/hub-economy.spec.ts --reporter=line`
 
 ### TASK-058: E2E — outpost core deployment via flight
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-015
 - **Description**: In a new `e2e/hub-deployment.spec.ts`, add a test: (1) Seed a save with a rocket containing an Outpost Core part, positioned as landed on the Moon (flight state with landed=true, bodyId='MOON'). (2) Activate the Outpost Core part (click the activation button or use keyboard shortcut). (3) Verify a deployment dialog/prompt appears. (4) Accept the deployment. (5) Verify the hub switcher now shows a new hub with a Moon location. (6) Verify the new hub name follows the auto-suggestion pattern (ends with " Outpost"). Tag `@smoke`.
 - **Verification**: `npx playwright test e2e/hub-deployment.spec.ts --reporter=line`
 
 ### TASK-059: E2E — hub reactivation
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-022
 - **Description**: In `e2e/hub-economy.spec.ts`, add a test: (1) Seed a save with an offline off-world hub and sufficient player money (> 1 period's maintenance cost). (2) Open the hub management panel for the offline hub. (3) Click the "Reactivate" button. (4) Confirm the dialog. (5) Verify the hub status changes to "Online". (6) Verify player money decreased by the maintenance cost.
 - **Verification**: `npx playwright test e2e/hub-economy.spec.ts --reporter=line`
 
 ### TASK-060: E2E — hub management panel display and rename
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-023
 - **Description**: In a new `e2e/hub-management.spec.ts`, add tests: (1) Open the hub management panel from the hub switcher. (2) Verify all fields display for Earth hub: name, body "Earth", type "Surface", status "Online", facilities list, crew count, maintenance "$0". (3) Edit the hub name to "Mission HQ". (4) Verify the hub switcher dropdown updates to show "Mission HQ". (5) Try renaming to a duplicate name (create another hub with that name in the seed) — verify error. Tag one test `@smoke`.
 - **Verification**: `npx playwright test e2e/hub-management.spec.ts --reporter=line`
