@@ -1524,7 +1524,7 @@ test.describe('Grabbing arm and satellite repair', () => {
 
     // Wait for the flight assembly to be populated.
     await page.waitForFunction(
-      () => window.__flightAssembly?.parts?.size > 0,
+      () => (window.__flightAssembly?.parts?.size ?? 0) > 0,
       { timeout: 10_000 },
     );
 

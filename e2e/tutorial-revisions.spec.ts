@@ -398,7 +398,7 @@ async function expectPartUnlocked(page: Page, partId: string): Promise<void> {
 
 async function expectFacilityBuilt(page: Page, facilityId: string): Promise<void> {
   const ok: boolean = await page.evaluate(
-    (id: string) => window.__gameState?.facilities?.[id]?.built === true,
+    (id: string) => window.__gameState?.hubs?.[0]?.facilities?.[id]?.built === true,
     facilityId,
   );
   expect(ok).toBe(true);

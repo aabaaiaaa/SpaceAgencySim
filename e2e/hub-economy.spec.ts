@@ -148,13 +148,13 @@ test.describe('Hub Economy', () => {
     const gs = await getGameState(page);
     expect(gs).not.toBeNull();
 
-    const hub = (gs!.hubs as any[]).find(h => h.id === 'moon-base');
+    const hub = (gs!.hubs as Record<string, unknown>[]).find(h => h.id === 'moon-base');
     expect(hub).toBeDefined();
-    expect(hub.online).toBe(false);
+    expect(hub!.online).toBe(false);
 
-    const crew = (gs!.crew as any[]).find(c => c.id === 'crew-moon-1');
+    const crew = (gs!.crew as Record<string, unknown>[]).find(c => c.id === 'crew-moon-1');
     expect(crew).toBeDefined();
-    expect(crew.stationedHubId).toBe('earth');
+    expect(crew!.stationedHubId).toBe('earth');
   });
 
   // =========================================================================
@@ -243,9 +243,9 @@ test.describe('Hub Economy', () => {
     expect(moneyAfter).toBe(moneyWithTourists);
 
     // Verify tourists are still present (departurePeriod = 100, currentPeriod = 1)
-    const moonHubAfter = (gsAfter!.hubs as any[]).find(h => h.id === 'moon-base');
+    const moonHubAfter = (gsAfter!.hubs as Record<string, unknown>[]).find(h => h.id === 'moon-base');
     expect(moonHubAfter).toBeDefined();
-    expect(moonHubAfter.tourists).toHaveLength(2);
+    expect(moonHubAfter!.tourists).toHaveLength(2);
   });
 
   // =========================================================================
@@ -319,9 +319,9 @@ test.describe('Hub Economy', () => {
     const gs = await getGameState(page);
     expect(gs).not.toBeNull();
 
-    const hub = (gs!.hubs as any[]).find(h => h.id === 'moon-base');
+    const hub = (gs!.hubs as Record<string, unknown>[]).find(h => h.id === 'moon-base');
     expect(hub).toBeDefined();
-    expect(hub.online).toBe(true);
+    expect(hub!.online).toBe(true);
 
     // Reactivation costs one period's maintenance: crew-hab tier 1 = $5,000
     const expectedMoney = startingMoney - 5_000;

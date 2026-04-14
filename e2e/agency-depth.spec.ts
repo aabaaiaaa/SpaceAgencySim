@@ -183,7 +183,7 @@ test.describe('Construction menu — building a facility', () => {
 
   test('(1) crew admin not built initially', async () => {
     const gs = await getGameState(page) as GameState;
-    expect(gs.facilities[FacilityId.CREW_ADMIN]).toBeFalsy();
+    expect(gs.hubs[0].facilities[FacilityId.CREW_ADMIN]).toBeFalsy();
   });
 
   test('(2) can build crew admin from construction menu', async () => {
@@ -197,7 +197,7 @@ test.describe('Construction menu — building a facility', () => {
 
     // Wait for facility to be built in game state
     await page.waitForFunction(
-      () => window.__gameState?.facilities?.['crew-admin']?.built === true,
+      () => window.__gameState?.hubs?.[0]?.facilities?.['crew-admin']?.built === true,
       { timeout: 5_000 },
     );
 
@@ -206,9 +206,9 @@ test.describe('Construction menu — building a facility', () => {
 
     // Verify the facility is now built and money deducted
     const gs = await getGameState(page) as GameState;
-    expect(gs.facilities[FacilityId.CREW_ADMIN]).toBeTruthy();
-    expect(gs.facilities[FacilityId.CREW_ADMIN].built).toBe(true);
-    expect(gs.facilities[FacilityId.CREW_ADMIN].tier).toBe(1);
+    expect(gs.hubs[0].facilities[FacilityId.CREW_ADMIN]).toBeTruthy();
+    expect(gs.hubs[0].facilities[FacilityId.CREW_ADMIN].built).toBe(true);
+    expect(gs.hubs[0].facilities[FacilityId.CREW_ADMIN].tier).toBe(1);
     // Crew Admin costs $100,000 (with possible reputation discount)
     expect(gs.money).toBeLessThan(2_000_000);
   });
@@ -896,9 +896,9 @@ test.describe('Operating costs charged per period', () => {
     // Build crew admin (adds another $10k upkeep)
     await page.evaluate(() => {
       const gs = window.__gameState as
-        { facilities: Record<string, { built: boolean; tier: number }> } | undefined;
+        { hubs: Array<{ facilities: Record<string, { built: boolean; tier: number }> }> } | undefined;
       if (!gs) return;
-      gs.facilities['crew-admin'] = { built: true, tier: 1 };
+      gs.hubs[0].facilities['crew-admin'] = { built: true, tier: 1 };
     });
 
     const gsBefore = await getGameState(page) as GameState;

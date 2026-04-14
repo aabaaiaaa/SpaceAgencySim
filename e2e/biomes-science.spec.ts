@@ -878,7 +878,7 @@ test.describe('Yield formula', () => {
         ? diminishingReturns[priorCount]
         : 0;
       // R&D Lab tier 2 → bonus = 0.20
-      const rdLabTier: number = state?.facilities?.['rd-lab']?.tier ?? 0;
+      const rdLabTier: number = state?.hubs?.[0]?.facilities?.['rd-lab']?.tier ?? 0;
       const rdLabBonuses: Record<number, number> = { 0: 0, 1: 0.10, 2: 0.20, 3: 0.30 };
       const rdLabBonus: number = rdLabBonuses[rdLabTier] ?? 0;
 
@@ -929,7 +929,7 @@ test.describe('Yield formula', () => {
     // Verify the R&D Lab bonus via game state.
     const rdLabTier: number = await page.evaluate((): number => {
       const w = window;
-      const fac: FacilityEntry | undefined = w.__gameState?.facilities?.['rd-lab'];
+      const fac: FacilityEntry | undefined = w.__gameState?.hubs?.[0]?.facilities?.['rd-lab'];
       return fac?.tier ?? 0;
     });
     expect(rdLabTier).toBe(1);
@@ -953,7 +953,7 @@ test.describe('Yield formula', () => {
 
     const rdLabTier: number = await page.evaluate((): number => {
       const w = window;
-      const fac: FacilityEntry | undefined = w.__gameState?.facilities?.['rd-lab'];
+      const fac: FacilityEntry | undefined = w.__gameState?.hubs?.[0]?.facilities?.['rd-lab'];
       return fac?.tier ?? 0;
     });
     expect(rdLabTier).toBe(3);
@@ -1423,7 +1423,7 @@ test.describe('R&D Lab tier gating', () => {
     const result: TierGateResult = await page.evaluate((): TierGateResult => {
       const w = window;
       const state = w.__gameState;
-      const rdLabTier: number = state?.facilities?.['rd-lab']?.tier ?? 0;
+      const rdLabTier: number = state?.hubs?.[0]?.facilities?.['rd-lab']?.tier ?? 0;
       const maxTech: Record<number, number> = { 1: 2, 2: 4, 3: 5 };
 
       // sci-t3 is tier 3 — check if it exceeds max.
@@ -1469,7 +1469,7 @@ test.describe('R&D Lab tier gating', () => {
     const tier3Result: TierCheckResult = await page.evaluate((): TierCheckResult => {
       const w = window;
       const state = w.__gameState;
-      const rdLabTier: number = state?.facilities?.['rd-lab']?.tier ?? 0;
+      const rdLabTier: number = state?.hubs?.[0]?.facilities?.['rd-lab']?.tier ?? 0;
       const maxTech: Record<number, number> = { 1: 2, 2: 4, 3: 5 };
       const maxVal: number = maxTech[rdLabTier] ?? 0;
       return { maxTech: maxVal, tier3Allowed: 3 <= maxVal, tier5Allowed: 5 <= maxVal };
@@ -1505,7 +1505,7 @@ test.describe('R&D Lab tier gating', () => {
     const result: TierMaxResult = await page.evaluate((): TierMaxResult => {
       const w = window;
       const state = w.__gameState;
-      const rdLabTier: number = state?.facilities?.['rd-lab']?.tier ?? 0;
+      const rdLabTier: number = state?.hubs?.[0]?.facilities?.['rd-lab']?.tier ?? 0;
       const maxTech: Record<number, number> = { 1: 2, 2: 4, 3: 5 };
       const maxVal: number = maxTech[rdLabTier] ?? 0;
       return { maxTech: maxVal, tier5Allowed: 5 <= maxVal };
@@ -1539,7 +1539,7 @@ test.describe('R&D Lab tier gating', () => {
     const result: RdLabStatus = await page.evaluate((): RdLabStatus => {
       const w = window;
       const state = w.__gameState;
-      const rdLab: FacilityEntry | undefined = state?.facilities?.['rd-lab'];
+      const rdLab: FacilityEntry | undefined = state?.hubs?.[0]?.facilities?.['rd-lab'];
       const hasRdLab: boolean = rdLab?.built === true;
       return { hasRdLab };
     });

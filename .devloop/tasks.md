@@ -479,7 +479,7 @@
 - **Verification**: `npx tsc --noEmit && npx eslint src/ --max-warnings=10`
 
 ### TASK-074: Smoke test verification
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-072, TASK-073
 - **Description**: Run the full smoke test suite (unit + E2E) to verify all critical paths work. Fix any failures. This is the final verification step.
 - **Verification**: `npm run test:smoke:unit && npm run test:smoke:e2e`

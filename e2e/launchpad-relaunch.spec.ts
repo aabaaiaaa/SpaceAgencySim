@@ -98,7 +98,7 @@ async function fireStageAndVerifyLiftoff(page: Page): Promise<void> {
 
   // Wait for the staging system to be ready before pressing stage.
   await page.waitForFunction(
-    () => window.__flightPs?.activeParts?.size > 0,
+    () => (window.__flightPs?.activeParts?.size ?? 0) > 0,
     { timeout: 5_000 },
   );
 

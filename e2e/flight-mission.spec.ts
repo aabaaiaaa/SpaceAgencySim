@@ -103,7 +103,7 @@ test.describe('Flight — First Flight Mission Completion', () => {
     const moneyAfter: number = await page.evaluate((): number => window.__gameState?.money ?? 0);
     const missionReward: number = 15_000;
     const facilityCount: number = await page.evaluate(
-      (): number => Object.values(window.__gameState?.facilities ?? {}).filter(
+      (): number => Object.values(window.__gameState?.hubs?.[0]?.facilities ?? {}).filter(
         (f: { built: boolean }) => f.built,
       ).length,
     );
