@@ -253,6 +253,17 @@ export function initHubUI(container: HTMLElement, state: GameState, onNavigate: 
 
   // Show the PixiJS background.
   showHubScene();
+
+  // Preload commonly-navigated screens during idle time to prime the module cache.
+  const preload = () => {
+    import('./vab.ts');
+    import('./missionControl.ts');
+  };
+  if (typeof requestIdleCallback === 'function') {
+    requestIdleCallback(preload);
+  } else {
+    setTimeout(preload, 1000);
+  }
 }
 
 /**

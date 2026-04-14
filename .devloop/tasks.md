@@ -137,7 +137,7 @@
 - **Verification**: `npx tsc --noEmit src/ui/hubManagement.ts`
 
 ### TASK-022: Hub management panel — actions (rename, reactivate, abandon)
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-021
 - **Description**: In `src/ui/hubManagement.ts`, wire up the action buttons: (1) Name field: on blur/Enter, call `renameHub()`. Show error notification if validation fails. Update hub switcher dropdown text. (2) Reactivate button: visible when `canReactivate`. On click, show confirmation dialog "Reactivate {name} for ${cost}?" with Confirm/Cancel. On confirm, call `reactivateHub()` from hubs.ts, re-render panel. (3) Abandon button: visible when `canAbandon`. On click, show confirmation dialog with warning text about crew evacuation and route breakage. On confirm, call `abandonHub()`, close panel, re-render hub switcher. Use the game's existing dialog/notification patterns.
 - **Verification**: `npx tsc --noEmit src/ui/hubManagement.ts`
@@ -279,13 +279,13 @@
 - **Verification**: `npm run build && ls -la dist/assets/*.js | wc -l` (should show multiple JS chunks, not just one)
 
 ### TASK-043: Configure Vite manual chunks
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-042
 - **Description**: In `vite.config.ts`, add `build.rollupOptions.output.manualChunks` configuration. Define chunks: `'vendor-pixi'` for pixi.js, `'core-hubs'` for hubs/hubCrew/hubTourists/hubTypes, `'core-mining'` for mining/refinery, `'core-routes'` for routes, `'core-physics'` for physics/orbit, `'data-catalogs'` for all src/data/ modules. Use the function form of `manualChunks` if the array form doesn't resolve paths correctly: `manualChunks(id) { if (id.includes('pixi.js')) return 'vendor-pixi'; ... }`. Run `npm run build` and verify the output contains the expected chunk files.
 - **Verification**: `npm run build 2>&1 | tail -20`
 
 ### TASK-044: Add idle preloading of adjacent screens
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-042
 - **Description**: In the hub screen initialization code (after the hub screen is displayed), add idle-time preloading of the most common next screens. Use `requestIdleCallback` (or `setTimeout` as fallback) to trigger `import('./ui/vab/index.ts')` and `import('./ui/missionControl/index.ts')`. These dynamic imports run in the background — the returned promise is intentionally not awaited. This primes the module cache so the first navigation to these screens is instant. Don't preload ALL screens — just the 2-3 most common next transitions from the hub.
 - **Verification**: `npm run build`
@@ -297,13 +297,13 @@
 ### Unit Test Gaps
 
 ### TASK-045: Unit test — hub with zero facilities
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-015
 - **Description**: In `src/tests/hubs.test.ts` (or `hubs-edge-cases.test.ts`), add tests for a hub with zero facilities: (1) `getActiveHub()` returns the hub correctly. (2) `calculateHubMaintenance()` returns 0 (no facilities = no maintenance). (3) `hasFacility(state, anyFacilityId)` returns false. (4) `getFacilityTier(state, anyFacilityId)` returns 0. (5) `getHubManagementInfo()` returns empty facilities array. Create the hub using `makeHub()` factory with `facilities: {}`.
 - **Verification**: `npx vitest run src/tests/hubs.test.ts`
 
 ### TASK-046: Unit test — tourist revenue edge cases
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-003
 - **Description**: In `src/tests/hubs-tourists.test.ts`, add tests: (1) Tourist with `revenue = 0` — verify `processTouristRevenue()` doesn't error and credits $0. (2) Tourist where `departurePeriod === currentPeriod` — verify revenue IS credited this period, tourist IS kept this period, and removed next period. (3) Multiple tourists departing same period — verify all get revenue credited before removal.
 - **Verification**: `npx vitest run src/tests/hubs-tourists.test.ts`

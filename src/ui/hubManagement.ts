@@ -15,6 +15,7 @@ import {
   reactivateHub,
   abandonHub,
 } from '../core/hubs.ts';
+import { renderHubSwitcher } from './hubSwitcher.ts';
 import './hubManagement.css';
 
 // ---------------------------------------------------------------------------
@@ -130,6 +131,7 @@ function _buildHeader(info: HubManagementInfo): HTMLDivElement {
       } else {
         if (errorEl) errorEl.textContent = '';
         originalName = trimmed;
+        if (_state) renderHubSwitcher(_state);
       }
     };
 
@@ -366,11 +368,7 @@ function _buildActions(info: HubManagementInfo): HTMLDivElement {
     btn.textContent = 'Reactivate';
     btn.title = 'Pay one period of maintenance to bring this hub back online';
     btn.addEventListener('click', () => {
-      if (!_state || !_hubId) return;
-      const success = reactivateHub(_state, _hubId);
-      if (success) {
-        _refreshPanel();
-      }
+      _showReactivateConfirmation(info);
     });
     row.appendChild(btn);
   }
@@ -387,6 +385,66 @@ function _buildActions(info: HubManagementInfo): HTMLDivElement {
   }
 
   return row;
+}
+
+// ---------------------------------------------------------------------------
+// Reactivate confirmation dialog
+// ---------------------------------------------------------------------------
+
+function _showReactivateConfirmation(info: HubManagementInfo): void {
+  if (!_backdrop) return;
+
+  const panel = _backdrop.querySelector<HTMLDivElement>('.hub-mgmt-panel');
+  if (!panel) return;
+
+  // Remove any existing confirmation overlay
+  const existing = panel.querySelector('.hub-mgmt-confirm-overlay');
+  if (existing) existing.remove();
+
+  // Make the panel position relative for the overlay
+  panel.style.position = 'relative';
+
+  const overlay = document.createElement('div');
+  overlay.className = 'hub-mgmt-confirm-overlay';
+  overlay.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
+
+  const box = document.createElement('div');
+  box.className = 'hub-mgmt-confirm-box';
+
+  const title = document.createElement('div');
+  title.className = 'hub-mgmt-confirm-title';
+  title.textContent = 'Reactivate Hub?';
+
+  const msg = document.createElement('div');
+  msg.className = 'hub-mgmt-confirm-msg';
+  msg.textContent = `Reactivate ${info.name} for ${_formatMoney(info.maintenanceCostPerPeriod)}? The hub will come back online.`;
+
+  const buttons = document.createElement('div');
+  buttons.className = 'hub-mgmt-confirm-buttons';
+
+  const cancelBtn = document.createElement('button');
+  cancelBtn.className = 'btn-secondary';
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.addEventListener('click', () => overlay.remove());
+
+  const confirmBtn = document.createElement('button');
+  confirmBtn.className = 'btn-primary';
+  confirmBtn.textContent = 'Confirm';
+  confirmBtn.addEventListener('click', () => {
+    if (!_state || !_hubId) return;
+    const success = reactivateHub(_state, _hubId);
+    if (success) {
+      _refreshPanel();
+    }
+  });
+
+  buttons.appendChild(cancelBtn);
+  buttons.appendChild(confirmBtn);
+  box.appendChild(title);
+  box.appendChild(msg);
+  box.appendChild(buttons);
+  overlay.appendChild(box);
+  panel.appendChild(overlay);
 }
 
 // ---------------------------------------------------------------------------
@@ -436,6 +494,7 @@ function _showAbandonConfirmation(): void {
     if (!_state || !_hubId) return;
     const result = abandonHub(_state, _hubId);
     if (result.success) {
+      if (_state) renderHubSwitcher(_state);
       hideHubManagementPanel();
     }
   });

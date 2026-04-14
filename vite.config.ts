@@ -9,6 +9,20 @@ export default defineConfig({
       ignored: ['**/src/tests/**', '**/e2e/**', '**/test-map.json', '**/scripts/**', '**/playwright-report/**', '**/test-results/**'],
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('pixi.js')) return 'vendor-pixi';
+          if (id.includes('src/core/hubs.ts') || id.includes('src/core/hubCrew.ts') || id.includes('src/core/hubTourists.ts') || id.includes('src/core/hubTypes.ts')) return 'core-hubs';
+          if (id.includes('src/core/mining.ts') || id.includes('src/core/refinery.ts')) return 'core-mining';
+          if (id.includes('src/core/routes.ts')) return 'core-routes';
+          if (id.includes('src/core/physics.ts') || id.includes('src/core/orbit.ts')) return 'core-physics';
+          if (id.includes('src/data/parts.ts') || id.includes('src/data/bodies.') || id.includes('src/data/resources.') || id.includes('src/data/missions.') || id.includes('src/data/contracts.') || id.includes('src/data/hubFacilities.ts') || id.includes('src/data/hubNames.ts')) return 'data-catalogs';
+        },
+      },
+    },
+  },
   // Test configuration for Vitest (headless unit tests for core game logic)
   test: {
     environment: 'node',

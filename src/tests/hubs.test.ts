@@ -28,6 +28,7 @@ import {
   renameHub,
   abandonHub,
   getHubManagementInfo,
+  calculateHubMaintenance,
 } from '../core/hubs.ts';
 import { HUB_NAME_POOL } from '../data/hubNames.ts';
 import {
@@ -41,6 +42,7 @@ import {
   OFFWORLD_FACILITY_COSTS,
 } from '../data/hubFacilities.ts';
 import { getTransitDelay } from '../core/hubCrew.ts';
+import { makeHub } from './_factories.ts';
 
 // ---------------------------------------------------------------------------
 // GameState hub initialization
@@ -964,5 +966,49 @@ describe('getHubManagementInfo', () => {
 
   it('throws for non-existent hub ID', () => {
     expect(() => getHubManagementInfo(state, 'nonexistent-hub')).toThrow('Hub not found');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hub with zero facilities
+// ---------------------------------------------------------------------------
+
+describe('Hub with zero facilities', () => {
+  let state: GameState;
+
+  beforeEach(() => {
+    state = createGameState();
+    // Add a hub with no facilities
+    const emptyHub = makeHub({ id: 'empty-hub', name: 'Empty Base', facilities: {} });
+    state.hubs.push(emptyHub);
+    setActiveHub(state, 'empty-hub');
+  });
+
+  it('getActiveHub returns the hub correctly', () => {
+    const hub = getActiveHub(state);
+    expect(hub.id).toBe('empty-hub');
+    expect(hub.name).toBe('Empty Base');
+  });
+
+  it('calculateHubMaintenance returns 0 for no facilities', () => {
+    const hub = getActiveHub(state);
+    expect(calculateHubMaintenance(hub)).toBe(0);
+  });
+
+  it('hasFacility returns false for any facility', () => {
+    expect(hasFacility(state, FacilityId.LAUNCH_PAD)).toBe(false);
+    expect(hasFacility(state, FacilityId.CREW_HAB)).toBe(false);
+    expect(hasFacility(state, FacilityId.MISSION_CONTROL)).toBe(false);
+  });
+
+  it('getFacilityTier returns 0 for any facility', () => {
+    expect(getFacilityTier(state, FacilityId.LAUNCH_PAD)).toBe(0);
+    expect(getFacilityTier(state, FacilityId.CREW_HAB)).toBe(0);
+  });
+
+  it('getHubManagementInfo returns empty facilities array', () => {
+    const info = getHubManagementInfo(state, 'empty-hub');
+    expect(info.facilities).toEqual([]);
+    expect(info.maintenanceCostPerPeriod).toBe(0);
   });
 });

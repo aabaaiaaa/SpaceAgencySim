@@ -226,6 +226,48 @@ describe('processTouristRevenue', () => {
     processTouristRevenue(state);
     expect(state.money).toBe(moneyBefore + 1_000 + 2_000 + 3_000);
   });
+
+  it('handles tourist with zero revenue without error', () => {
+    const hub = makeHub({
+      facilities: { [FacilityId.CREW_HAB]: { built: true, tier: 1 } },
+      tourists: [makeTourist({ revenue: 0, departurePeriod: 10 })],
+    });
+    state.hubs = [state.hubs[0], hub];
+    const moneyBefore = state.money;
+    processTouristRevenue(state);
+    expect(state.money).toBe(moneyBefore); // $0 added
+    expect(hub.tourists).toHaveLength(1); // still present
+  });
+
+  it('credits revenue and removes tourist when departurePeriod equals currentPeriod', () => {
+    state.currentPeriod = 5;
+    const hub = makeHub({
+      facilities: { [FacilityId.CREW_HAB]: { built: true, tier: 1 } },
+      tourists: [makeTourist({ revenue: 2_000, departurePeriod: 5 })],
+    });
+    state.hubs = [state.hubs[0], hub];
+    const moneyBefore = state.money;
+    processTouristRevenue(state);
+    expect(state.money).toBe(moneyBefore + 2_000); // revenue credited
+    expect(hub.tourists).toHaveLength(0); // tourist removed
+  });
+
+  it('credits revenue for all tourists departing in the same period before removing them', () => {
+    state.currentPeriod = 5;
+    const hub = makeHub({
+      facilities: { [FacilityId.CREW_HAB]: { built: true, tier: 1 } },
+      tourists: [
+        makeTourist({ revenue: 1_000, departurePeriod: 5 }),
+        makeTourist({ revenue: 3_000, departurePeriod: 5 }),
+        makeTourist({ revenue: 2_000, departurePeriod: 5 }),
+      ],
+    });
+    state.hubs = [state.hubs[0], hub];
+    const moneyBefore = state.money;
+    processTouristRevenue(state);
+    expect(state.money).toBe(moneyBefore + 1_000 + 3_000 + 2_000); // all revenue credited
+    expect(hub.tourists).toHaveLength(0); // all removed
+  });
 });
 
 // ---------------------------------------------------------------------------
