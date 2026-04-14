@@ -37,7 +37,7 @@
 - **Verification**: `npx vitest run src/tests/hubs-construction.test.ts src/tests/hubs.test.ts` — all pass with new deterministic IDs.
 
 ### TASK-007: Update E2E factories for sequential hub IDs and new save version
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-005, TASK-006
 - **Description**: Update E2E test factories in `e2e/helpers/_saveFactory.ts` and `e2e/helpers/_factories.ts` to include `nextHubId` in save state and use the updated `SAVE_VERSION`. Ensure `buildSaveEnvelope()` produces valid saves. Run targeted E2E tests that exercise save/load to verify.
 - **Verification**: `npx playwright test e2e/saveload.spec.ts` — save/load E2E tests pass with new format.
@@ -49,7 +49,7 @@
 - **Verification**: `npx tsc --noEmit` passes. `npx vitest run src/tests/hubManagement.test.ts` — existing tests pass (if any). Grep confirms no import path changes needed outside `src/ui/hubManagement/`.
 
 ### TASK-008a: Verify hub management panel split doesn't break E2E
-- **Status**: in-progress
+- **Status**: done
 - **Dependencies**: TASK-008
 - **Description**: Run the hub management E2E tests to verify the sub-module split didn't break any UI behavior. The barrel re-export should make this transparent, but confirm with a targeted E2E run.
 - **Verification**: `npx playwright test e2e/hub-management.spec.ts` — all tests pass.
@@ -61,7 +61,7 @@
 - **Verification**: `npx vitest run src/tests/routes.test.ts` — existing route tests pass (no regressions).
 
 ### TASK-010: Unit tests for route leg chaining validation
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-009
 - **Description**: Add unit tests for the leg chaining validation: valid 2-leg chain passes, valid 3-leg chain passes, broken chain (mismatched body) rejected, single-leg route passes, hub ID mismatch on same body handled correctly, `processRoutes()` marks unchained route as broken. See requirements.md §6.
 - **Verification**: `npx vitest run src/tests/routes.test.ts` — all new chaining tests pass.

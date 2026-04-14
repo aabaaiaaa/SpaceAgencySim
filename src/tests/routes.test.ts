@@ -11,6 +11,7 @@ import {
   processRoutes,
   getRouteDependencies,
   getSafeOrbitRange,
+  validateLegChaining,
 } from '../core/routes.ts';
 import type { SafeOrbitRange } from '../core/routes.ts';
 import { createMiningSite } from '../core/mining.ts';
@@ -19,7 +20,7 @@ import { advancePeriod } from '../core/period.ts';
 import { ResourceType, EARTH_HUB_ID } from '../core/constants.ts';
 import { RESOURCES_BY_ID } from '../data/resources.ts';
 
-import type { RouteLocation, RouteLeg } from '../core/gameState.ts';
+import type { RouteLocation, RouteLeg, Route } from '../core/gameState.ts';
 import type { ProveRouteLegParams } from '../core/routes.ts';
 
 // ---------------------------------------------------------------------------
@@ -1284,5 +1285,103 @@ describe('processRoutes hub-targeted delivery', () => {
 
     expect(route.status).toBe('active');
     expect(result.delivered[ResourceType.WATER_ICE]).toBe(2000);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// validateLegChaining
+// ---------------------------------------------------------------------------
+
+describe('validateLegChaining', () => {
+  function makeLeg(origin: RouteLocation, destination: RouteLocation, id = 'leg-1'): RouteLeg {
+    return {
+      id,
+      origin,
+      destination,
+      craftDesignId: 'design-1',
+      craftCount: 1,
+      cargoCapacityKg: 5000,
+      costPerRun: 100_000,
+      provenFlightId: 'f1',
+    };
+  }
+
+  it('returns true for an empty legs array', () => {
+    expect(validateLegChaining([])).toBe(true);
+  });
+
+  it('returns true for a single leg', () => {
+    const leg = makeLeg(surface('MOON'), orbit('EARTH', 200));
+    expect(validateLegChaining([leg])).toBe(true);
+  });
+
+  it('returns true for a valid 2-leg chain (A→B, B→C)', () => {
+    const leg1 = makeLeg(orbit('MOON', 50), orbit('EARTH', 200), 'leg-1');
+    const leg2 = makeLeg(orbit('EARTH', 200), surface('EARTH'), 'leg-2');
+    expect(validateLegChaining([leg1, leg2])).toBe(true);
+  });
+
+  it('returns true for a valid 3-leg chain (A→B, B→C, C→D)', () => {
+    const leg1 = makeLeg(surface('MOON'), orbit('MOON', 50), 'leg-1');
+    const leg2 = makeLeg(orbit('MOON', 50), orbit('EARTH', 200), 'leg-2');
+    const leg3 = makeLeg(orbit('EARTH', 200), surface('EARTH'), 'leg-3');
+    expect(validateLegChaining([leg1, leg2, leg3])).toBe(true);
+  });
+
+  it('returns false for a broken chain (bodyId mismatch)', () => {
+    const leg1 = makeLeg(orbit('MOON', 50), orbit('EARTH', 200), 'leg-1');
+    // leg2 origin is MARS, not EARTH — chain is broken
+    const leg2 = makeLeg(orbit('MARS', 100), surface('EARTH'), 'leg-2');
+    expect(validateLegChaining([leg1, leg2])).toBe(false);
+  });
+
+  it('returns false when hubId differs on same body (both non-null)', () => {
+    const dest: RouteLocation = { bodyId: 'MOON', locationType: 'surface', hubId: 'hub-alpha' };
+    const nextOrigin: RouteLocation = { bodyId: 'MOON', locationType: 'surface', hubId: 'hub-beta' };
+    const leg1 = makeLeg(orbit('EARTH', 200), dest, 'leg-1');
+    const leg2 = makeLeg(nextOrigin, orbit('MOON', 50), 'leg-2');
+    expect(validateLegChaining([leg1, leg2])).toBe(false);
+  });
+
+  it('returns true when one hubId is null (hub check skipped)', () => {
+    const dest: RouteLocation = { bodyId: 'MOON', locationType: 'surface', hubId: 'hub-alpha' };
+    const nextOrigin: RouteLocation = { bodyId: 'MOON', locationType: 'surface', hubId: null };
+    const leg1 = makeLeg(orbit('EARTH', 200), dest, 'leg-1');
+    const leg2 = makeLeg(nextOrigin, orbit('MOON', 50), 'leg-2');
+    expect(validateLegChaining([leg1, leg2])).toBe(true);
+  });
+
+  it('processRoutes marks an unchained route as broken', () => {
+    const state = createGameState();
+
+    // Create a mining site on MOON with stocked orbital buffer
+    const site = createMiningSite(state, {
+      name: 'Lunar Mine',
+      bodyId: 'MOON',
+      coordinates: { x: 0, y: 0 },
+      controlUnitPartId: 'ctrl-1',
+    });
+    site.orbitalBuffer[ResourceType.WATER_ICE] = 5000;
+
+    // Manually construct a route with unchained legs:
+    // Leg 1: MOON orbit → EARTH orbit
+    // Leg 2: MARS orbit → EARTH orbit  (MARS ≠ EARTH — chain is broken)
+    const brokenRoute: Route = {
+      id: 'route-unchained',
+      name: 'Unchained Route',
+      status: 'active',
+      resourceType: ResourceType.WATER_ICE,
+      legs: [
+        makeLeg(orbit('MOON', 50), orbit('EARTH', 200), 'leg-1'),
+        makeLeg(orbit('MARS', 100), orbit('EARTH', 200), 'leg-2'),
+      ],
+      throughputPerPeriod: 2000,
+      totalCostPerPeriod: 100_000,
+    };
+    state.routes.push(brokenRoute);
+
+    processRoutes(state);
+
+    expect(brokenRoute.status).toBe('broken');
   });
 });
