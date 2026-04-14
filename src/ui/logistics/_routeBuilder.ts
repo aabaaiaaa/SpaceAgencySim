@@ -9,6 +9,7 @@
 
 import type { ResourceType } from '../../core/constants.ts';
 import { createRoute } from '../../core/routes.ts';
+import { getHub } from '../../core/hubs.ts';
 import { getBodyDef } from '../../data/bodies.ts';
 import {
   getLogisticsState,
@@ -108,16 +109,55 @@ export function renderBuilderPanel(): HTMLDivElement {
   legsDisplay.className = 'logistics-builder-legs';
 
   if (ls.builderLegs.length === 0) {
-    legsDisplay.textContent = 'No legs added yet';
-    legsDisplay.classList.add('logistics-builder-legs-empty');
+    // Show selected origin hub/body info above "No legs added yet"
+    if (ls.builderCurrentBodyId && ls.builderOriginHubId && ls.state) {
+      const originHub = getHub(ls.state, ls.builderOriginHubId);
+      if (originHub) {
+        const originInfo = document.createElement('div');
+        originInfo.className = 'logistics-builder-origin-info';
+        originInfo.textContent = `Origin: ${originHub.name} (${ls.builderCurrentBodyId})`;
+        originInfo.style.color = '#FFD700';
+        originInfo.style.fontSize = '11px';
+        originInfo.style.marginBottom = '4px';
+        legsDisplay.appendChild(originInfo);
+      }
+    } else if (ls.builderCurrentBodyId) {
+      const bodyDef = getBodyDef(ls.builderCurrentBodyId);
+      const bodyName = bodyDef?.name ?? ls.builderCurrentBodyId;
+      const originInfo = document.createElement('div');
+      originInfo.className = 'logistics-builder-origin-info';
+      originInfo.textContent = `Origin: ${bodyName}`;
+      originInfo.style.color = '#FFD700';
+      originInfo.style.fontSize = '11px';
+      originInfo.style.marginBottom = '4px';
+      legsDisplay.appendChild(originInfo);
+    }
+    const emptyMsg = document.createElement('div');
+    emptyMsg.textContent = 'No legs added yet';
+    emptyMsg.classList.add('logistics-builder-legs-empty');
+    legsDisplay.appendChild(emptyMsg);
   } else {
+    // Show origin hub label on the first leg if an origin hub is selected
+    if (ls.builderOriginHubId && ls.state) {
+      const originHub = getHub(ls.state, ls.builderOriginHubId);
+      if (originHub) {
+        const originLabel = document.createElement('div');
+        originLabel.className = 'logistics-builder-origin-info';
+        originLabel.textContent = `From: ${originHub.name}`;
+        originLabel.style.color = '#FFD700';
+        originLabel.style.fontSize = '11px';
+        originLabel.style.marginBottom = '4px';
+        legsDisplay.appendChild(originLabel);
+      }
+    }
+
     // Show summary of chained legs
     for (const legId of ls.builderLegs) {
       const leg = ls.state?.provenLegs.find((pl) => pl.id === legId);
       if (leg) {
         const legEl = document.createElement('div');
         legEl.className = 'logistics-builder-leg-item';
-        legEl.textContent = `${formatLocation(leg.origin)} \u2192 ${formatLocation(leg.destination)}`;
+        legEl.textContent = `${formatLocation(leg.origin, ls.state?.hubs)} \u2192 ${formatLocation(leg.destination, ls.state?.hubs)}`;
         legsDisplay.appendChild(legEl);
       }
     }
@@ -200,6 +240,10 @@ export function renderBuilderPanel(): HTMLDivElement {
  * Collect resource types available for route building.
  * A resource is available if at least one proven leg touches a body
  * that produces it (via its resource profile).
+ *
+ * When a source body is selected (`builderCurrentBodyId`), additionally
+ * includes resources with orbital buffer stock on that body, and filters
+ * the full list to the intersection of profile resources and buffer resources.
  */
 function _getAvailableResourceTypes(): string[] {
   const ls = getLogisticsState();
@@ -221,6 +265,44 @@ function _getAvailableResourceTypes(): string[] {
         resourceTypes.add(entry.resourceType);
       }
     }
+  }
+
+  // If a source body is selected, also include resources with orbital buffer
+  // stock on that body and filter to the combined set
+  if (ls.builderCurrentBodyId && ls.state) {
+    const sites = ls.state.miningSites.filter(
+      s => s.bodyId === ls.builderCurrentBodyId,
+    );
+    const bufferResources = new Set<string>();
+    for (const site of sites) {
+      for (const [resourceType, amount] of Object.entries(site.orbitalBuffer)) {
+        if ((amount ?? 0) > 0) bufferResources.add(resourceType);
+      }
+    }
+
+    // Combine: keep profile resources from the source body plus buffer resources
+    const sourceBodyDef = getBodyDef(ls.builderCurrentBodyId);
+    const sourceProfileResources = new Set<string>();
+    if (sourceBodyDef?.resourceProfile) {
+      for (const entry of sourceBodyDef.resourceProfile) {
+        sourceProfileResources.add(entry.resourceType);
+      }
+    }
+
+    // Filter to resources relevant to the source body:
+    // either in the body's resource profile or currently in orbital buffer
+    const relevantResources = new Set<string>();
+    for (const rt of resourceTypes) {
+      if (sourceProfileResources.has(rt) || bufferResources.has(rt)) {
+        relevantResources.add(rt);
+      }
+    }
+    // Also add any buffer resources not yet in the profile set
+    for (const rt of bufferResources) {
+      relevantResources.add(rt);
+    }
+
+    return [...relevantResources].sort();
   }
 
   return [...resourceTypes].sort();

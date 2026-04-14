@@ -10,6 +10,9 @@
  */
 
 import type { RouteLocation } from '../../core/gameState.ts';
+import type { Hub } from '../../core/hubTypes.ts';
+import { getHubsOnBody } from '../../core/hubs.ts';
+import { EARTH_HUB_ID } from '../../core/constants.ts';
 import {
   getLogisticsState,
   triggerRender,
@@ -37,12 +40,26 @@ export function getBodyColor(bodyId: string): string {
 /**
  * Format a RouteLocation for display.
  * E.g. `"MOON (surface)"` or `"MARS (orbit, 200km)"`.
+ * When `hubs` is provided and the location has a `hubId`, the hub name
+ * is prepended: `"Apollo Outpost (Moon, surface)"`.
  */
-export function formatLocation(loc: RouteLocation): string {
-  if (loc.locationType === 'orbit' && loc.altitude !== undefined) {
-    return `${loc.bodyId} (orbit, ${loc.altitude}km)`;
+export function formatLocation(
+  loc: RouteLocation,
+  hubs?: { id: string; name: string }[],
+): string {
+  const locDetail =
+    loc.locationType === 'orbit' && loc.altitude !== undefined
+      ? `orbit, ${loc.altitude}km`
+      : loc.locationType;
+
+  if (loc.hubId && hubs) {
+    const hub = hubs.find(h => h.id === loc.hubId);
+    if (hub) {
+      return `${hub.name} (${loc.bodyId}, ${locDetail})`;
+    }
   }
-  return `${loc.bodyId} (${loc.locationType})`;
+
+  return `${loc.bodyId} (${locDetail})`;
 }
 
 // ---------------------------------------------------------------------------
@@ -135,10 +152,38 @@ export function renderRouteMap(): SVGSVGElement {
         circle.setAttribute('stroke-width', '3');
       }
       const clickBodyId = bodyId;
-      circle.addEventListener('click', () => {
+      circle.addEventListener('click', (e: Event) => {
+        const currentLs = getLogisticsState();
         // Only allow setting origin if no legs have been added yet
-        if (getLogisticsState().builderLegs.length === 0) {
-          getLogisticsState().builderCurrentBodyId = clickBodyId;
+        if (currentLs.builderLegs.length === 0) {
+          currentLs.builderCurrentBodyId = clickBodyId;
+
+          // Check how many hubs exist on this body
+          if (currentLs.state) {
+            const hubs = getHubsOnBody(currentLs.state, clickBodyId);
+            // Include Earth hub for EARTH body
+            const earthHub = clickBodyId === 'EARTH'
+              ? currentLs.state.hubs.find(h => h.id === EARTH_HUB_ID)
+              : undefined;
+            const allHubs = earthHub && !hubs.some(h => h.id === EARTH_HUB_ID)
+              ? [earthHub, ...hubs]
+              : hubs;
+
+            if (allHubs.length === 0) {
+              // No hubs on this body — body-level endpoint
+              currentLs.builderOriginHubId = null;
+            } else if (allHubs.length === 1) {
+              // Single hub — auto-select it
+              currentLs.builderOriginHubId = allHubs[0].id;
+            } else {
+              // Multiple hubs — show a popover for selection
+              _showHubPopover(e as MouseEvent, allHubs, clickBodyId);
+              return; // Don't re-render yet; popover handles selection
+            }
+          } else {
+            currentLs.builderOriginHubId = null;
+          }
+
           triggerRender();
         }
       });
@@ -205,6 +250,26 @@ export function renderRouteMap(): SVGSVGElement {
       if (dashArray !== 'none') rect.setAttribute('stroke-dasharray', dashArray);
       rect.style.cursor = 'pointer';
       rect.setAttribute('data-hub-id', node.hubId ?? '');
+
+      // Builder mode: highlight selected hub, add click handler
+      if (ls.builderMode && node.hubId) {
+        if (ls.builderOriginHubId === node.hubId) {
+          rect.setAttribute('stroke', '#FFD700');
+          rect.setAttribute('stroke-width', '2');
+        }
+        const clickHubId = node.hubId;
+        const clickBodyId = node.parentId ?? '';
+        rect.addEventListener('click', (e: Event) => {
+          e.stopPropagation();
+          const currentLs = getLogisticsState();
+          if (currentLs.builderLegs.length === 0) {
+            currentLs.builderCurrentBodyId = clickBodyId;
+            currentLs.builderOriginHubId = clickHubId;
+            triggerRender();
+          }
+        });
+      }
+
       svg.appendChild(rect);
     } else {
       // orbitalHub — diamond shape (rotated square)
@@ -221,6 +286,26 @@ export function renderRouteMap(): SVGSVGElement {
       if (dashArray !== 'none') rect.setAttribute('stroke-dasharray', dashArray);
       rect.style.cursor = 'pointer';
       rect.setAttribute('data-hub-id', node.hubId ?? '');
+
+      // Builder mode: highlight selected hub, add click handler
+      if (ls.builderMode && node.hubId) {
+        if (ls.builderOriginHubId === node.hubId) {
+          rect.setAttribute('stroke', '#FFD700');
+          rect.setAttribute('stroke-width', '2');
+        }
+        const clickHubId = node.hubId;
+        const clickBodyId = node.parentId ?? '';
+        rect.addEventListener('click', (e: Event) => {
+          e.stopPropagation();
+          const currentLs = getLogisticsState();
+          if (currentLs.builderLegs.length === 0) {
+            currentLs.builderCurrentBodyId = clickBodyId;
+            currentLs.builderOriginHubId = clickHubId;
+            triggerRender();
+          }
+        });
+      }
+
       svg.appendChild(rect);
     }
 
@@ -356,3 +441,134 @@ export function renderRouteMap(): SVGSVGElement {
 
   return svg;
 }
+
+// ---------------------------------------------------------------------------
+// Hub selection popover (builder mode)
+// ---------------------------------------------------------------------------
+
+/** Currently open hub popover element, if any. */
+let _activeHubPopover: HTMLDivElement | null = null;
+
+/**
+ * Dismiss any active hub selection popover.
+ */
+function _dismissHubPopover(): void {
+  if (_activeHubPopover) {
+    _activeHubPopover.remove();
+    _activeHubPopover = null;
+  }
+}
+
+/**
+ * Show a small popover near the click position listing hub names on a body.
+ * Each hub name is a button the player clicks to select as the builder origin.
+ * Also includes a "No hub (body-level)" option to select the body without a hub.
+ */
+function _showHubPopover(
+  event: MouseEvent,
+  hubs: Hub[],
+  bodyId: string,
+): void {
+  _dismissHubPopover();
+
+  const ls = getLogisticsState();
+  const overlay = ls.overlay;
+  if (!overlay) return;
+
+  const popover = document.createElement('div');
+  popover.className = 'logistics-hub-popover';
+  popover.style.position = 'absolute';
+  popover.style.zIndex = '1000';
+
+  // Position near the click, relative to the overlay
+  const overlayRect = overlay.getBoundingClientRect();
+  const x = event.clientX - overlayRect.left + 10;
+  const y = event.clientY - overlayRect.top - 10;
+  popover.style.left = `${x}px`;
+  popover.style.top = `${y}px`;
+  popover.style.background = '#1a1a2e';
+  popover.style.border = '1px solid #444';
+  popover.style.borderRadius = '4px';
+  popover.style.padding = '4px 0';
+  popover.style.minWidth = '120px';
+  popover.style.boxShadow = '0 2px 8px rgba(0,0,0,0.5)';
+
+  const heading = document.createElement('div');
+  heading.style.padding = '4px 8px';
+  heading.style.color = '#aaa';
+  heading.style.fontSize = '10px';
+  heading.style.borderBottom = '1px solid #333';
+  heading.textContent = 'Select hub:';
+  popover.appendChild(heading);
+
+  for (const hub of hubs) {
+    const btn = document.createElement('button');
+    btn.className = 'logistics-hub-popover-btn';
+    btn.style.display = 'block';
+    btn.style.width = '100%';
+    btn.style.padding = '4px 8px';
+    btn.style.textAlign = 'left';
+    btn.style.background = 'transparent';
+    btn.style.border = 'none';
+    btn.style.color = '#ccc';
+    btn.style.cursor = 'pointer';
+    btn.style.fontSize = '11px';
+    btn.textContent = `${hub.name} (${hub.type})`;
+    const hubId = hub.id;
+    btn.addEventListener('mouseenter', () => { btn.style.background = '#2a2a4a'; });
+    btn.addEventListener('mouseleave', () => { btn.style.background = 'transparent'; });
+    btn.addEventListener('click', () => {
+      const currentLs = getLogisticsState();
+      currentLs.builderCurrentBodyId = bodyId;
+      currentLs.builderOriginHubId = hubId;
+      _dismissHubPopover();
+      triggerRender();
+    });
+    popover.appendChild(btn);
+  }
+
+  // "No hub" option for body-level endpoint
+  const noHubBtn = document.createElement('button');
+  noHubBtn.className = 'logistics-hub-popover-btn';
+  noHubBtn.style.display = 'block';
+  noHubBtn.style.width = '100%';
+  noHubBtn.style.padding = '4px 8px';
+  noHubBtn.style.textAlign = 'left';
+  noHubBtn.style.background = 'transparent';
+  noHubBtn.style.border = 'none';
+  noHubBtn.style.color = '#888';
+  noHubBtn.style.cursor = 'pointer';
+  noHubBtn.style.fontSize = '11px';
+  noHubBtn.style.fontStyle = 'italic';
+  noHubBtn.textContent = 'No hub (body-level)';
+  noHubBtn.addEventListener('mouseenter', () => { noHubBtn.style.background = '#2a2a4a'; });
+  noHubBtn.addEventListener('mouseleave', () => { noHubBtn.style.background = 'transparent'; });
+  noHubBtn.addEventListener('click', () => {
+    const currentLs = getLogisticsState();
+    currentLs.builderCurrentBodyId = bodyId;
+    currentLs.builderOriginHubId = null;
+    _dismissHubPopover();
+    triggerRender();
+  });
+  popover.appendChild(noHubBtn);
+
+  overlay.appendChild(popover);
+  _activeHubPopover = popover;
+
+  // Dismiss when clicking outside the popover
+  const dismissOnOutsideClick = (ev: MouseEvent) => {
+    if (!popover.contains(ev.target as Node)) {
+      _dismissHubPopover();
+      document.removeEventListener('click', dismissOnOutsideClick, true);
+    }
+  };
+  // Defer to avoid the current click event from immediately dismissing
+  requestAnimationFrame(() => {
+    document.addEventListener('click', dismissOnOutsideClick, true);
+  });
+}
+
+/**
+ * Public helper to show a hub popover. Exported for use by _routeBuilder.ts.
+ */
+export { _showHubPopover as showHubPopover };

@@ -16,7 +16,7 @@ import type { SafeOrbitRange } from '../core/routes.ts';
 import { createMiningSite } from '../core/mining.ts';
 import { createHub } from '../core/hubs.ts';
 import { advancePeriod } from '../core/period.ts';
-import { ResourceType } from '../core/constants.ts';
+import { ResourceType, EARTH_HUB_ID } from '../core/constants.ts';
 import { RESOURCES_BY_ID } from '../data/resources.ts';
 
 import type { RouteLocation, RouteLeg } from '../core/gameState.ts';
@@ -1056,5 +1056,233 @@ describe('route revenue integration', () => {
 
     // Verify buffer was actually deducted
     expect(site.orbitalBuffer[resourceType]).toBe(bufferAmount - expectedTransport);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// processRoutes — hub-targeted delivery
+// ---------------------------------------------------------------------------
+
+describe('processRoutes hub-targeted delivery', () => {
+  it('delivers to Earth hub and generates revenue from market sale', () => {
+    const state = createGameState();
+    state.money = 10_000_000;
+
+    // Create a mining site on MOON with stocked orbital buffer
+    const site = createMiningSite(state, {
+      name: 'Moon Mine',
+      bodyId: 'MOON',
+      coordinates: { x: 0, y: 0 },
+      controlUnitPartId: 'ctrl-1',
+    });
+    site.orbitalBuffer[ResourceType.WATER_ICE] = 5000;
+
+    // Prove a leg from MOON orbit to EARTH orbit with hub references
+    const pl = proveRouteLeg(state, {
+      origin: orbit('MOON', 50),
+      destination: orbit('EARTH', 200),
+      craftDesignId: 'cargo-shuttle',
+      cargoCapacityKg: 2000,
+      costPerRun: 50_000,
+      flightId: 'flight-earth-hub',
+      destinationHubId: EARTH_HUB_ID,
+    });
+
+    const route = createRoute(state, {
+      name: 'Moon to Earth Hub',
+      resourceType: ResourceType.WATER_ICE,
+      provenLegIds: [pl.id],
+    });
+    setRouteStatus(route, 'active');
+
+    const initialMoney = state.money;
+    const result = processRoutes(state);
+
+    // Transport amount = min(throughput=2000, buffer=5000) = 2000
+    const resourceDef = RESOURCES_BY_ID[ResourceType.WATER_ICE];
+    const expectedRevenue = 2000 * resourceDef.baseValuePerKg;
+
+    expect(result.revenue).toBe(expectedRevenue);
+    expect(result.operatingCost).toBe(50_000);
+    expect(result.delivered[ResourceType.WATER_ICE]).toBe(2000);
+    expect(site.orbitalBuffer[ResourceType.WATER_ICE]).toBe(3000);
+    expect(state.money).toBe(initialMoney - 50_000 + expectedRevenue);
+  });
+
+  it('delivers to off-world hub by depositing into destination orbital buffer', () => {
+    const state = createGameState();
+    state.money = 10_000_000;
+
+    // Create a mining site on MOON (source) with stocked orbital buffer
+    const moonSite = createMiningSite(state, {
+      name: 'Moon Mine',
+      bodyId: 'MOON',
+      coordinates: { x: 0, y: 0 },
+      controlUnitPartId: 'ctrl-1',
+    });
+    moonSite.orbitalBuffer[ResourceType.IRON_ORE] = 8000;
+
+    // Create a hub and mining site on MARS (destination)
+    const marsHub = createHub(state, { name: 'Mars Outpost', type: 'surface', bodyId: 'MARS' });
+    const marsSite = createMiningSite(state, {
+      name: 'Mars Base',
+      bodyId: 'MARS',
+      coordinates: { x: 100, y: 100 },
+      controlUnitPartId: 'ctrl-2',
+    });
+
+    // Prove a leg from MOON orbit to MARS orbit with hub reference
+    const pl = proveRouteLeg(state, {
+      origin: orbit('MOON', 50),
+      destination: orbit('MARS', 100),
+      craftDesignId: 'cargo-shuttle',
+      cargoCapacityKg: 3000,
+      costPerRun: 80_000,
+      flightId: 'flight-mars-hub',
+      destinationHubId: marsHub.id,
+    });
+
+    const route = createRoute(state, {
+      name: 'Moon to Mars Hub',
+      resourceType: ResourceType.IRON_ORE,
+      provenLegIds: [pl.id],
+    });
+    setRouteStatus(route, 'active');
+
+    const initialMoney = state.money;
+    const result = processRoutes(state);
+
+    // Transport amount = min(throughput=3000, buffer=8000) = 3000
+    expect(result.revenue).toBe(0); // No revenue for non-Earth destination
+    expect(result.operatingCost).toBe(80_000);
+    expect(result.delivered[ResourceType.IRON_ORE]).toBe(3000);
+    expect(moonSite.orbitalBuffer[ResourceType.IRON_ORE]).toBe(5000); // 8000 - 3000
+    expect(marsSite.orbitalBuffer[ResourceType.IRON_ORE]).toBe(3000); // deposited
+    expect(state.money).toBe(initialMoney - 80_000);
+  });
+
+  it('marks route as broken when a leg references a non-existent hub', () => {
+    const state = createGameState();
+    state.money = 10_000_000;
+
+    // Create a mining site on MOON with stocked orbital buffer
+    const site = createMiningSite(state, {
+      name: 'Moon Mine',
+      bodyId: 'MOON',
+      coordinates: { x: 0, y: 0 },
+      controlUnitPartId: 'ctrl-1',
+    });
+    site.orbitalBuffer[ResourceType.WATER_ICE] = 5000;
+
+    // Prove a leg — no hub references during proving
+    const pl = proveRouteLeg(state, {
+      origin: orbit('MOON', 50),
+      destination: orbit('EARTH', 200),
+      craftDesignId: 'cargo-shuttle',
+      cargoCapacityKg: 2000,
+      costPerRun: 50_000,
+      flightId: 'flight-broken-hub',
+    });
+
+    // Create a route (no hub validation at this point since hubIds are null)
+    const route = createRoute(state, {
+      name: 'Route with Bad Hub',
+      resourceType: ResourceType.WATER_ICE,
+      provenLegIds: [pl.id],
+    });
+    setRouteStatus(route, 'active');
+
+    // Manually inject an invalid hubId on a leg's destination to simulate
+    // a hub that was deleted after the route was created
+    route.legs[0].destination.hubId = 'deleted-hub-id';
+
+    const initialMoney = state.money;
+    const result = processRoutes(state);
+
+    // Route should be marked as broken
+    expect(route.status).toBe('broken');
+    // No resources should have been transported
+    expect(result.revenue).toBe(0);
+    expect(result.operatingCost).toBe(0);
+    expect(result.delivered).toEqual({});
+    // Buffer and money should be unchanged
+    expect(site.orbitalBuffer[ResourceType.WATER_ICE]).toBe(5000);
+    expect(state.money).toBe(initialMoney);
+  });
+
+  it('marks route as broken when origin leg references a non-existent hub', () => {
+    const state = createGameState();
+    state.money = 10_000_000;
+
+    // Create a mining site on MOON with stocked orbital buffer
+    const site = createMiningSite(state, {
+      name: 'Moon Mine',
+      bodyId: 'MOON',
+      coordinates: { x: 0, y: 0 },
+      controlUnitPartId: 'ctrl-1',
+    });
+    site.orbitalBuffer[ResourceType.WATER_ICE] = 5000;
+
+    const pl = proveRouteLeg(state, {
+      origin: orbit('MOON', 50),
+      destination: orbit('EARTH', 200),
+      craftDesignId: 'cargo-shuttle',
+      cargoCapacityKg: 2000,
+      costPerRun: 50_000,
+      flightId: 'flight-broken-origin',
+    });
+
+    const route = createRoute(state, {
+      name: 'Route with Bad Origin Hub',
+      resourceType: ResourceType.WATER_ICE,
+      provenLegIds: [pl.id],
+    });
+    setRouteStatus(route, 'active');
+
+    // Manually inject an invalid hubId on a leg's origin
+    route.legs[0].origin.hubId = 'nonexistent-origin-hub';
+
+    const result = processRoutes(state);
+
+    expect(route.status).toBe('broken');
+    expect(result.revenue).toBe(0);
+    expect(result.operatingCost).toBe(0);
+    expect(site.orbitalBuffer[ResourceType.WATER_ICE]).toBe(5000);
+  });
+
+  it('does not mark route as broken when hub references are null', () => {
+    const state = createGameState();
+    state.money = 10_000_000;
+
+    // Create a mining site on MOON with stocked orbital buffer
+    const site = createMiningSite(state, {
+      name: 'Moon Mine',
+      bodyId: 'MOON',
+      coordinates: { x: 0, y: 0 },
+      controlUnitPartId: 'ctrl-1',
+    });
+    site.orbitalBuffer[ResourceType.WATER_ICE] = 5000;
+
+    const pl = proveRouteLeg(state, {
+      origin: orbit('MOON', 50),
+      destination: orbit('EARTH', 200),
+      craftDesignId: 'cargo-shuttle',
+      cargoCapacityKg: 2000,
+      costPerRun: 50_000,
+      flightId: 'flight-null-hub',
+    });
+
+    const route = createRoute(state, {
+      name: 'Route with Null Hubs',
+      resourceType: ResourceType.WATER_ICE,
+      provenLegIds: [pl.id],
+    });
+    setRouteStatus(route, 'active');
+
+    // Legs have null hubIds by default — should be fine
+    const result = processRoutes(state);
+
+    expect(route.status).toBe('active');
+    expect(result.delivered[ResourceType.WATER_ICE]).toBe(2000);
   });
 });

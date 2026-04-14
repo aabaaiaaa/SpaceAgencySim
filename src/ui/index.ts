@@ -8,23 +8,32 @@ import type { GameState } from '../core/gameState.ts';
 import type { FlightReturnSummary } from '../core/flightReturn.ts';
 import { initMainMenu } from './mainmenu.ts';
 import { initHubUI, destroyHubUI, showWelcomeModal, showReturnResultsOverlay } from './hub.ts';
-import { initVabUI, resetVabUI } from './vab.ts';
-import { initCrewAdminUI, destroyCrewAdminUI } from './crewAdmin.ts';
-import { initMissionControlUI, destroyMissionControlUI } from './missionControl.ts';
-import { initLaunchPadUI, destroyLaunchPadUI } from './launchPad.ts';
-import { initSatelliteOpsUI, destroySatelliteOpsUI } from './satelliteOps.ts';
-import { initTrackingStationUI, destroyTrackingStationUI } from './trackingStation.ts';
-import { initLibraryUI, destroyLibraryUI } from './library.ts';
-import { initRdLabUI, destroyRdLabUI } from './rdLab.ts';
-import { openLogisticsPanel, closeLogisticsPanel } from './logistics/index.ts';
-import { stopFlightScene } from './flightController.ts';
 import { initTopBar, destroyTopBar, refreshTopBar, setCurrentScreen } from './topbar.ts';
-import { showVabScene, hideVabScene } from '../render/vab.ts';
 import { showHubScene } from '../render/hub.ts';
 import { hasFacility } from '../core/construction.ts';
 import { GameMode } from '../core/constants.ts';
 import './design-tokens.css';
 import { triggerAutoSave } from './autoSaveToast.ts';
+import { showLoadingIndicator, hideLoadingIndicator } from './loadingIndicator.ts';
+
+// ---------------------------------------------------------------------------
+// Cached dynamic-import module references
+// ---------------------------------------------------------------------------
+// Each screen module is loaded on first navigation and cached so that
+// destroy/cleanup functions are available in _handleExitToMenu and
+// _handleLoadGame without awaiting another import.
+
+let _cachedVab: typeof import('./vab.ts') | null = null;
+let _cachedVabRender: typeof import('../render/vab.ts') | null = null;
+let _cachedCrewAdmin: typeof import('./crewAdmin.ts') | null = null;
+let _cachedMissionControl: typeof import('./missionControl.ts') | null = null;
+let _cachedLaunchPad: typeof import('./launchPad.ts') | null = null;
+let _cachedSatelliteOps: typeof import('./satelliteOps.ts') | null = null;
+let _cachedTrackingStation: typeof import('./trackingStation.ts') | null = null;
+let _cachedLibrary: typeof import('./library.ts') | null = null;
+let _cachedRdLab: typeof import('./rdLab.ts') | null = null;
+let _cachedLogistics: typeof import('./logistics/index.ts') | null = null;
+let _cachedFlightController: typeof import('./flightController.ts') | null = null;
 
 export { initFlightHud, destroyFlightHud } from './flightHud.ts';
 export { showReturnResultsOverlay } from './hub.ts';
@@ -111,7 +120,7 @@ export function showMainMenu(
 ): void {
   // Reset VAB state so a new game gets a fresh VAB session.
   _vabInitialized = false;
-  resetVabUI();
+  _cachedVab?.resetVabUI();
   initMainMenu(container, onGameReady);
 }
 
@@ -130,8 +139,8 @@ export function initUI(container: HTMLElement, state: GameState): void {
   _libraryOpen        = false;
   _logisticsOpen      = false;
   // Ensure a fresh VAB assembly for each new game session.
-  resetVabUI();
-  hideVabScene(); // ensure VAB PixiJS is hidden when starting a new session
+  _cachedVab?.resetVabUI();
+  _cachedVabRender?.hideVabScene(); // ensure VAB PixiJS is hidden when starting a new session
 
   // Mount the persistent top bar — visible on all in-game screens.
   initTopBar(container, state, {
@@ -141,7 +150,7 @@ export function initUI(container: HTMLElement, state: GameState): void {
 
   setCurrentScreen('hub');
   initHubUI(container, state, (destination: string) => {
-    _handleNavigation(container, state, destination);
+    void _handleNavigation(container, state, destination);
   });
 
   // Show welcome modal on first hub visit for a new game.
@@ -164,7 +173,7 @@ export function returnToHubFromFlight(
   setCurrentScreen('hub');
   refreshTopBar();
   initHubUI(container, state, (destination: string) => {
-    _handleNavigation(container, state, destination);
+    void _handleNavigation(container, state, destination);
   });
   if (returnResults) {
     showReturnResultsOverlay(container, returnResults as FlightReturnSummary);
@@ -186,40 +195,40 @@ export function returnToHubFromFlight(
  * hamburger dropdown in the top bar.
  */
 function _handleExitToMenu(): void {
-  stopFlightScene(); // safe to call even if no flight is active
-  hideVabScene();    // hide VAB PixiJS container (no-op if already hidden)
+  _cachedFlightController?.stopFlightScene(); // safe to call even if no flight is active
+  _cachedVabRender?.hideVabScene();           // hide VAB PixiJS container (no-op if already hidden)
   destroyTopBar();
   destroyHubUI(); // no-op if hub is not the current screen
   if (_crewAdminOpen) {
-    destroyCrewAdminUI();
+    _cachedCrewAdmin?.destroyCrewAdminUI();
     _crewAdminOpen = false;
   }
   if (_missionControlOpen) {
-    destroyMissionControlUI();
+    _cachedMissionControl?.destroyMissionControlUI();
     _missionControlOpen = false;
   }
   if (_launchPadOpen) {
-    destroyLaunchPadUI();
+    _cachedLaunchPad?.destroyLaunchPadUI();
     _launchPadOpen = false;
   }
   if (_satelliteOpsOpen) {
-    destroySatelliteOpsUI();
+    _cachedSatelliteOps?.destroySatelliteOpsUI();
     _satelliteOpsOpen = false;
   }
   if (_trackingStationOpen) {
-    destroyTrackingStationUI();
+    _cachedTrackingStation?.destroyTrackingStationUI();
     _trackingStationOpen = false;
   }
   if (_libraryOpen) {
-    destroyLibraryUI();
+    _cachedLibrary?.destroyLibraryUI();
     _libraryOpen = false;
   }
   if (_rdLabOpen) {
-    destroyRdLabUI();
+    _cachedRdLab?.destroyRdLabUI();
     _rdLabOpen = false;
   }
   if (_logisticsOpen) {
-    closeLogisticsPanel();
+    _cachedLogistics?.closeLogisticsPanel();
     _logisticsOpen = false;
   }
 
@@ -246,18 +255,18 @@ function _handleExitToMenu(): void {
  * Called when the player loads a save from the in-game hamburger menu modal.
  */
 function _handleLoadGame(loadedState: GameState): void {
-  stopFlightScene();
-  hideVabScene();
+  _cachedFlightController?.stopFlightScene();
+  _cachedVabRender?.hideVabScene();
   destroyTopBar();
   destroyHubUI();
-  if (_crewAdminOpen)      { destroyCrewAdminUI();      _crewAdminOpen = false; }
-  if (_missionControlOpen) { destroyMissionControlUI();  _missionControlOpen = false; }
-  if (_launchPadOpen)      { destroyLaunchPadUI();       _launchPadOpen = false; }
-  if (_satelliteOpsOpen)   { destroySatelliteOpsUI();    _satelliteOpsOpen = false; }
-  if (_trackingStationOpen){ destroyTrackingStationUI(); _trackingStationOpen = false; }
-  if (_libraryOpen)        { destroyLibraryUI();         _libraryOpen = false; }
-  if (_rdLabOpen)          { destroyRdLabUI();           _rdLabOpen = false; }
-  if (_logisticsOpen)      { closeLogisticsPanel();      _logisticsOpen = false; }
+  if (_crewAdminOpen)      { _cachedCrewAdmin?.destroyCrewAdminUI();      _crewAdminOpen = false; }
+  if (_missionControlOpen) { _cachedMissionControl?.destroyMissionControlUI();  _missionControlOpen = false; }
+  if (_launchPadOpen)      { _cachedLaunchPad?.destroyLaunchPadUI();       _launchPadOpen = false; }
+  if (_satelliteOpsOpen)   { _cachedSatelliteOps?.destroySatelliteOpsUI();    _satelliteOpsOpen = false; }
+  if (_trackingStationOpen){ _cachedTrackingStation?.destroyTrackingStationUI(); _trackingStationOpen = false; }
+  if (_libraryOpen)        { _cachedLibrary?.destroyLibraryUI();         _libraryOpen = false; }
+  if (_rdLabOpen)          { _cachedRdLab?.destroyRdLabUI();           _rdLabOpen = false; }
+  if (_logisticsOpen)      { _cachedLogistics?.closeLogisticsPanel();      _logisticsOpen = false; }
 
   if (_container) {
     _container.innerHTML = '';
@@ -282,7 +291,7 @@ function _handleLoadGame(loadedState: GameState): void {
 /**
  * Handle a navigation request from the hub.
  */
-function _handleNavigation(container: HTMLElement, state: GameState, destination: string): void {
+async function _handleNavigation(container: HTMLElement, state: GameState, destination: string): Promise<void> {
   // Block navigation to unbuilt facilities (except in sandbox where all are built).
   if (state.gameMode !== GameMode.SANDBOX && !hasFacility(state, destination)) {
     // Show a brief tooltip message on the hub overlay.
@@ -302,26 +311,42 @@ function _handleNavigation(container: HTMLElement, state: GameState, destination
   if (destination === 'vab') {
     // Tear down the hub overlay and show the VAB.
     destroyHubUI();
-    showVabScene();
     setCurrentScreen('vab');
 
     if (!_vabInitialized) {
-      initVabUI(container, state, {
-        onBack: () => {
-          // Remove the VAB overlay and return to the hub.
-          const vabRoot = document.getElementById('vab-root');
-          if (vabRoot) vabRoot.remove();
-          _vabInitialized = false;
-          hideVabScene();
-          showHubScene();
-          setCurrentScreen('hub');
-          refreshTopBar();
-          initHubUI(container, state, (dest: string) => {
-            _handleNavigation(container, state, dest);
-          });
-        },
-      });
-      _vabInitialized = true;
+      showLoadingIndicator();
+      try {
+        const [vabMod, vabRender] = await Promise.all([
+          import('./vab.ts'),
+          import('../render/vab.ts'),
+        ]);
+        _cachedVab = vabMod;
+        _cachedVabRender = vabRender;
+        hideLoadingIndicator();
+
+        vabRender.showVabScene();
+        vabMod.initVabUI(container, state, {
+          onBack: () => {
+            // Remove the VAB overlay and return to the hub.
+            const vabRoot = document.getElementById('vab-root');
+            if (vabRoot) vabRoot.remove();
+            _vabInitialized = false;
+            _cachedVabRender?.hideVabScene();
+            showHubScene();
+            setCurrentScreen('hub');
+            refreshTopBar();
+            initHubUI(container, state, (dest: string) => {
+              void _handleNavigation(container, state, dest);
+            });
+          },
+        });
+        _vabInitialized = true;
+      } catch (err) {
+        hideLoadingIndicator();
+        console.error('Failed to load VAB:', err);
+      }
+    } else {
+      _cachedVabRender?.showVabScene();
     }
 
     return;
@@ -333,18 +358,27 @@ function _handleNavigation(container: HTMLElement, state: GameState, destination
     setCurrentScreen('crew-admin');
 
     if (!_crewAdminOpen) {
-      initCrewAdminUI(container, state, {
-        onBack: () => {
-          // Crew Admin has already destroyed itself; re-show the hub.
-          _crewAdminOpen = false;
-          setCurrentScreen('hub');
-          showHubScene();
-          initHubUI(container, state, (dest: string) => {
-            _handleNavigation(container, state, dest);
-          });
-        },
-      });
-      _crewAdminOpen = true;
+      showLoadingIndicator();
+      try {
+        const mod = await import('./crewAdmin.ts');
+        _cachedCrewAdmin = mod;
+        hideLoadingIndicator();
+
+        mod.initCrewAdminUI(container, state, {
+          onBack: () => {
+            _crewAdminOpen = false;
+            setCurrentScreen('hub');
+            showHubScene();
+            initHubUI(container, state, (dest: string) => {
+              void _handleNavigation(container, state, dest);
+            });
+          },
+        });
+        _crewAdminOpen = true;
+      } catch (err) {
+        hideLoadingIndicator();
+        console.error('Failed to load Crew Admin:', err);
+      }
     }
 
     return;
@@ -356,18 +390,27 @@ function _handleNavigation(container: HTMLElement, state: GameState, destination
     setCurrentScreen('mission-control');
 
     if (!_missionControlOpen) {
-      initMissionControlUI(container, state, {
-        onBack: () => {
-          // Mission Control has already destroyed itself; re-show the hub.
-          _missionControlOpen = false;
-          setCurrentScreen('hub');
-          showHubScene();
-          initHubUI(container, state, (dest: string) => {
-            _handleNavigation(container, state, dest);
-          });
-        },
-      });
-      _missionControlOpen = true;
+      showLoadingIndicator();
+      try {
+        const mod = await import('./missionControl.ts');
+        _cachedMissionControl = mod;
+        hideLoadingIndicator();
+
+        mod.initMissionControlUI(container, state, {
+          onBack: () => {
+            _missionControlOpen = false;
+            setCurrentScreen('hub');
+            showHubScene();
+            initHubUI(container, state, (dest: string) => {
+              void _handleNavigation(container, state, dest);
+            });
+          },
+        });
+        _missionControlOpen = true;
+      } catch (err) {
+        hideLoadingIndicator();
+        console.error('Failed to load Mission Control:', err);
+      }
     }
 
     return;
@@ -379,18 +422,27 @@ function _handleNavigation(container: HTMLElement, state: GameState, destination
     setCurrentScreen('launch-pad');
 
     if (!_launchPadOpen) {
-      initLaunchPadUI(container, state, {
-        onBack: () => {
-          // Launch Pad has already destroyed itself; re-show the hub.
-          _launchPadOpen = false;
-          setCurrentScreen('hub');
-          showHubScene();
-          initHubUI(container, state, (dest: string) => {
-            _handleNavigation(container, state, dest);
-          });
-        },
-      });
-      _launchPadOpen = true;
+      showLoadingIndicator();
+      try {
+        const mod = await import('./launchPad.ts');
+        _cachedLaunchPad = mod;
+        hideLoadingIndicator();
+
+        mod.initLaunchPadUI(container, state, {
+          onBack: () => {
+            _launchPadOpen = false;
+            setCurrentScreen('hub');
+            showHubScene();
+            initHubUI(container, state, (dest: string) => {
+              void _handleNavigation(container, state, dest);
+            });
+          },
+        });
+        _launchPadOpen = true;
+      } catch (err) {
+        hideLoadingIndicator();
+        console.error('Failed to load Launch Pad:', err);
+      }
     }
 
     return;
@@ -402,17 +454,27 @@ function _handleNavigation(container: HTMLElement, state: GameState, destination
     setCurrentScreen('satellite-ops');
 
     if (!_satelliteOpsOpen) {
-      initSatelliteOpsUI(container, state, {
-        onBack: () => {
-          _satelliteOpsOpen = false;
-          setCurrentScreen('hub');
-          showHubScene();
-          initHubUI(container, state, (dest: string) => {
-            _handleNavigation(container, state, dest);
-          });
-        },
-      });
-      _satelliteOpsOpen = true;
+      showLoadingIndicator();
+      try {
+        const mod = await import('./satelliteOps.ts');
+        _cachedSatelliteOps = mod;
+        hideLoadingIndicator();
+
+        mod.initSatelliteOpsUI(container, state, {
+          onBack: () => {
+            _satelliteOpsOpen = false;
+            setCurrentScreen('hub');
+            showHubScene();
+            initHubUI(container, state, (dest: string) => {
+              void _handleNavigation(container, state, dest);
+            });
+          },
+        });
+        _satelliteOpsOpen = true;
+      } catch (err) {
+        hideLoadingIndicator();
+        console.error('Failed to load Satellite Ops:', err);
+      }
     }
 
     return;
@@ -424,17 +486,27 @@ function _handleNavigation(container: HTMLElement, state: GameState, destination
     setCurrentScreen('tracking-station');
 
     if (!_trackingStationOpen) {
-      initTrackingStationUI(container, state, {
-        onBack: () => {
-          _trackingStationOpen = false;
-          setCurrentScreen('hub');
-          showHubScene();
-          initHubUI(container, state, (dest: string) => {
-            _handleNavigation(container, state, dest);
-          });
-        },
-      });
-      _trackingStationOpen = true;
+      showLoadingIndicator();
+      try {
+        const mod = await import('./trackingStation.ts');
+        _cachedTrackingStation = mod;
+        hideLoadingIndicator();
+
+        mod.initTrackingStationUI(container, state, {
+          onBack: () => {
+            _trackingStationOpen = false;
+            setCurrentScreen('hub');
+            showHubScene();
+            initHubUI(container, state, (dest: string) => {
+              void _handleNavigation(container, state, dest);
+            });
+          },
+        });
+        _trackingStationOpen = true;
+      } catch (err) {
+        hideLoadingIndicator();
+        console.error('Failed to load Tracking Station:', err);
+      }
     }
 
     return;
@@ -445,17 +517,27 @@ function _handleNavigation(container: HTMLElement, state: GameState, destination
     setCurrentScreen('library');
 
     if (!_libraryOpen) {
-      initLibraryUI(container, state, {
-        onBack: () => {
-          _libraryOpen = false;
-          setCurrentScreen('hub');
-          showHubScene();
-          initHubUI(container, state, (dest: string) => {
-            _handleNavigation(container, state, dest);
-          });
-        },
-      });
-      _libraryOpen = true;
+      showLoadingIndicator();
+      try {
+        const mod = await import('./library.ts');
+        _cachedLibrary = mod;
+        hideLoadingIndicator();
+
+        mod.initLibraryUI(container, state, {
+          onBack: () => {
+            _libraryOpen = false;
+            setCurrentScreen('hub');
+            showHubScene();
+            initHubUI(container, state, (dest: string) => {
+              void _handleNavigation(container, state, dest);
+            });
+          },
+        });
+        _libraryOpen = true;
+      } catch (err) {
+        hideLoadingIndicator();
+        console.error('Failed to load Library:', err);
+      }
     }
 
     return;
@@ -466,17 +548,27 @@ function _handleNavigation(container: HTMLElement, state: GameState, destination
     setCurrentScreen('rd-lab');
 
     if (!_rdLabOpen) {
-      initRdLabUI(container, state, {
-        onBack: () => {
-          _rdLabOpen = false;
-          setCurrentScreen('hub');
-          showHubScene();
-          initHubUI(container, state, (dest: string) => {
-            _handleNavigation(container, state, dest);
-          });
-        },
-      });
-      _rdLabOpen = true;
+      showLoadingIndicator();
+      try {
+        const mod = await import('./rdLab.ts');
+        _cachedRdLab = mod;
+        hideLoadingIndicator();
+
+        mod.initRdLabUI(container, state, {
+          onBack: () => {
+            _rdLabOpen = false;
+            setCurrentScreen('hub');
+            showHubScene();
+            initHubUI(container, state, (dest: string) => {
+              void _handleNavigation(container, state, dest);
+            });
+          },
+        });
+        _rdLabOpen = true;
+      } catch (err) {
+        hideLoadingIndicator();
+        console.error('Failed to load R&D Lab:', err);
+      }
     }
 
     return;
@@ -487,24 +579,34 @@ function _handleNavigation(container: HTMLElement, state: GameState, destination
     setCurrentScreen('logistics-center');
 
     if (!_logisticsOpen) {
-      openLogisticsPanel(state, container);
-      _logisticsOpen = true;
+      showLoadingIndicator();
+      try {
+        const mod = await import('./logistics/index.ts');
+        _cachedLogistics = mod;
+        hideLoadingIndicator();
 
-      // Override back button to return to hub
-      const backBtn = document.getElementById('logistics-back-btn');
-      if (backBtn) {
-        // Clone to remove existing listeners
-        const newBtn = backBtn.cloneNode(true) as HTMLElement;
-        backBtn.replaceWith(newBtn);
-        newBtn.addEventListener('click', () => {
-          closeLogisticsPanel();
-          _logisticsOpen = false;
-          setCurrentScreen('hub');
-          showHubScene();
-          initHubUI(container, state, (dest: string) => {
-            _handleNavigation(container, state, dest);
+        mod.openLogisticsPanel(state, container);
+        _logisticsOpen = true;
+
+        // Override back button to return to hub
+        const backBtn = document.getElementById('logistics-back-btn');
+        if (backBtn) {
+          // Clone to remove existing listeners
+          const newBtn = backBtn.cloneNode(true) as HTMLElement;
+          backBtn.replaceWith(newBtn);
+          newBtn.addEventListener('click', () => {
+            _cachedLogistics?.closeLogisticsPanel();
+            _logisticsOpen = false;
+            setCurrentScreen('hub');
+            showHubScene();
+            initHubUI(container, state, (dest: string) => {
+              void _handleNavigation(container, state, dest);
+            });
           });
-        });
+        }
+      } catch (err) {
+        hideLoadingIndicator();
+        console.error('Failed to load Logistics Center:', err);
       }
     }
 

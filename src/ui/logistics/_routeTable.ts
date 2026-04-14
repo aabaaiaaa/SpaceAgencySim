@@ -190,7 +190,7 @@ function _renderRoutesTable(routes: Route[]): HTMLTableElement {
         // Origin -> Destination
         const tdRoute = document.createElement('td');
         tdRoute.colSpan = 2;
-        tdRoute.textContent = `${formatLocation(leg.origin)} \u2192 ${formatLocation(leg.destination)}`;
+        tdRoute.textContent = `${formatLocation(leg.origin, ls.state?.hubs)} \u2192 ${formatLocation(leg.destination, ls.state?.hubs)}`;
         tdRoute.className = 'logistics-leg-route';
         legTr.appendChild(tdRoute);
 
@@ -247,6 +247,7 @@ function _renderRoutesTable(routes: Route[]): HTMLTableElement {
 }
 
 function _renderProvenLegsSection(provenLegs: ProvenLeg[]): HTMLDivElement {
+  const ls = getLogisticsState();
   const section = document.createElement('div');
   section.className = 'logistics-proven-legs-section';
 
@@ -271,7 +272,7 @@ function _renderProvenLegsSection(provenLegs: ProvenLeg[]): HTMLDivElement {
     routeEl.className = 'logistics-proven-leg-route';
 
     const originSpan = document.createElement('span');
-    originSpan.textContent = formatLocation(leg.origin);
+    originSpan.textContent = formatLocation(leg.origin, ls.state?.hubs);
     routeEl.appendChild(originSpan);
 
     const arrowSpan = document.createElement('span');
@@ -280,7 +281,7 @@ function _renderProvenLegsSection(provenLegs: ProvenLeg[]): HTMLDivElement {
     routeEl.appendChild(arrowSpan);
 
     const destSpan = document.createElement('span');
-    destSpan.textContent = formatLocation(leg.destination);
+    destSpan.textContent = formatLocation(leg.destination, ls.state?.hubs);
     routeEl.appendChild(destSpan);
 
     card.appendChild(routeEl);

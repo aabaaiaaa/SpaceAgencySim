@@ -131,7 +131,7 @@
 - **Verification**: `npx vitest run src/tests/hubs.test.ts`
 
 ### TASK-021: Hub management panel UI — layout and display
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-020
 - **Description**: Create `src/ui/hubManagement.ts`. Export functions `showHubManagementPanel(state, hubId)` and `hideHubManagementPanel()`. The panel is a modal overlay (dark semi-transparent backdrop + centered panel). Layout: (1) Header with hub name as an editable text input (blur or Enter to save, Escape to cancel). (2) Info grid: Body name, Type (Surface/Orbital), Status badge (green "Online", red "Offline", yellow "Building"), Established period. (3) Facilities section: list each facility with name and tier badge, under-construction ones marked "(Building)". (4) Population: crew count + names if <10, tourist count. (5) Economy: maintenance cost, total investment. (6) Actions row at bottom. Style with the game's existing dark theme patterns. Close button (X) in top-right corner. Click backdrop to close.
 - **Verification**: `npx tsc --noEmit src/ui/hubManagement.ts`
@@ -233,7 +233,7 @@
 - **Verification**: `npx vitest run src/tests/routes.test.ts`
 
 ### TASK-036: Update route processing for hub-targeted delivery
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-035
 - **Description**: In `src/core/routes.ts`, update `processRoutes()`: (1) Source resolution: find mining site on the source hub's body (use `route.legs[0].origin.bodyId`). Read from orbital buffer as before. (2) Destination: if destination hubId refers to Earth hub, sell at market (unchanged). If off-world hub, deposit into the orbital buffer of the mining site on the destination body. (3) Add safety check: if any leg references a hubId not found in `state.hubs`, mark route as `broken` and skip. (4) The existing `routeConnectsBodies()` helper in hubCrew.ts should continue to work since it checks bodyId on legs, not hubId. Write unit tests: delivery to off-world hub, delivery to Earth hub, broken route on missing hub.
 - **Verification**: `npx vitest run src/tests/routes.test.ts`
@@ -245,13 +245,13 @@
 - **Verification**: `npx tsc --noEmit`
 
 ### TASK-038: Route builder hub interaction on SVG map
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-029, TASK-037
 - **Description**: In `src/ui/logistics/_routeBuilder.ts`, update builder mode to handle hub clicks: (1) Hub nodes on the SVG map (from TASK-029) are clickable in builder mode. Clicking a hub sets it as the route origin or extends the route. (2) When a body with exactly one hub is clicked, auto-select that hub. (3) When a body with multiple hubs is clicked, show a small popover/tooltip listing the hub names. Player clicks one to select. Implement the popover as an absolutely positioned div near the click location, with hub names as buttons. (4) When a body with no hubs is clicked, set `hubId: null` on the route endpoint. (5) Resource type dropdown: after selecting a source, filter to resources available in the orbital buffer of the source body's mining sites.
 - **Verification**: `npx tsc --noEmit src/ui/logistics/_routeBuilder.ts`
 
 ### TASK-039: Route table hub name display
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-035
 - **Description**: In `src/ui/logistics/_routeTable.ts`, update the route table rendering. When displaying route leg origins and destinations: if the leg's `hubId` is non-null, look up the hub name from `state.hubs` and display as "{hubName} ({bodyName}, {locationType})" — e.g. "Apollo Outpost (Moon, surface)". If `hubId` is null, display as before: "{bodyName} ({locationType})". Also update the route summary row if it shows origin/destination.
 - **Verification**: `npx tsc --noEmit src/ui/logistics/_routeTable.ts`
@@ -273,7 +273,7 @@
 - **Verification**: `npx tsc --noEmit src/ui/loadingIndicator.ts`
 
 ### TASK-042: Convert screen navigation to dynamic imports
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-040, TASK-041
 - **Description**: Find the screen switching/navigation function (grep for how screens are shown — likely a central router or switch statement that calls `showVAB()`, `showFlight()`, etc.). Convert each screen's static import to a dynamic import pattern: `async function navigateToX() { showLoadingIndicator(); const { showX } = await import('./path'); hideLoadingIndicator(); showX(); }`. Screens to convert: VAB, flight controller, logistics, mission control, crew admin. The hub screen stays statically imported (it's the default screen). Ensure error handling: if dynamic import fails, hide loading indicator and show error notification. Associated render modules (render/vab, render/flight, render/map) should be imported by their UI screen module, not separately by the router.
 - **Verification**: `npm run build && ls -la dist/assets/*.js | wc -l` (should show multiple JS chunks, not just one)

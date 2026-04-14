@@ -27,6 +27,7 @@ export interface LogisticsState {
   builderRouteName: string;
   builderLegs: string[];           // proven leg IDs
   builderCurrentBodyId: string | null;
+  builderOriginHubId: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -48,6 +49,7 @@ function _createDefaultState(): LogisticsState {
     builderRouteName: '',
     builderLegs: [],
     builderCurrentBodyId: null,
+    builderOriginHubId: null,
   };
 }
 
@@ -72,6 +74,7 @@ export function resetBuilderState(): void {
   _logisticsState.builderRouteName = '';
   _logisticsState.builderLegs = [];
   _logisticsState.builderCurrentBodyId = null;
+  _logisticsState.builderOriginHubId = null;
 }
 
 /** Reset the entire logistics state to initial values. */

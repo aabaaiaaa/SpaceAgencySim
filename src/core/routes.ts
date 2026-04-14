@@ -355,6 +355,17 @@ export function processRoutes(state: GameState): { revenue: number; operatingCos
     if (route.status !== 'active') continue;
     if (route.legs.length === 0) continue;
 
+    // Safety check: verify all hub references are valid
+    const hasInvalidHub = route.legs.some(leg => {
+      if (leg.origin.hubId && !state.hubs.find(h => h.id === leg.origin.hubId)) return true;
+      if (leg.destination.hubId && !state.hubs.find(h => h.id === leg.destination.hubId)) return true;
+      return false;
+    });
+    if (hasInvalidHub) {
+      route.status = 'broken';
+      continue;
+    }
+
     // Find source body from first leg's origin
     const sourceBodyId = route.legs[0].origin.bodyId;
 
