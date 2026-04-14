@@ -425,19 +425,19 @@
 - **Verification**: `npx playwright test e2e/logistics.spec.ts --reporter=line`
 
 ### TASK-066: E2E — hub-to-hub route creation
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-038
 - **Description**: In `e2e/route-interactions.spec.ts`, add a test: (1) Seed a save with hubs on Earth and Moon, plus a proven leg between them (with hubId fields set). (2) Open the Logistics Center, Routes tab. (3) Click "Create Route". (4) Select a resource type. (5) Click the Earth hub node on the SVG map. (6) Click the proven leg to Moon. (7) Confirm the route. (8) Verify the route table shows the Earth hub name and Moon hub name as endpoints (not just "Earth" and "Moon"). Tag `@smoke`.
 - **Verification**: `npx playwright test e2e/route-interactions.spec.ts --reporter=line`
 
 ### TASK-067: E2E — incompatible save slot display
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006
 - **Description**: In `e2e/save-load.spec.ts` (or new file), add a test: (1) Seed localStorage with a save in an old format (version = current SAVE_VERSION - 1). (2) Open the save/load dialog. (3) Verify the save slot shows the save name but is visually grayed out. (4) Verify "(Incompatible)" text is displayed. (5) Verify the Load button is disabled for that slot.
 - **Verification**: `npx playwright test e2e/save-load.spec.ts --reporter=line`
 
 ### TASK-068: E2E — code-splitting screen navigation
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-042
 - **Description**: In `e2e/navigation.spec.ts` (or new file), add a test that navigates between all screens and verifies each loads correctly: (1) Start at hub screen. (2) Navigate to VAB — verify VAB elements visible. (3) Return to hub. (4) Navigate to Mission Control — verify MC elements visible. (5) Return to hub. (6) Navigate to Crew Admin — verify crew list visible. (7) Return to hub. (8) Navigate to Logistics — verify logistics panel visible. This tests that dynamic imports work correctly in the built game. Tag `@smoke`.
 - **Verification**: `npx playwright test e2e/navigation.spec.ts --reporter=line`
@@ -445,13 +445,13 @@
 ### Integration Tests
 
 ### TASK-069: Integration test — full off-world pipeline
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-036, TASK-019
 - **Description**: In `src/tests/hubs-integration.test.ts` (new file), write a comprehensive integration test: (1) Create game state with Earth hub. (2) Create an off-world surface hub on the Moon (via `createHub()`). (3) Deliver construction resources to complete the Crew Hab (call `deliverResources()` then `processConstructionProjects()`). (4) Verify hub comes online. (5) Hire crew at the hub (via `hireCrewAtHub()`), verify import tax applied. (6) Advance multiple periods. (7) Verify crew salary deducted, hub maintenance deducted, hub stays online. (8) Verify crew transit delay clears after correct number of periods.
 - **Verification**: `npx vitest run src/tests/hubs-integration.test.ts`
 
 ### TASK-070: Integration test — hub offline cascade
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-036, TASK-019
 - **Description**: In `src/tests/hubs-integration.test.ts`, add a test: (1) Create state with an online off-world hub, 2 crew stationed there, 3 tourists, money set to $0. (2) Call `advancePeriod()` (or the individual processing functions in order). (3) Verify in a single period: maintenance fails (money < cost), hub goes offline, crew `stationedHubId` changed to Earth with transit delay, tourists array emptied. (4) Verify the order: maintenance → offline → evacuation → tourist eviction all happen in one period call.
 - **Verification**: `npx vitest run src/tests/hubs-integration.test.ts`

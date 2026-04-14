@@ -230,4 +230,52 @@ test.describe('Save & Load Flow', () => {
     });
     expect(hasProbe).toBe(true);
   });
+
+  test('(9) incompatible save slot is grayed out with "(Incompatible)" text and no Load action in topbar load dialog', async ({ page }) => {
+    // Seed slot 0 with a current-version save (so we can load into the game),
+    // and slot 1 with an old-version save (to verify incompatibility display).
+    const currentEnvelope = makeEnvelope({ saveName: 'Current Save' });
+    const oldEnvelope = makeEnvelope({ saveName: 'Old Save', version: 3 });
+
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await page.addInitScript(({ key0, env0, key1, env1 }) => {
+      localStorage.setItem(key0, JSON.stringify(env0));
+      localStorage.setItem(key1, JSON.stringify(env1));
+    }, {
+      key0: 'spaceAgencySave_0', env0: currentEnvelope,
+      key1: 'spaceAgencySave_1', env1: oldEnvelope,
+    });
+
+    // Load the current-version save to get into the game.
+    await page.goto('/');
+    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
+    await page.click('[data-action="load"][data-slot="0"]');
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
+
+    // Open the topbar Load Game dialog.
+    await page.click('#topbar-menu-btn');
+    await expect(page.locator('#topbar-dropdown')).toBeVisible({ timeout: 5_000 });
+    await page.locator('#topbar-dropdown').getByText('Load Game').click();
+    await expect(page.locator('#load-modal-backdrop')).toBeVisible({ timeout: 5_000 });
+
+    // Slot 1 should be visible in the load dialog.
+    const slot1 = page.locator('[data-testid="load-slot-1"]');
+    await expect(slot1).toBeVisible({ timeout: 5_000 });
+
+    // The slot should show the save name with "(Incompatible)" appended.
+    await expect(slot1.locator('strong')).toContainText('Old Save', { timeout: 5_000 });
+    await expect(slot1.locator('strong')).toContainText('(Incompatible)', { timeout: 5_000 });
+
+    // The slot should have the grayed-out incompatible class.
+    await expect(slot1).toHaveClass(/save-slot-incompatible/, { timeout: 5_000 });
+
+    // The action tag should say "Incompatible" instead of "Load".
+    const actionTag = slot1.locator('.save-slot-action-tag');
+    await expect(actionTag).toHaveText('Incompatible', { timeout: 5_000 });
+
+    // Slot 0 (current version) should NOT be incompatible — sanity check.
+    const slot0 = page.locator('[data-testid="load-slot-0"]');
+    await expect(slot0).not.toHaveClass(/save-slot-incompatible/, { timeout: 5_000 });
+    await expect(slot0.locator('.save-slot-action-tag')).toHaveText('Load', { timeout: 5_000 });
+  });
 });

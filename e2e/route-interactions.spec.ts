@@ -14,6 +14,7 @@ import {
   seedAndLoadSave,
   ALL_FACILITIES,
   dismissWelcomeModal,
+  buildHub,
 } from './helpers.js';
 
 // ---------------------------------------------------------------------------
@@ -482,6 +483,144 @@ test.describe('Route Interactions', () => {
 
     // The route should contain the name we entered
     await expect(routeTable).toContainText('Test Builder Route', { timeout: 5_000 });
+  });
+
+  test('@smoke hub-to-hub route creation shows hub names as endpoints', async ({ page }) => {
+    // Build hubs: Earth HQ and a Moon outpost
+    const earthHub = buildHub({
+      id: 'earth',
+      name: 'Earth HQ',
+      type: 'surface',
+      bodyId: 'EARTH',
+      coordinates: { x: 0, y: 0 },
+      facilities: { ...ALL_FACILITIES },
+      online: true,
+    });
+
+    const moonHub = buildHub({
+      id: 'moon-outpost',
+      name: 'Artemis Base',
+      type: 'surface',
+      bodyId: 'MOON',
+      coordinates: { x: 0, y: 0 },
+      facilities: {},
+      online: true,
+    });
+
+    const envelope = buildSaveEnvelope({
+      gameMode: 'sandbox',
+      tutorialMode: false,
+      money: 10_000_000,
+      hubs: [earthHub, moonHub],
+      activeHubId: 'earth',
+    });
+
+    await seedAndLoadSave(page, envelope);
+
+    // Inject a mining site on Moon (so Moon shows on the SVG map) and a
+    // proven leg between Earth and Moon with hubId fields set to the hubs.
+    await page.evaluate(() => {
+      const gs = window.__gameState;
+
+      if (!gs.miningSites) gs.miningSites = [];
+      if (!gs.provenLegs) gs.provenLegs = [];
+      if (!gs.routes) gs.routes = [];
+
+      gs.miningSites.push({
+        id: 'site-hub-route-1',
+        name: 'Lunar Mine Gamma',
+        bodyId: 'MOON',
+        coordinates: { x: 0, y: 0 },
+        controlUnit: { partId: 'base-control-unit-mk1' },
+        modules: [],
+        storage: {},
+        powerGenerated: 100,
+        powerRequired: 10,
+        orbitalBuffer: { WATER_ICE: 5000 },
+      });
+
+      gs.provenLegs.push({
+        id: 'proven-leg-hub-1',
+        origin: { bodyId: 'EARTH', locationType: 'orbit', altitude: 200, hubId: 'earth' },
+        destination: { bodyId: 'MOON', locationType: 'orbit', altitude: 50, hubId: 'moon-outpost' },
+        craftDesignId: 'cargo-shuttle',
+        cargoCapacityKg: 2000,
+        costPerRun: 50000,
+        provenFlightId: 'flight-hub-1',
+        dateProven: 1,
+      });
+    });
+
+    await openRoutesTab(page);
+
+    // Click "Create Route" to enter builder mode
+    const createBtn = page.locator('.logistics-builder-create-btn');
+    await expect(createBtn).toBeVisible({ timeout: 5_000 });
+    await createBtn.click();
+
+    // Builder panel should appear
+    const builderPanel = page.locator('.logistics-builder-panel');
+    await expect(builderPanel).toBeVisible({ timeout: 5_000 });
+
+    // Select a resource type from the dropdown
+    const resourceSelect = builderPanel.locator('.logistics-builder-select');
+    await resourceSelect.selectOption({ index: 1 });
+
+    // Enter a route name
+    const nameInput = builderPanel.locator('.logistics-builder-input');
+    await nameInput.fill('Hub-to-Hub Water Run');
+
+    // Click Earth on the SVG map to set origin.
+    // With only one hub on Earth (Earth HQ), the builder auto-selects it.
+    const earthCircle = page.locator('.logistics-route-map .body-earth');
+    await expect(earthCircle).toBeVisible({ timeout: 5_000 });
+    await earthCircle.dispatchEvent('click');
+
+    // Wait for proven leg lines to appear (outbound from Earth)
+    await page.waitForFunction(() => {
+      const legs = document.querySelectorAll('.logistics-route-map .proven-leg-line');
+      return legs.length > 0;
+    }, { timeout: 5_000 });
+
+    // Click the proven leg (Earth -> Moon, index 0)
+    const provenLeg = page.locator('#route-leg-proven-0');
+    await expect(provenLeg).toBeVisible({ timeout: 5_000 });
+    await provenLeg.dispatchEvent('click');
+
+    // Wait for the leg to appear in the builder chain
+    await page.waitForFunction(() => {
+      const items = document.querySelectorAll('.logistics-builder-leg-item');
+      return items.length >= 1;
+    }, { timeout: 5_000 });
+
+    // Click "Create Route" confirm button
+    const confirmBtn = builderPanel.locator('.logistics-builder-confirm-btn');
+    await expect(confirmBtn).toBeVisible({ timeout: 5_000 });
+    await confirmBtn.click();
+
+    // Builder should close
+    await expect(builderPanel).not.toBeVisible({ timeout: 5_000 });
+
+    // Verify the route appears in the routes table
+    const routeTable = page.locator('.logistics-routes-table');
+    await expect(routeTable).toBeVisible({ timeout: 5_000 });
+    await expect(routeTable).toContainText('Hub-to-Hub Water Run', { timeout: 5_000 });
+
+    // Expand the route to see leg details with hub names
+    const routeRow = routeTable.locator('tbody tr').first();
+    const expandBtn = routeRow.locator('.logistics-expand-btn');
+    await expect(expandBtn).toBeVisible({ timeout: 5_000 });
+    await expandBtn.click();
+
+    // A leg row should appear
+    const legRow = page.locator('.logistics-leg-row');
+    await expect(legRow).toHaveCount(1, { timeout: 5_000 });
+
+    // formatLocation with hubId set renders: "HubName (BODY, locDetail)"
+    // Verify that the leg row shows the Earth hub name and Moon hub name
+    // instead of just bare body names.
+    await expect(legRow).toContainText('Earth HQ', { timeout: 5_000 });
+    await expect(legRow).toContainText('Artemis Base', { timeout: 5_000 });
   });
 
 });
