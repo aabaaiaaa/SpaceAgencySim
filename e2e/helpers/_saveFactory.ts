@@ -89,12 +89,16 @@ export interface SaveEnvelopeParams {
   challenges?: ChallengesState;
   customChallenges?: Record<string, unknown>[];
   fieldCraft?: Record<string, unknown>[];
+  miningSites?: Record<string, unknown>[];
+  provenLegs?: Record<string, unknown>[];
+  routes?: Record<string, unknown>[];
   /** Convenience shorthand: sets the Earth hub's facilities without building a full `hubs` array. Ignored when `hubs` is provided. */
   facilities?: Record<string, { built: boolean; tier: number }>;
   hubs?: HubSave[];
   activeHubId?: string;
   autoSaveEnabled?: boolean;
   debugMode?: boolean;
+  welcomeShown?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -135,10 +139,14 @@ export interface SaveEnvelopeState {
   challenges: ChallengesState;
   customChallenges: Record<string, unknown>[];
   fieldCraft: Record<string, unknown>[];
+  miningSites: Record<string, unknown>[];
+  provenLegs: Record<string, unknown>[];
+  routes: Record<string, unknown>[];
   hubs: HubSave[];
   activeHubId: string;
   autoSaveEnabled: boolean;
   debugMode: boolean;
+  welcomeShown: boolean;
 }
 
 export interface SaveEnvelope {
@@ -196,8 +204,12 @@ export function buildSaveEnvelope(params: SaveEnvelopeParams = {}): SaveEnvelope
     challenges      = { active: null, results: {} },
     customChallenges= [],
     fieldCraft      = [],
+    miningSites     = [],
+    provenLegs      = [],
+    routes          = [],
     autoSaveEnabled    = true,
     debugMode          = false,
+    welcomeShown       = true,
   } = params;
 
   // Default hubs — Earth HQ with starter facilities.
@@ -259,10 +271,14 @@ export function buildSaveEnvelope(params: SaveEnvelopeParams = {}): SaveEnvelope
       challenges,
       customChallenges,
       fieldCraft,
+      miningSites,
+      provenLegs,
+      routes,
       hubs,
       activeHubId,
       autoSaveEnabled,
       debugMode,
+      welcomeShown,
     },
   };
 }

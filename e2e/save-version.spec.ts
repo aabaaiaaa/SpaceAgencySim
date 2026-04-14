@@ -47,20 +47,23 @@ test.describe('Save Version Indicator', () => {
     const badge = slot0Card.locator('[data-testid="version-warning"]');
     await expect(badge).toBeVisible({ timeout: 5_000 });
     await expect(badge).toContainText('v0', { timeout: 5_000 });
-    await expect(badge).toContainText('current: v3', { timeout: 5_000 });
+    await expect(badge).toContainText('current: v4', { timeout: 5_000 });
   });
 
   test('topbar load modal: mismatched-version save shows version warning', async ({ page }) => {
-    // Seed a save with a mismatched version and load the game.
-    const envelope: SaveEnvelope = buildSaveEnvelope({ version: 0, saveName: 'Old Save' });
-    await page.addInitScript(({ key, env }: { key: string; env: SaveEnvelope }) => {
-      localStorage.setItem(key, JSON.stringify(env));
-    }, { key: SAVE_KEY, env: envelope });
+    // Seed slot 0 with a current-version save (so we can load into the game),
+    // and slot 1 with a mismatched-version save (to verify warning display).
+    const currentEnvelope: SaveEnvelope = buildSaveEnvelope({ saveName: 'Current Save' });
+    const oldEnvelope: SaveEnvelope = buildSaveEnvelope({ version: 0, saveName: 'Old Save' });
+    await page.addInitScript(({ key0, env0, key1, env1 }: { key0: string; env0: SaveEnvelope; key1: string; env1: SaveEnvelope }) => {
+      localStorage.setItem(key0, JSON.stringify(env0));
+      localStorage.setItem(key1, JSON.stringify(env1));
+    }, { key0: SAVE_KEY, env0: currentEnvelope, key1: 'spaceAgencySave_1', env1: oldEnvelope });
 
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
-    // Load the save to get into the game.
+    // Load the current-version save (slot 0) to get into the game.
     await page.click('[data-action="load"][data-slot="0"]');
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
 
@@ -70,8 +73,8 @@ test.describe('Save Version Indicator', () => {
     await page.locator('#topbar-dropdown button').filter({ hasText: 'Load Game' }).click();
     await expect(page.locator('#load-modal-backdrop')).toBeVisible({ timeout: 5_000 });
 
-    // The load slot should show the version warning.
-    const slot = page.locator('[data-testid="load-slot-0"]');
+    // Slot 1 (old version) should show the version warning.
+    const slot = page.locator('[data-testid="load-slot-1"]');
     await expect(slot).toBeVisible({ timeout: 5_000 });
     const badge = slot.locator('[data-testid="version-warning"]');
     await expect(badge).toBeVisible({ timeout: 5_000 });
@@ -80,7 +83,7 @@ test.describe('Save Version Indicator', () => {
 
   test('topbar load modal: current-version save shows no version warning', async ({ page }) => {
     // Seed a save with the current version.
-    const envelope: SaveEnvelope = buildSaveEnvelope({ version: 3, saveName: 'Current Save' });
+    const envelope: SaveEnvelope = buildSaveEnvelope({ saveName: 'Current Save' });
     await page.addInitScript(({ key, env }: { key: string; env: SaveEnvelope }) => {
       localStorage.setItem(key, JSON.stringify(env));
     }, { key: SAVE_KEY, env: envelope });

@@ -79,9 +79,10 @@ test.describe('Hub Switcher', () => {
 
     await seedAndLoadSave(page, save);
 
-    // Switcher wrapper should be hidden (only one hub)
-    const wrapper = page.locator('#hub-switcher-wrapper');
-    await expect(wrapper).toBeHidden({ timeout: 5_000 });
+    // Switcher select dropdown should be hidden (only one hub),
+    // but the wrapper stays visible for the gear button
+    const select = page.locator('#hub-switcher');
+    await expect(select).toBeHidden({ timeout: 5_000 });
   });
 
   test('shows [Building] status for under-construction hub', async ({ page }) => {

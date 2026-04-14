@@ -32,7 +32,7 @@ export function initHubSwitcher(
   // Create wrapper div for positioning
   const wrapper = document.createElement('div');
   wrapper.id = 'hub-switcher-wrapper';
-  wrapper.style.cssText = 'position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:20;';
+  wrapper.style.cssText = 'position:absolute;top:52px;left:50%;transform:translateX(-50%);z-index:20;pointer-events:auto;';
 
   _stateRef = state;
 

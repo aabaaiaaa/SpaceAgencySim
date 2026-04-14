@@ -206,8 +206,8 @@ describe('Hub CRUD — createHub', () => {
       expect(del.amount).toBe(0);
     }
 
-    // Money cost is not scaled by environment
-    expect(project.moneyCost).toBe(crewHabCost.moneyCost);
+    // Money cost is also scaled by environment multiplier
+    expect(project.moneyCost).toBe(crewHabCost.moneyCost * titanMultiplier);
   });
 
   it('hub is added to state.hubs', () => {

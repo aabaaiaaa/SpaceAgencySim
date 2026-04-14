@@ -4,6 +4,7 @@ import type { GameState } from '../core/gameState.ts';
 import {
   saveGame,
   loadGame,
+  SAVE_VERSION,
   _setSessionStartTimeForTesting,
 } from '../core/saveload.ts';
 
@@ -126,7 +127,7 @@ describe('debugMode save migration', () => {
     const legacyEnvelope = {
       saveName: 'Legacy Save',
       timestamp: new Date().toISOString(),
-      version: 1,
+      version: SAVE_VERSION,
       state: JSON.parse(JSON.stringify(state)),
     };
     localStorage.setItem('spaceAgencySave_0', JSON.stringify(legacyEnvelope));
@@ -143,7 +144,7 @@ describe('debugMode save migration', () => {
     const envelope = {
       saveName: 'Debug Save',
       timestamp: new Date().toISOString(),
-      version: 1,
+      version: SAVE_VERSION,
       state: JSON.parse(JSON.stringify(state)),
     };
     localStorage.setItem('spaceAgencySave_0', JSON.stringify(envelope));

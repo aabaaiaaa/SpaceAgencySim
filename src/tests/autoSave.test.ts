@@ -129,7 +129,7 @@ describe('performAutoSave', () => {
     expect(envelope.saveName).toBe('Auto-Save');
     expect(envelope.state.agencyName).toBe('Test Agency');
     expect(typeof envelope.timestamp).toBe('string');
-    expect(envelope.version).toBe(3);
+    expect(envelope.version).toBe(4);
   });
 
   it('accumulates session play time', async () => {

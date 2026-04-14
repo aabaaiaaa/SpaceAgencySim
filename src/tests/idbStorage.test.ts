@@ -5,6 +5,7 @@ import {
   loadGame,
   loadGameAsync,
   deleteSave,
+  SAVE_VERSION,
   _setSessionStartTimeForTesting,
   decompressSaveData,
 } from '../core/saveload.ts';
@@ -339,7 +340,7 @@ describe('loadGameAsync()', () => {
     const oldEnvelope: TestSaveEnvelope = {
       saveName: 'Old',
       timestamp: '2025-01-01T00:00:00.000Z',
-      version: 1,
+      version: SAVE_VERSION,
       state: JSON.parse(JSON.stringify(oldState)) as GameState,
     };
     localStorage.setItem('spaceAgencySave_0', JSON.stringify(oldEnvelope));
@@ -350,7 +351,7 @@ describe('loadGameAsync()', () => {
     const newEnvelope: TestSaveEnvelope = {
       saveName: 'New',
       timestamp: '2025-06-01T00:00:00.000Z',
-      version: 1,
+      version: SAVE_VERSION,
       state: JSON.parse(JSON.stringify(newState)) as GameState,
     };
     await idbSet('spaceAgencySave_0', JSON.stringify(newEnvelope));
@@ -366,7 +367,7 @@ describe('loadGameAsync()', () => {
     const oldEnvelope: TestSaveEnvelope = {
       saveName: 'Old IDB',
       timestamp: '2025-01-01T00:00:00.000Z',
-      version: 1,
+      version: SAVE_VERSION,
       state: JSON.parse(JSON.stringify(oldState)) as GameState,
     };
     await idbSet('spaceAgencySave_0', JSON.stringify(oldEnvelope));
@@ -377,7 +378,7 @@ describe('loadGameAsync()', () => {
     const newEnvelope: TestSaveEnvelope = {
       saveName: 'New LS',
       timestamp: '2025-06-01T00:00:00.000Z',
-      version: 1,
+      version: SAVE_VERSION,
       state: JSON.parse(JSON.stringify(newState)) as GameState,
     };
     localStorage.setItem('spaceAgencySave_0', JSON.stringify(newEnvelope));
@@ -392,7 +393,7 @@ describe('loadGameAsync()', () => {
     const envelope: TestSaveEnvelope = {
       saveName: 'IDB Only',
       timestamp: '2025-03-01T00:00:00.000Z',
-      version: 1,
+      version: SAVE_VERSION,
       state: JSON.parse(JSON.stringify(state)) as GameState,
     };
     await idbSet('spaceAgencySave_2', JSON.stringify(envelope));
@@ -432,7 +433,7 @@ describe('loadGameAsync()', () => {
     const envelope: TestSaveEnvelope = {
       saveName: 'Sync Restore',
       timestamp: '2025-04-01T00:00:00.000Z',
-      version: 1,
+      version: SAVE_VERSION,
       state: JSON.parse(JSON.stringify(state)) as GameState,
     };
     await idbSet('spaceAgencySave_0', JSON.stringify(envelope));

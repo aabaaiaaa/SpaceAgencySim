@@ -40,7 +40,9 @@ import {
   DIMINISHING_RETURNS,
   FacilityId,
   MalfunctionType,
+  EARTH_HUB_ID,
 } from '../core/constants.ts';
+import { makeEarthHub } from './_factories.ts';
 import {
   createRocketAssembly,
   addPartToAssembly,
@@ -94,11 +96,13 @@ interface TestGameStateOverrides {
 }
 
 function makeGameState(overrides: TestGameStateOverrides = {}): GameState {
+  const facilities = overrides.facilities ?? {};
   return {
     scienceLog: [],
     sciencePoints: 0,
     crew: [],
-    facilities: {},
+    hubs: [makeEarthHub({ facilities })],
+    activeHubId: EARTH_HUB_ID,
     ...overrides,
   } as unknown as GameState;
 }

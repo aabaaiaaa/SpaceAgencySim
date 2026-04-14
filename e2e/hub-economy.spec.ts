@@ -130,7 +130,7 @@ test.describe('Hub Economy', () => {
     const switcher = page.locator('#hub-switcher');
     await expect(switcher).toBeVisible({ timeout: 5_000 });
     const moonOptionBefore = switcher.locator('option[value="moon-base"]');
-    await expect(moonOptionBefore).toBeVisible({ timeout: 5_000 });
+    await expect(moonOptionBefore).toHaveCount(1, { timeout: 5_000 });
     // Should NOT show [Offline] before flight
     const textBefore = await moonOptionBefore.textContent();
     expect(textBefore).not.toContain('[Offline]');

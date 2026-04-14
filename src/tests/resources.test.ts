@@ -217,9 +217,9 @@ describe('Mining module parts', () => {
     expect(PartType.MINING_MODULE).toBe('MINING_MODULE');
   });
 
-  it('PARTS catalog contains all 10 mining modules', () => {
+  it('PARTS catalog contains all 13 mining modules', () => {
     const miningParts = PARTS.filter(p => p.type === PartType.MINING_MODULE);
-    expect(miningParts).toHaveLength(10);
+    expect(miningParts).toHaveLength(13);
   });
 
   it('each mining module has a valid miningModuleType property', () => {
