@@ -216,7 +216,7 @@ describe('startFacilityUpgrade', () => {
       const baseRes = baseCost.resources.find(r => r.resourceId === req.resourceId)!;
       expect(req.amount).toBe(baseRes.amount * 2 * envMult);
     }
-    expect(project!.moneyCost).toBe(baseCost.moneyCost * 2);
+    expect(project!.moneyCost).toBe(baseCost.moneyCost * 2 * envMult);
   });
 
   it('returns null if facility not built', () => {
@@ -236,6 +236,52 @@ describe('startFacilityUpgrade', () => {
     startFacilityUpgrade(state, hub, FacilityId.VAB);
     // Second call should fail
     expect(startFacilityUpgrade(state, hub, FacilityId.VAB)).toBeNull();
+  });
+});
+
+describe('createHub money cost environment scaling', () => {
+  let state: GameState;
+  beforeEach(() => { state = createGameState(); });
+
+  it('scales Crew Hab moneyCost by Mars environment multiplier (1.3)', () => {
+    const hub = createHub(state, { name: 'Mars Base', type: 'surface', bodyId: 'MARS' });
+    const crewHabCost = OFFWORLD_FACILITY_COSTS.find(c => c.facilityId === FacilityId.CREW_HAB)!;
+    const envMult = getEnvironmentCostMultiplier('MARS');
+    expect(envMult).toBeCloseTo(1.3);
+    expect(hub.constructionQueue[0].moneyCost).toBeCloseTo(crewHabCost.moneyCost * envMult);
+  });
+
+  it('scales Crew Hab moneyCost by Moon environment multiplier (1.0)', () => {
+    const hub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    const crewHabCost = OFFWORLD_FACILITY_COSTS.find(c => c.facilityId === FacilityId.CREW_HAB)!;
+    const envMult = getEnvironmentCostMultiplier('MOON');
+    expect(envMult).toBeCloseTo(1.0);
+    expect(hub.constructionQueue[0].moneyCost).toBeCloseTo(crewHabCost.moneyCost * envMult);
+  });
+
+  it('scales Crew Hab moneyCost by Titan environment multiplier (1.8)', () => {
+    const hub = createHub(state, { name: 'Titan Outpost', type: 'surface', bodyId: 'TITAN' });
+    const crewHabCost = OFFWORLD_FACILITY_COSTS.find(c => c.facilityId === FacilityId.CREW_HAB)!;
+    const envMult = getEnvironmentCostMultiplier('TITAN');
+    expect(envMult).toBeCloseTo(1.8);
+    expect(hub.constructionQueue[0].moneyCost).toBeCloseTo(crewHabCost.moneyCost * envMult);
+  });
+});
+
+describe('startFacilityUpgrade money cost environment scaling', () => {
+  let state: GameState;
+  beforeEach(() => { state = createGameState(); });
+
+  it('scales upgrade moneyCost by Mars environment multiplier', () => {
+    const hub = createHub(state, { name: 'Mars Base', type: 'surface', bodyId: 'MARS' });
+    hub.facilities[FacilityId.VAB] = { built: true, tier: 1 };
+
+    const project = startFacilityUpgrade(state, hub, FacilityId.VAB);
+    expect(project).not.toBeNull();
+
+    const baseCost = OFFWORLD_FACILITY_COSTS.find(c => c.facilityId === FacilityId.VAB)!;
+    const envMult = getEnvironmentCostMultiplier('MARS');
+    expect(project!.moneyCost).toBeCloseTo(baseCost.moneyCost * 2 * envMult);
   });
 });
 

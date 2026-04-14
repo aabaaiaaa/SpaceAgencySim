@@ -103,7 +103,7 @@ export function createHub(
       facilityId: FacilityId.CREW_HAB,
       resourcesRequired,
       resourcesDelivered,
-      moneyCost: crewHabCost.moneyCost,
+      moneyCost: crewHabCost.moneyCost * envMultiplier,
       startedPeriod: state.currentPeriod,
     });
   }
@@ -367,7 +367,7 @@ export function startFacilityUpgrade(
     facilityId,
     resourcesRequired,
     resourcesDelivered,
-    moneyCost: costDef.moneyCost * nextTier,
+    moneyCost: costDef.moneyCost * nextTier * envMultiplier,
     startedPeriod: state.currentPeriod,
   };
 

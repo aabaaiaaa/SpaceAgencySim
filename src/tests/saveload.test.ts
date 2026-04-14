@@ -846,29 +846,17 @@ describe('Save format version field', () => {
     expect(envelope.version).toBe(SAVE_VERSION);
   });
 
-  it('loadGame() loads a version-0 (no version field) save with all migrations applied', async () => {
-    // Simulate a pre-versioning save: no version field, missing fields that
-    // the migration logic defaults via ??=.
+  it('loadGame() rejects a version-0 (no version field) save as incompatible', async () => {
     const state = freshState();
-    // @ts-expect-error — deliberately deleting required fields to simulate pre-versioning save
-    delete state.malfunctionMode;
-    // @ts-expect-error — deliberately deleting required field
-    delete state.savedDesigns;
-    // @ts-expect-error — deliberately deleting required field
-    delete state.welcomeShown;
     const legacyEnvelope = {
       saveName: 'Legacy',
       timestamp: new Date(0).toISOString(),
-      // Intentionally no "version" field
+      // Intentionally no "version" field — treated as version 0
       state: JSON.parse(JSON.stringify(state)),
     };
     localStorage.setItem('spaceAgencySave_0', JSON.stringify(legacyEnvelope));
 
-    const restored = await loadGame(0);
-    // Migrations should have run — check fields that get defaulted by ??=.
-    expect(restored.malfunctionMode).toBe('normal');
-    expect(Array.isArray(restored.savedDesigns)).toBe(true);
-    expect(restored.welcomeShown).toBe(true);
+    await expect(loadGame(0)).rejects.toThrow(/incompatible version/i);
   });
 
   it('loadGame() loads a save matching the current version without warnings', async () => {
@@ -882,10 +870,7 @@ describe('Save format version field', () => {
     warnSpy.mockRestore();
   });
 
-  it('loadGame() warns when save version is higher than current', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
-    // Create a save with a future version number.
+  it('loadGame() rejects a save from a newer version', async () => {
     const state = freshState();
     const futureEnvelope = {
       saveName: 'Future',
@@ -895,28 +880,20 @@ describe('Save format version field', () => {
     };
     localStorage.setItem('spaceAgencySave_0', JSON.stringify(futureEnvelope));
 
-    const restored = await loadGame(0);
-    expect(restored).toBeDefined();
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy.mock.calls[0][0]).toMatch(/newer version/i);
-    warnSpy.mockRestore();
+    await expect(loadGame(0)).rejects.toThrow(/incompatible version/i);
   });
 
-  it('loadGame() still returns valid state from a future-version save', async () => {
+  it('loadGame() rejects a save from an older version', async () => {
     const state = freshState();
-    state.money = 42_000;
-    const futureEnvelope = {
-      saveName: 'Future OK',
+    const oldEnvelope = {
+      saveName: 'Old',
       timestamp: new Date(0).toISOString(),
-      version: SAVE_VERSION + 1,
+      version: SAVE_VERSION - 1,
       state: JSON.parse(JSON.stringify(state)),
     };
-    localStorage.setItem('spaceAgencySave_1', JSON.stringify(futureEnvelope));
+    localStorage.setItem('spaceAgencySave_1', JSON.stringify(oldEnvelope));
 
-    vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const restored = await loadGame(1);
-    expect(restored.money).toBe(42_000);
-    vi.restoreAllMocks();
+    await expect(loadGame(1)).rejects.toThrow(/incompatible version/i);
   });
 
   it('round-trip save/load preserves the version field in storage', async () => {
@@ -971,72 +948,6 @@ describe('Save migration edge cases', () => {
     localStorage.setItem('spaceAgencySave_0', JSON.stringify(envelope));
   }
 
-  it('loads a save with savedDesigns: null and defaults it to an empty array', async () => {
-    injectEnvelope({
-      _rawStatePatches: { savedDesigns: null },
-    });
-
-    const restored = await loadGame(0);
-    expect(Array.isArray(restored.savedDesigns)).toBe(true);
-    expect(restored.savedDesigns).toHaveLength(0);
-  });
-
-  it('loads a save with savedDesigns: undefined and defaults it to an empty array', async () => {
-    injectEnvelope({
-      _rawStatePatches: { savedDesigns: undefined },
-    });
-
-    const restored = await loadGame(0);
-    expect(Array.isArray(restored.savedDesigns)).toBe(true);
-    expect(restored.savedDesigns).toHaveLength(0);
-  });
-
-  it('loads successfully when saveSharedLibrary() throws during design migration', async () => {
-    // We need to make saveSharedLibrary throw. Since saveload.js imports it
-    // statically, we mock the designLibrary module.
-    const { saveSharedLibrary } = await import('../core/designLibrary.js');
-    const saveSpy = vi.spyOn({ saveSharedLibrary }, 'saveSharedLibrary');
-
-    // To truly test this, we inject a save with legacy designs that trigger
-    // the migration path (designs without savePrivate flag), and mock
-    // localStorage to throw on the shared library key write.
-    const originalSetItem = mockStorage.setItem.bind(mockStorage);
-    const sharedLibKey = 'spaceAgencyDesignLibrary';
-
-    // Make saveSharedLibrary's internal localStorage.setItem throw for the
-    // shared library key only.
-    mockStorage.setItem = (key: string, value: string): void => {
-      if (key === sharedLibKey) {
-        throw new Error('Storage full — unable to save design library. Delete old saves or designs to free space.');
-      }
-      return originalSetItem(key, value);
-    };
-
-    // Inject a save with a legacy design that lacks savePrivate (triggers migration).
-    const state = freshState();
-    state.savedDesigns = [
-      makeRocketDesign({ id: 'design-1', name: 'Legacy Rocket', savePrivate: undefined }),
-    ];
-    const envelope = {
-      saveName: 'Migration Fail',
-      timestamp: new Date(0).toISOString(),
-      version: SAVE_VERSION,
-      state: JSON.parse(JSON.stringify(state)),
-    };
-    // Remove savePrivate so it's truly undefined in the stored JSON.
-    delete envelope.state.savedDesigns[0].savePrivate;
-    originalSetItem('spaceAgencySave_0', JSON.stringify(envelope));
-
-    // loadGame should throw because saveSharedLibrary throws (the error
-    // propagates from the migration block). This documents the current
-    // behaviour: a storage failure during migration is NOT caught by loadGame.
-    await expect(loadGame(0)).rejects.toThrow(/Storage full/i);
-
-    // Restore original setItem.
-    mockStorage.setItem = originalSetItem;
-    saveSpy.mockRestore();
-  });
-
   it('loads a save with an invalid malfunctionMode value without crashing', async () => {
     // The ??= migration only defaults null/undefined — an invalid string value
     // passes through. This test documents the current behaviour.
@@ -1049,59 +960,23 @@ describe('Save migration edge cases', () => {
     expect(restored.malfunctionMode).toBe('banana');
   });
 
-  it('loads a pre-version save (no version field) with all migrations applied', async () => {
-    // Simulate a very old save: no version field, missing several fields
-    // that were added in later iterations.
+  it('rejects a pre-version save (no version field) as incompatible', async () => {
     const rawState = JSON.parse(JSON.stringify(freshState())) as Record<string, unknown>;
-    delete rawState.malfunctionMode;
-    delete rawState.savedDesigns;
-    delete rawState.welcomeShown;
-    delete rawState.autoSaveEnabled;
-    delete rawState.debugMode;
-    delete rawState.sciencePoints;
-    delete rawState.scienceLog;
-    delete rawState.achievements;
-    delete rawState.partInventory;
-
     const legacyEnvelope = {
       saveName: 'Ancient Save',
       timestamp: new Date(0).toISOString(),
-      // No "version" field at all — pre-versioning save
+      // No "version" field at all — treated as version 0
       state: rawState,
     };
     localStorage.setItem('spaceAgencySave_0', JSON.stringify(legacyEnvelope));
 
-    const restored = await loadGame(0);
-
-    // All ??= migrations should have applied defaults.
-    expect(restored.malfunctionMode).toBe('normal');
-    expect(Array.isArray(restored.savedDesigns)).toBe(true);
-    expect(restored.welcomeShown).toBe(true);
-    expect(restored.autoSaveEnabled).toBe(true);
-    expect(restored.debugMode).toBe(false);
-    expect(restored.sciencePoints).toBe(0);
-    expect(Array.isArray(restored.scienceLog)).toBe(true);
-    expect(Array.isArray(restored.achievements)).toBe(true);
-    expect(Array.isArray(restored.partInventory)).toBe(true);
+    await expect(loadGame(0)).rejects.toThrow(/incompatible version/i);
   });
 
-  it('loads a future-version save and emits a console warning', async () => {
-    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-
+  it('rejects a future-version save as incompatible', async () => {
     injectEnvelope({ version: SAVE_VERSION + 10 });
 
-    const restored = await loadGame(0);
-
-    // The state should still load (best-effort forward compatibility).
-    expect(restored).toBeDefined();
-    expect(restored.money).toBe(freshState().money);
-
-    // A warning should have been logged about the newer version.
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    expect(warnSpy.mock.calls[0][0]).toContain(`"saveVersion":${SAVE_VERSION + 10}`);
-    expect(warnSpy.mock.calls[0][0]).toMatch(/newer version/i);
-
-    warnSpy.mockRestore();
+    await expect(loadGame(0)).rejects.toThrow(/incompatible version/i);
   });
 });
 
@@ -1471,7 +1346,7 @@ describe('Save compression', () => {
   });
 
   describe('backward compatibility with uncompressed saves', () => {
-    it('loadGame reads an uncompressed (pre-compression) save', async () => {
+    it('loadGame reads an uncompressed save with the current version', async () => {
       const state = freshState();
       state.agencyName = 'Old Agency';
       state.money = 12345;
@@ -1479,7 +1354,7 @@ describe('Save compression', () => {
       const envelope = {
         saveName: 'Legacy Save',
         timestamp: new Date(0).toISOString(),
-        version: 1, // Pre-compression version.
+        version: SAVE_VERSION,
         state: JSON.parse(JSON.stringify(state)),
       };
       // Write as uncompressed JSON (simulating old save format).
@@ -1491,21 +1366,19 @@ describe('Save compression', () => {
       expect(restored.money).toBe(12345);
     });
 
-    it('loadGame reads an uncompressed save with no version field (version 0)', async () => {
+    it('loadGame rejects an uncompressed save with a mismatched version', async () => {
       const state = freshState();
       state.agencyName = 'Ancient Agency';
 
       const envelope = {
         saveName: 'Ancient Save',
         timestamp: new Date(0).toISOString(),
-        // No version field — pre-versioning save.
+        version: 1, // Old version — now rejected.
         state: JSON.parse(JSON.stringify(state)),
       };
       localStorage.setItem('spaceAgencySave_1', JSON.stringify(envelope));
 
-      const restored = await loadGame(1);
-
-      expect(restored.agencyName).toBe('Ancient Agency');
+      await expect(loadGame(1)).rejects.toThrow(/incompatible version/i);
     });
 
     it('listSaves handles a mix of compressed and uncompressed slots', async () => {
@@ -1551,18 +1424,18 @@ describe('Save compression', () => {
   });
 
   describe('save version bump', () => {
-    it('SAVE_VERSION is 3 (bumped for hubs)', () => {
-      expect(SAVE_VERSION).toBe(3);
+    it('SAVE_VERSION is 4 (incompatible saves rejected)', () => {
+      expect(SAVE_VERSION).toBe(4);
     });
 
-    it('saved envelopes contain version 3', async () => {
+    it('saved envelopes contain version 4', async () => {
       const state = freshState();
       await saveGame(state, 0, 'Version Test');
 
       const raw = localStorage.getItem('spaceAgencySave_0');
       const json = decompressSaveData(raw!);
       const envelope = JSON.parse(json) as SaveEnvelope;
-      expect(envelope.version).toBe(3);
+      expect(envelope.version).toBe(4);
     });
   });
 });
@@ -1829,24 +1702,6 @@ describe('Save/load round-trip for mining/route fields', () => {
     expect(loaded.routes[0].legs).toHaveLength(1);
   });
 
-  it('old saves without mining fields default to empty arrays', async () => {
-    const state = createGameState();
-    // Manually delete the fields to simulate an old save
-    // @ts-expect-error - intentionally deleting required fields to simulate old save format
-    delete state.miningSites;
-    // @ts-expect-error - intentionally deleting required fields to simulate old save format
-    delete state.provenLegs;
-    // @ts-expect-error - intentionally deleting required fields to simulate old save format
-    delete state.routes;
-
-    await saveGame(state, 0, 'test');
-    const loaded = await loadGame(0);
-
-    expect(loaded.miningSites).toEqual([]);
-    expect(loaded.provenLegs).toEqual([]);
-    expect(loaded.routes).toEqual([]);
-  });
-
   it('per-module stored/storageCapacityKg/storageState survive save/load round-trip', async () => {
     const state = createGameState();
     state.miningSites.push({
@@ -1901,48 +1756,4 @@ describe('Save/load round-trip for mining/route fields', () => {
     expect(site.storage).toEqual({ IRON_ORE: 250, WATER_ICE: 100, OXYGEN: 400 });
   });
 
-  it('old saves with storage modules missing stored field default to empty object', async () => {
-    const state = createGameState();
-    state.miningSites.push({
-      id: 'site-compat',
-      name: 'Backwards Compat Site',
-      bodyId: 'MOON',
-      coordinates: { x: 300, y: 300 },
-      controlUnit: { partId: 'base-control-unit-mk1' },
-      modules: [{
-        id: 'old-silo',
-        partId: 'storage-silo-mk1',
-        type: MiningModuleType.STORAGE_SILO,
-        powerDraw: 2,
-        connections: [],
-        // No stored, storageCapacityKg, or storageState fields — simulating old save
-      }, {
-        id: 'old-drill',
-        partId: 'mining-drill-mk1',
-        type: MiningModuleType.MINING_DRILL,
-        powerDraw: 25,
-        connections: [],
-        // Non-storage module — should NOT get stored field
-      }],
-      storage: {},
-      powerGenerated: 100,
-      powerRequired: 27,
-      orbitalBuffer: {},
-    });
-
-    // Manually strip the stored field to simulate an old save format
-    delete state.miningSites[0].modules[0].stored;
-
-    await saveGame(state, 0, 'compat-test');
-    const loaded = await loadGame(0);
-
-    const site = loaded.miningSites[0];
-    const silo = site.modules.find(m => m.id === 'old-silo')!;
-    // Should have been defaulted to empty object by loadGame()
-    expect(silo.stored).toEqual({});
-
-    const drill = site.modules.find(m => m.id === 'old-drill')!;
-    // Non-storage modules should NOT get a stored field
-    expect(drill.stored).toBeUndefined();
-  });
 });

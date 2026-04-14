@@ -3,31 +3,31 @@
 ## Phase A: Review Fixes & Save Migration Removal
 
 ### TASK-001: Fix TypeScript errors in mapView.test.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/tests/mapView.test.ts`, three incomplete Hub mock objects at lines ~233, ~239, and ~577 cause `tsc --noEmit` to fail. Replace each inline `{ id: 'earth', facilities }` mock with a call to `makeEarthHub()` from `src/tests/_factories.ts`, passing any necessary overrides (e.g. specific facilities). Ensure the test assertions that reference hub fields still pass. Import `makeEarthHub` at the top of the file if not already imported.
 - **Verification**: `npx tsc --noEmit src/tests/mapView.test.ts && npx vitest run src/tests/mapView.test.ts`
 
 ### TASK-002: Fix hub money cost environment scaling
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/core/hubs.ts`, find `createHub()` where the initial Crew Hab construction project is created. The `moneyCost` field is set to `crewHabCost.moneyCost` without multiplying by `envMultiplier`. Change to `crewHabCost.moneyCost * envMultiplier`. Similarly, find `startFacilityUpgrade()` where `moneyCost` is `costDef.moneyCost * nextTier` — change to `costDef.moneyCost * nextTier * envMultiplier`. Then add/update unit tests in `src/tests/hubs-construction.test.ts`: (a) verify creating a hub on Mars (envMultiplier 1.3) has moneyCost = base * 1.3, (b) verify Moon (1.0) has moneyCost = base * 1.0, (c) verify facility upgrade money scales by both tier and environment.
 - **Verification**: `npx vitest run src/tests/hubs-construction.test.ts`
 
 ### TASK-003: Fix magic string and add tourist departure comment
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/core/hubTourists.ts`: (1) Add `import { FacilityId } from './constants.ts';` if not already imported. (2) Replace `hub.facilities['crew-hab']` (around line 24) with `hub.facilities[FacilityId.CREW_HAB]`. (3) At the tourist departure filter (around line 70, the `hub.tourists.filter(t => t.departurePeriod > state.currentPeriod)` line), add a comment above it: `// departurePeriod is the last period the tourist is present. Revenue is credited during this period, then the tourist departs at the start of the next period.`
 - **Verification**: `npx vitest run src/tests/hubs-tourists.test.ts && npx tsc --noEmit src/core/hubTourists.ts`
 
 ### TASK-004: Deduplicate body colors — CSS as single source of truth
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/ui/logistics/_routeMap.ts`, find the `BODY_COLORS` constant (or `getBodyColor()` function with hardcoded colors). Replace it with a function that reads CSS custom properties: `getComputedStyle(document.documentElement).getPropertyValue(\`--body-color-\${bodyId.toLowerCase()}\`).trim()`. If the value is empty (DOM not attached), fall back to `'#888'`. Verify that `src/ui/logistics.css` has `--body-color-*` custom properties for all bodies used in the game (sun, earth, moon, mars, ceres, jupiter, saturn, titan — and any others). Update all callers of the old function/constant within `_routeMap.ts` and `_routeBuilder.ts` to use the new helper. Export the helper so other modules can use it if needed.
 - **Verification**: `npx vitest run src/tests/logistics.test.ts 2>/dev/null; npx tsc --noEmit src/ui/logistics/_routeMap.ts`
 
 ### TASK-005: Remove all save migration functions
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/core/saveload.ts`: (1) Delete `migrateToHubs()` and every other `migrateTo*()` function. (2) Remove the migration chain/dispatcher that calls them during load (look for a function that checks save version and applies migrations sequentially). (3) In the load function, add a version check: if `save.version !== SAVE_VERSION`, return an error result (e.g. `{ success: false, error: 'incompatible' }`) instead of attempting migration. (4) Bump `SAVE_VERSION` by 1. Do NOT change the save/load function signatures — just change the internal logic to reject incompatible saves.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts 2>/dev/null; npx tsc --noEmit src/core/saveload.ts`

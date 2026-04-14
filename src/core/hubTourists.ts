@@ -11,6 +11,7 @@ import type { GameState } from './gameState.ts';
 import type { Hub, Tourist } from './hubTypes.ts';
 import { getCrewAtHub } from './hubCrew.ts';
 import { CREW_HAB_CAPACITY } from '../data/hubFacilities.ts';
+import { FacilityId } from './constants.ts';
 
 // ---------------------------------------------------------------------------
 // Capacity
@@ -21,7 +22,7 @@ import { CREW_HAB_CAPACITY } from '../data/hubFacilities.ts';
  * Returns 0 if the hub has no Crew Hab facility.
  */
 export function getHubCapacity(hub: Hub): number {
-  const crewHab = hub.facilities['crew-hab'];
+  const crewHab = hub.facilities[FacilityId.CREW_HAB];
   if (!crewHab) return 0;
   return CREW_HAB_CAPACITY[crewHab.tier] ?? 0;
 }
@@ -66,7 +67,8 @@ export function processTouristRevenue(state: GameState): void {
       state.money += tourist.revenue;
     }
 
-    // Remove departed tourists
+    // departurePeriod is the last period the tourist is present. Revenue is credited
+    // during this period, then the tourist departs at the start of the next period.
     hub.tourists = hub.tourists.filter(t => t.departurePeriod > state.currentPeriod);
   }
 }

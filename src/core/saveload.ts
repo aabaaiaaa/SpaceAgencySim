@@ -14,15 +14,13 @@
  */
 
 import { compressToUTF16, decompressFromUTF16 } from 'lz-string';
-import { AstronautStatus, EARTH_HUB_ID, FACILITY_DEFINITIONS, GameMode, DEFAULT_DIFFICULTY_SETTINGS, MiningModuleType } from './constants.ts';
+import { AstronautStatus, GameMode } from './constants.ts';
 import { crc32 } from './crc32.ts';
-import { loadSharedLibrary, saveSharedLibrary } from './designLibrary.ts';
 import { logger } from './logger.ts';
 import { idbSet, idbGet, idbDelete, isIdbAvailable } from './idbStorage.ts';
-import { recomputeSiteStorage } from './mining.ts';
 import { loadSettings, migrateSettings, saveSettings } from './settingsStore.ts';
 
-import type { GameState, RocketDesign } from './gameState.ts';
+import type { GameState } from './gameState.ts';
 import type { MalfunctionMode as MalfunctionModeType } from './constants.ts';
 
 // ---------------------------------------------------------------------------
@@ -39,7 +37,7 @@ const SAVE_KEY_PREFIX = 'spaceAgencySave_';
  * Current save format version. Bump this whenever the save envelope or
  * state schema changes in a way that requires new migration logic.
  */
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 // ---------------------------------------------------------------------------
 // Session Time Tracking
@@ -490,164 +488,19 @@ export async function loadGame(slotIndex: number): Promise<GameState> {
   }
 
   // Determine the save format version.  Pre-versioning saves have no version
-  // field; treat them as version 0 so all migrations run.
+  // field; treat them as version 0.
   const saveVersion = typeof envelope.version === 'number' ? envelope.version : 0;
 
-  if (saveVersion > SAVE_VERSION) {
-    logger.warn('save', `Save slot ${slotIndex} was created by a newer version`, { saveVersion, currentVersion: SAVE_VERSION });
+  // Version check — reject incompatible saves.
+  if (saveVersion !== SAVE_VERSION) {
+    throw new Error(
+      `Save slot ${slotIndex} is from an incompatible version (save: v${saveVersion}, current: v${SAVE_VERSION}).`,
+    );
   }
 
   // Reset the timer so play time accumulated before this load is not
   // double-counted on the next save.
   resetSessionTimer();
-
-  // Default savedDesigns for saves created before this feature existed.
-  envelope.state.savedDesigns ??= [];
-
-  // Default malfunctionMode for saves created before it moved to gameState.
-  envelope.state.malfunctionMode ??= 'normal';
-
-  // Migrate legacy savedDesigns: designs without a savePrivate flag are
-  // migrated to the shared library (cross-save) and removed from the
-  // per-slot array. Designs explicitly marked savePrivate stay in the slot.
-  const toMigrate: RocketDesign[] = [];
-  const toKeep: RocketDesign[] = [];
-  for (const d of envelope.state.savedDesigns) {
-    if (d.savePrivate === undefined || d.savePrivate === null) {
-      d.savePrivate = false;
-      toMigrate.push(d);
-    } else if (d.savePrivate) {
-      toKeep.push(d);
-    } else {
-      toMigrate.push(d);
-    }
-  }
-  if (toMigrate.length > 0) {
-    const shared = loadSharedLibrary();
-    const existingIds = new Set(shared.map((s) => s.id));
-    for (const d of toMigrate) {
-      if (!existingIds.has(d.id)) {
-        shared.push(d);
-      }
-    }
-    saveSharedLibrary(shared);
-  }
-  envelope.state.savedDesigns = toKeep;
-
-  // Default facilities for saves created before the construction system.
-  if (!envelope.state.facilities || typeof envelope.state.facilities !== 'object') {
-    envelope.state.facilities = Object.fromEntries(
-      FACILITY_DEFINITIONS
-        .filter((f) => f.starter)
-        .map((f) => [f.id, { built: true, tier: 1 }]),
-    );
-  }
-  envelope.state.tutorialMode ??= true;
-
-  // Default gameMode for saves created before the game mode system.
-  if (!envelope.state.gameMode) {
-    envelope.state.gameMode = envelope.state.tutorialMode ? GameMode.TUTORIAL : GameMode.FREEPLAY;
-  }
-  envelope.state.sandboxSettings ??= null;
-
-  // Default contracts for saves created before the contract system.
-  if (!envelope.state.contracts || typeof envelope.state.contracts !== 'object') {
-    envelope.state.contracts = { board: [], active: [], completed: [], failed: [] };
-  }
-  envelope.state.reputation ??= 50;
-
-  // Default science tracking for saves created before the instrument system.
-  envelope.state.sciencePoints ??= 0;
-  envelope.state.scienceLog ??= [];
-
-  // Default tech tree state for saves created before the tech tree system.
-  if (!envelope.state.techTree || typeof envelope.state.techTree !== 'object') {
-    envelope.state.techTree = { researched: [], unlockedInstruments: [] };
-  }
-  envelope.state.techTree.researched ??= [];
-  envelope.state.techTree.unlockedInstruments ??= [];
-
-  // Default part inventory for saves created before the reusability system.
-  envelope.state.partInventory ??= [];
-
-  // Default achievements for saves created before the achievement system.
-  envelope.state.achievements ??= [];
-
-  // Default challenges for saves created before the challenge system.
-  if (!envelope.state.challenges || typeof envelope.state.challenges !== 'object') {
-    envelope.state.challenges = { active: null, results: {} };
-  }
-  envelope.state.challenges.results ??= {};
-
-  // Default custom challenges for saves created before the custom challenge system.
-  if (!Array.isArray(envelope.state.customChallenges)) {
-    envelope.state.customChallenges = [];
-  }
-
-  // Default difficulty settings for saves created before the settings system.
-  if (!envelope.state.difficultySettings || typeof envelope.state.difficultySettings !== 'object') {
-    envelope.state.difficultySettings = { ...DEFAULT_DIFFICULTY_SETTINGS };
-  }
-  envelope.state.difficultySettings.malfunctionFrequency ??= DEFAULT_DIFFICULTY_SETTINGS.malfunctionFrequency;
-  envelope.state.difficultySettings.weatherSeverity      ??= DEFAULT_DIFFICULTY_SETTINGS.weatherSeverity;
-  envelope.state.difficultySettings.financialPressure    ??= DEFAULT_DIFFICULTY_SETTINGS.financialPressure;
-  envelope.state.difficultySettings.injuryDuration       ??= DEFAULT_DIFFICULTY_SETTINGS.injuryDuration;
-
-  // Default welcomeShown for saves created before the welcome modal.
-  // Existing saves should not see the welcome modal, so default to true.
-  envelope.state.welcomeShown ??= true;
-
-  // Default autoSaveEnabled for saves created before the auto-save system.
-  envelope.state.autoSaveEnabled ??= true;
-
-  // Default debugMode for saves created before the debug mode toggle.
-  envelope.state.debugMode ??= false;
-
-  // Remove obsolete useWorkerPhysics — worker physics is now the only mode.
-  delete (envelope.state as Record<string, unknown>).useWorkerPhysics;
-
-  // Default showPerfDashboard for saves created before the perf dashboard feature.
-  envelope.state.showPerfDashboard ??= false;
-
-  // Remove missions 002 and 003 (consolidated into mission-001 in iteration 6).
-  const removedMissionIds = new Set(['mission-002', 'mission-003']);
-  if (envelope.state.missions) {
-    for (const bucket of ['available', 'accepted', 'completed'] as const) {
-      if (Array.isArray(envelope.state.missions[bucket])) {
-        envelope.state.missions[bucket] = envelope.state.missions[bucket].filter(
-          (m: { id: string }) => !removedMissionIds.has(m.id),
-        );
-      }
-    }
-  }
-
-  // Default horizontalVelocity on in-progress flights.
-  if (envelope.state.flightState && envelope.state.flightState.horizontalVelocity == null) {
-    envelope.state.flightState.horizontalVelocity = 0;
-  }
-
-  // Default mining/route fields for saves created before the resource system.
-  envelope.state.miningSites ??= [];
-  envelope.state.provenLegs ??= [];
-  envelope.state.routes ??= [];
-
-  // Backfill per-module storage fields for saves created before per-module storage.
-  const STORAGE_MODULE_TYPES = new Set([
-    MiningModuleType.STORAGE_SILO,
-    MiningModuleType.PRESSURE_VESSEL,
-    MiningModuleType.FLUID_TANK,
-  ]);
-  for (const site of envelope.state.miningSites) {
-    for (const mod of site.modules ?? []) {
-      if (STORAGE_MODULE_TYPES.has(mod.type) && mod.stored == null) {
-        mod.stored = {};
-      }
-    }
-    recomputeSiteStorage(site);
-  }
-
-  // Migrate legacy saves to the hub system (Earth HQ from facilities/inventory).
-  migrateToHubs(envelope.state);
 
   // Re-link state.facilities to the active hub's facilities so they share
   // the same object reference (JSON round-tripping breaks this link).
@@ -667,45 +520,6 @@ export async function loadGame(slotIndex: number): Promise<GameState> {
   applyPersistedSettings(envelope.state as GameState);
 
   return envelope.state as GameState;
-}
-
-/**
- * Migrates a raw save state to include the hubs system.
- *
- * For legacy saves (pre-hub), creates an Earth HQ hub from the save's existing
- * `facilities` and `partInventory` fields. Also defaults `stationedHubId` and
- * `transitUntil` on all crew members.
- *
- * Idempotent: if `state.hubs` already exists and is an array, this is a no-op.
- *
- * @param state - The raw (any-typed) state object from the save envelope.
- */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function migrateToHubs(state: any): void {
-  if (Array.isArray(state.hubs)) return;
-
-  state.hubs = [{
-    id: EARTH_HUB_ID,
-    name: 'Earth HQ',
-    type: 'surface',
-    bodyId: 'EARTH',
-    coordinates: { x: 0, y: 0 },
-    facilities: state.facilities ? { ...state.facilities } : {},
-    tourists: [],
-    partInventory: state.partInventory ? [...state.partInventory] : [],
-    constructionQueue: [],
-    maintenanceCost: 0,
-    established: 0,
-    online: true,
-  }];
-  state.activeHubId = EARTH_HUB_ID;
-
-  if (Array.isArray(state.crew)) {
-    for (const c of state.crew) {
-      c.stationedHubId ??= EARTH_HUB_ID;
-      c.transitUntil ??= null;
-    }
-  }
 }
 
 /**

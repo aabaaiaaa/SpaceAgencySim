@@ -22,11 +22,12 @@ import {
   isDeepSpaceCommsAvailable,
   getAllowedMapZooms,
 } from '../core/mapView.ts';
-import { BODY_RADIUS, ALTITUDE_BANDS, FlightPhase } from '../core/constants.ts';
+import { BODY_RADIUS, ALTITUDE_BANDS, FlightPhase, EARTH_HUB_ID } from '../core/constants.ts';
 import { computeOrbitalElements, circularOrbitVelocity } from '../core/orbit.ts';
 import { BODY_ORBIT_RADIUS, SOI_RADIUS } from '../core/manoeuvre.ts';
-import type { OrbitalElements, TransferState, GameState, FacilityState } from '../core/gameState.ts';
+import type { OrbitalElements, TransferState, GameState } from '../core/gameState.ts';
 import type { PhysicsState } from '../core/physics.ts';
+import { makeEarthHub } from './_factories.ts';
 
 type MockPs = Pick<PhysicsState, 'posX' | 'posY' | 'velX' | 'velY' | 'angle'>;
 
@@ -229,18 +230,17 @@ describe('generateOrbitPredictions', () => {
 
 describe('isMapViewAvailable', () => {
   it('returns false when tracking station is not built', () => {
-    const facilities = {} as Record<string, FacilityState>;
-    const state = { orbitalObjects: [], facilities, hubs: [{ id: 'earth', facilities }], activeHubId: 'earth' } as Partial<GameState> as GameState;
+    const hub = makeEarthHub({ facilities: {} });
+    const state = { orbitalObjects: [], hubs: [hub], activeHubId: EARTH_HUB_ID } as Partial<GameState> as GameState;
     expect(isMapViewAvailable(state)).toBe(false);
   });
 
   it('returns true when tracking station is built', () => {
-    const facilities = { 'tracking-station': { built: true, tier: 1 } as FacilityState };
+    const hub = makeEarthHub({ facilities: { 'tracking-station': { built: true, tier: 1 } } });
     const state = {
       orbitalObjects: [],
-      facilities,
-      hubs: [{ id: 'earth', facilities }],
-      activeHubId: 'earth',
+      hubs: [hub],
+      activeHubId: EARTH_HUB_ID,
     } as Partial<GameState> as GameState;
     expect(isMapViewAvailable(state)).toBe(true);
   });
@@ -571,14 +571,13 @@ describe('getMapTransferTargets', () => {
 
 describe('Tracking Station tier-based features', () => {
   function makeState(tier: number): GameState {
-    const facilities = tier === 0
-      ? {} as Record<string, FacilityState>
-      : { 'tracking-station': { built: true, tier } as FacilityState };
+    const hub = tier === 0
+      ? makeEarthHub({ facilities: {} })
+      : makeEarthHub({ facilities: { 'tracking-station': { built: true, tier } } });
     return {
       orbitalObjects: [],
-      facilities,
-      hubs: [{ id: 'earth', facilities }],
-      activeHubId: 'earth',
+      hubs: [hub],
+      activeHubId: EARTH_HUB_ID,
     } as Partial<GameState> as GameState;
   }
 
