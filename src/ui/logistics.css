@@ -148,11 +148,17 @@
   padding: var(--panel-padding);
 }
 
+.logistics-route-map-container {
+  overflow-x: auto;
+  overflow-y: hidden;
+  margin-bottom: var(--space-lg);
+}
+
 .logistics-route-map {
   background: #1a1a2e;
   border: 1px solid #333;
   border-radius: 4px;
-  margin-bottom: var(--space-lg);
+  display: block;
 }
 
 .logistics-routes-table {

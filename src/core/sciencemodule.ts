@@ -37,10 +37,11 @@ import { getPartById, ActivationBehaviour } from '../data/parts.ts';
 import { getInstrumentById, isInstrumentValidForBiome } from '../data/instruments.ts';
 import { PartType, ScienceDataType, DIMINISHING_RETURNS,
          ANALYSIS_TRANSMIT_YIELD_MIN, ANALYSIS_TRANSMIT_YIELD_MAX,
-         FacilityId, RD_LAB_SCIENCE_BONUS } from './constants.ts';
+         FacilityId, RD_LAB_SCIENCE_BONUS, EARTH_HUB_ID } from './constants.ts';
 import { getBiome, getScienceMultiplier } from './biomes.ts';
 // hasMalfunction not used directly — inline check avoids PhysicsStateWithMalfunctions type mismatch
 import { MalfunctionType } from './constants.ts';
+import { getHub } from './hubs.ts';
 
 import type { GameState, ScienceLogEntry, FlightEvent } from './gameState.ts';
 import type { ScienceModuleStateEntry } from './physics.ts';
@@ -733,7 +734,8 @@ export function calculateYield(
  */
 function _getRdLabScienceBonus(gameState: GameState | null): number {
   if (!gameState) return 0;
-  const fac = gameState.facilities[FacilityId.RD_LAB];
+  const earthHub = getHub(gameState, EARTH_HUB_ID);
+  const fac = earthHub?.facilities[FacilityId.RD_LAB];
   if (!fac?.built) return 0;
   const tier: number = fac.tier ?? 1;
   return (RD_LAB_SCIENCE_BONUS as Record<number, number>)[tier] ?? 0;

@@ -14,7 +14,7 @@ import {
   getLogisticsState,
   triggerRender,
 } from './_state.ts';
-import { computeSchematicLayout } from './_schematicLayout.ts';
+import { computeSchematicLayout, getSchematicWidth } from './_schematicLayout.ts';
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -46,6 +46,35 @@ export function formatLocation(loc: RouteLocation): string {
 }
 
 // ---------------------------------------------------------------------------
+// Bezier curve helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Compute a quadratic Bezier path string between two points.
+ * The control point is offset perpendicular to the line joining the
+ * endpoints, alternating direction based on legIndex for visual clarity.
+ */
+function bezierPath(
+  x1: number, y1: number,
+  x2: number, y2: number,
+  legIndex: number,
+): string {
+  const mx = (x1 + x2) / 2;
+  const my = (y1 + y2) / 2;
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist === 0) return `M ${x1},${y1} L ${x2},${y2}`;
+  const px = -dy / dist;
+  const py = dx / dist;
+  const offset = 0.18 * dist;
+  const sign = legIndex % 2 === 0 ? 1 : -1;
+  const cx = mx + px * offset * sign;
+  const cy = my + py * offset * sign;
+  return `M ${x1},${y1} Q ${cx},${cy} ${x2},${y2}`;
+}
+
+// ---------------------------------------------------------------------------
 // Route Map SVG
 // ---------------------------------------------------------------------------
 
@@ -60,9 +89,13 @@ export function renderRouteMap(): SVGSVGElement {
   const svgNS = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(svgNS, 'svg');
   svg.setAttribute('class', 'logistics-route-map');
-  svg.setAttribute('viewBox', '0 0 800 200');
-  svg.setAttribute('width', '100%');
-  svg.setAttribute('height', '200');
+
+  // Dynamic viewBox based on computed layout width
+  const computedWidth = Math.max(getSchematicWidth(layout), 800);
+  const svgHeight = 220;
+  svg.setAttribute('viewBox', `0 0 ${computedWidth} ${svgHeight}`);
+  svg.setAttribute('width', `${computedWidth}px`);
+  svg.setAttribute('height', `${svgHeight}px`);
 
   // Determine which bodies to show
   const visibleBodies = new Set<string>();
@@ -125,19 +158,19 @@ export function renderRouteMap(): SVGSVGElement {
     svg.appendChild(label);
   }
 
-  // --- Proven leg dashed lines ---
+  // --- Proven leg Bezier curves ---
   if (ls.state) {
+    let provenIndex = 0;
     for (const leg of ls.state.provenLegs) {
       const originPos = layout.get(leg.origin.bodyId);
       const destPos = layout.get(leg.destination.bodyId);
       if (!originPos || !destPos) continue;
 
-      const line = document.createElementNS(svgNS, 'line');
-      line.setAttribute('x1', String(originPos.x));
-      line.setAttribute('y1', String(originPos.y));
-      line.setAttribute('x2', String(destPos.x));
-      line.setAttribute('y2', String(destPos.y));
-      line.setAttribute('class', 'proven-leg-line');
+      const path = document.createElementNS(svgNS, 'path');
+      path.setAttribute('d', bezierPath(originPos.x, originPos.y, destPos.x, destPos.y, provenIndex));
+      path.setAttribute('fill', 'none');
+      path.setAttribute('id', `route-leg-proven-${provenIndex}`);
+      path.setAttribute('class', 'proven-leg-line');
 
       const isOutbound = ls.builderMode && ls.builderCurrentBodyId != null
         && leg.origin.bodyId === ls.builderCurrentBodyId;
@@ -145,14 +178,14 @@ export function renderRouteMap(): SVGSVGElement {
       if (ls.builderMode && ls.builderCurrentBodyId != null) {
         if (isOutbound) {
           // Highlight outbound legs: solid line, bright color, clickable
-          line.setAttribute('stroke', '#64B4FF');
-          line.setAttribute('stroke-width', '2.5');
+          path.setAttribute('stroke', '#64B4FF');
+          path.setAttribute('stroke-width', '2.5');
           // No dash -- solid line to distinguish from non-outbound
-          line.style.cursor = 'pointer';
+          path.style.cursor = 'pointer';
 
           const legId = leg.id;
           const destBodyId = leg.destination.bodyId;
-          line.addEventListener('click', () => {
+          path.addEventListener('click', () => {
             const currentLs = getLogisticsState();
             currentLs.builderLegs.push(legId);
             currentLs.builderCurrentBodyId = destBodyId;
@@ -160,56 +193,59 @@ export function renderRouteMap(): SVGSVGElement {
           });
         } else {
           // Fade non-outbound legs
-          line.setAttribute('stroke', '#888');
-          line.setAttribute('stroke-width', '1.5');
-          line.setAttribute('stroke-dasharray', '6 4');
-          line.setAttribute('opacity', '0.2');
-          line.style.cursor = 'default';
+          path.setAttribute('stroke', '#888');
+          path.setAttribute('stroke-width', '1.5');
+          path.setAttribute('stroke-dasharray', '6 4');
+          path.setAttribute('opacity', '0.2');
+          path.style.cursor = 'default';
         }
       } else {
         // Normal (non-builder) mode
-        line.setAttribute('stroke', '#888');
-        line.setAttribute('stroke-width', '1.5');
-        line.setAttribute('stroke-dasharray', '6 4');
-        line.style.cursor = 'pointer';
+        path.setAttribute('stroke', '#888');
+        path.setAttribute('stroke-width', '1.5');
+        path.setAttribute('stroke-dasharray', '6 4');
+        path.style.cursor = 'pointer';
       }
 
       // Tooltip on hover
       const titleEl = document.createElementNS(svgNS, 'title');
       titleEl.textContent = `Craft: ${leg.craftDesignId}\nCapacity: ${leg.cargoCapacityKg} kg\nCost/Run: $${leg.costPerRun.toLocaleString()}`;
-      line.appendChild(titleEl);
+      path.appendChild(titleEl);
 
-      svg.appendChild(line);
+      svg.appendChild(path);
+      provenIndex++;
     }
 
-    // --- Active route solid lines ---
+    // --- Active route Bezier curves ---
+    let activeLegCounter = 0;
     for (const route of ls.state.routes) {
+      const routeIndex = ls.state.routes.indexOf(route);
       for (const leg of route.legs) {
         const originPos = layout.get(leg.origin.bodyId);
         const destPos = layout.get(leg.destination.bodyId);
         if (!originPos || !destPos) continue;
 
-        const line = document.createElementNS(svgNS, 'line');
-        line.setAttribute('x1', String(originPos.x));
-        line.setAttribute('y1', String(originPos.y));
-        line.setAttribute('x2', String(destPos.x));
-        line.setAttribute('y2', String(destPos.y));
-        line.setAttribute('stroke-width', '2.5');
-        line.setAttribute('class', `route-line route-${route.status}`);
-        line.style.cursor = 'pointer';
+        const legIndex = route.legs.indexOf(leg);
+        const path = document.createElementNS(svgNS, 'path');
+        path.setAttribute('d', bezierPath(originPos.x, originPos.y, destPos.x, destPos.y, activeLegCounter));
+        path.setAttribute('fill', 'none');
+        path.setAttribute('id', `route-leg-active-${routeIndex}-${legIndex}`);
+        path.setAttribute('stroke-width', '2.5');
+        path.setAttribute('class', `route-line route-${route.status}`);
+        path.style.cursor = 'pointer';
 
         // Color by status
         if (route.status === 'broken') {
-          line.setAttribute('stroke', '#CC3333');
+          path.setAttribute('stroke', '#CC3333');
         } else if (route.status === 'paused') {
-          line.setAttribute('stroke', 'rgba(100, 180, 255, 0.4)');
+          path.setAttribute('stroke', 'rgba(100, 180, 255, 0.4)');
         } else {
-          line.setAttribute('stroke', '#64B4FF');
+          path.setAttribute('stroke', '#64B4FF');
         }
 
         // Click to highlight route in table
         const routeId = route.id;
-        line.addEventListener('click', () => {
+        path.addEventListener('click', () => {
           const overlay = getLogisticsState().overlay;
           const tableRow = overlay?.querySelector(`tr[data-route-id="${routeId}"]`);
           if (tableRow) {
@@ -220,7 +256,8 @@ export function renderRouteMap(): SVGSVGElement {
           }
         });
 
-        svg.appendChild(line);
+        svg.appendChild(path);
+        activeLegCounter++;
       }
     }
   }

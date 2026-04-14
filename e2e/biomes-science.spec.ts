@@ -1343,7 +1343,8 @@ test.describe('Tech tree system', () => {
       if ((state.money ?? 0) < fundsCost) return { success: false, reason: 'not enough funds' };
 
       // Check R&D Lab tier allows tier 2 (RD_TIER_MAX_TECH[1] = 2).
-      const rdLabTier: number = state.facilities?.['rd-lab']?.tier ?? 0;
+      const earthHub = state.hubs?.[0];
+      const rdLabTier: number = earthHub?.facilities?.['rd-lab']?.tier ?? 0;
       const maxTech: Record<number, number> = { 1: 2, 2: 4, 3: 5 };
       if (2 > (maxTech[rdLabTier] ?? 0)) return { success: false, reason: 'R&D Lab tier too low' };
 

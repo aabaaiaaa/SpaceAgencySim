@@ -714,6 +714,7 @@ export interface RouteLocation {
   bodyId: string;
   locationType: 'surface' | 'orbit';
   altitude?: number;
+  hubId: string | null;
 }
 
 export interface RouteLeg {

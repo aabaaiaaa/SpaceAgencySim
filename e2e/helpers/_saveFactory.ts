@@ -89,6 +89,8 @@ export interface SaveEnvelopeParams {
   challenges?: ChallengesState;
   customChallenges?: Record<string, unknown>[];
   fieldCraft?: Record<string, unknown>[];
+  /** Convenience shorthand: sets the Earth hub's facilities without building a full `hubs` array. Ignored when `hubs` is provided. */
+  facilities?: Record<string, { built: boolean; tier: number }>;
   hubs?: HubSave[];
   activeHubId?: string;
   autoSaveEnabled?: boolean;
@@ -199,14 +201,17 @@ export function buildSaveEnvelope(params: SaveEnvelopeParams = {}): SaveEnvelope
   } = params;
 
   // Default hubs — Earth HQ with starter facilities.
-  // Callers who need custom facilities should pass a full `hubs` array.
+  // When `facilities` is provided at the top level, it overrides the Earth hub's
+  // facilities (convenience shorthand so callers don't need to build a full `hubs` array).
+  // When `hubs` is provided explicitly, it takes precedence and `facilities` is ignored.
+  const earthFacilities = params.facilities ?? STARTER_FACILITIES;
   const hubs = params.hubs ?? [{
     id: 'earth',
     name: 'Earth HQ',
     type: 'surface' as const,
     bodyId: 'EARTH',
     coordinates: { x: 0, y: 0 },
-    facilities: { ...STARTER_FACILITIES },
+    facilities: { ...earthFacilities },
     tourists: [],
     partInventory: [],
     constructionQueue: [],

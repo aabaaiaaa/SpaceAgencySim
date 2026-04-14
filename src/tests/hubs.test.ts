@@ -24,6 +24,7 @@ import {
   getSurfaceHubsForRecovery,
   findNearbyOrbitalHub,
   generateHubName,
+  renameHub,
 } from '../core/hubs.ts';
 import { HUB_NAME_POOL } from '../data/hubNames.ts';
 import {
@@ -541,5 +542,101 @@ describe('generateHubName', () => {
 
     const name = generateHubName(state, 'orbital');
     expect(name).toMatch(/^Hub-\d+ Station$/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hub name uniqueness — createHub
+// ---------------------------------------------------------------------------
+
+describe('Hub name uniqueness — createHub', () => {
+  let state: GameState;
+  beforeEach(() => { state = createGameState(); });
+
+  it('rejects duplicate name on create', () => {
+    createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    expect(() => createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MARS' }))
+      .toThrow('Hub name already exists: Moon Base');
+  });
+
+  it('rejects duplicate name case-insensitively on create', () => {
+    createHub(state, { name: 'Alpha', type: 'surface', bodyId: 'MOON' });
+    expect(() => createHub(state, { name: 'ALPHA', type: 'orbital', bodyId: 'MARS' }))
+      .toThrow('Hub name already exists: ALPHA');
+  });
+
+  it('rejects name matching existing Earth hub', () => {
+    // Earth hub is named "Earth HQ"
+    expect(() => createHub(state, { name: 'earth hq', type: 'surface', bodyId: 'MOON' }))
+      .toThrow('Hub name already exists: earth hq');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Hub renaming — renameHub
+// ---------------------------------------------------------------------------
+
+describe('Hub renaming — renameHub', () => {
+  let state: GameState;
+  beforeEach(() => { state = createGameState(); });
+
+  it('valid rename succeeds', () => {
+    const hub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    const result = renameHub(state, hub.id, 'Lunar Outpost');
+    expect(result).toEqual({ success: true });
+    expect(hub.name).toBe('Lunar Outpost');
+  });
+
+  it('Earth hub can be renamed', () => {
+    const earthHub = state.hubs[0];
+    const result = renameHub(state, earthHub.id, 'Home Base');
+    expect(result).toEqual({ success: true });
+    expect(earthHub.name).toBe('Home Base');
+  });
+
+  it('rejects empty name', () => {
+    const hub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    const result = renameHub(state, hub.id, '   ');
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Hub name cannot be empty');
+    expect(hub.name).toBe('Moon Base'); // unchanged
+  });
+
+  it('rejects name over 40 characters', () => {
+    const hub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    const longName = 'A'.repeat(41);
+    const result = renameHub(state, hub.id, longName);
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Hub name cannot exceed 40 characters');
+    expect(hub.name).toBe('Moon Base'); // unchanged
+  });
+
+  it('rejects duplicate name on rename', () => {
+    createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    const hub2 = createHub(state, { name: 'Mars Base', type: 'surface', bodyId: 'MARS' });
+    const result = renameHub(state, hub2.id, 'Moon Base');
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Hub name already exists: Moon Base');
+    expect(hub2.name).toBe('Mars Base'); // unchanged
+  });
+
+  it('rejects duplicate name case-insensitively on rename', () => {
+    createHub(state, { name: 'Alpha', type: 'surface', bodyId: 'MOON' });
+    const hub2 = createHub(state, { name: 'Beta', type: 'surface', bodyId: 'MARS' });
+    const result = renameHub(state, hub2.id, 'ALPHA');
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Hub name already exists');
+  });
+
+  it('allows renaming to the same name (own name is not a conflict)', () => {
+    const hub = createHub(state, { name: 'Moon Base', type: 'surface', bodyId: 'MOON' });
+    const result = renameHub(state, hub.id, 'Moon Base');
+    expect(result).toEqual({ success: true });
+  });
+
+  it('returns error for non-existent hub ID', () => {
+    const result = renameHub(state, 'nonexistent-hub', 'New Name');
+    expect(result.success).toBe(false);
+    expect(result.error).toBe('Hub not found');
   });
 });

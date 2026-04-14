@@ -79,6 +79,13 @@ export function createHub(
     biomeId?: string;
   },
 ): Hub {
+  // Validate name uniqueness (case-insensitive)
+  const nameLower = options.name.toLowerCase();
+  const duplicate = state.hubs.find(h => h.name.toLowerCase() === nameLower);
+  if (duplicate) {
+    throw new Error(`Hub name already exists: ${options.name}`);
+  }
+
   const id = 'hub-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
 
   // Look up Crew Hab cost definition
@@ -191,6 +198,49 @@ export function generateHubName(state: GameState, hubType: 'surface' | 'orbital'
   // Pick a random name from available pool
   const baseName = available[Math.floor(Math.random() * available.length)];
   return baseName + suffix;
+}
+
+// ---------------------------------------------------------------------------
+// Hub Renaming
+// ---------------------------------------------------------------------------
+
+/**
+ * Renames a hub after validating the new name.
+ * Returns `{ success: true }` on success, or `{ success: false, error }` on failure.
+ *
+ * Validation rules:
+ * - Name must be non-empty (after trimming)
+ * - Name must be 40 characters or fewer
+ * - Name must be unique among all hubs (case-insensitive), excluding the hub being renamed
+ */
+export function renameHub(
+  state: GameState,
+  hubId: string,
+  newName: string,
+): { success: boolean; error?: string } {
+  const hub = state.hubs.find(h => h.id === hubId);
+  if (!hub) {
+    return { success: false, error: 'Hub not found' };
+  }
+
+  const trimmed = newName.trim();
+  if (trimmed.length === 0) {
+    return { success: false, error: 'Hub name cannot be empty' };
+  }
+  if (trimmed.length > 40) {
+    return { success: false, error: 'Hub name cannot exceed 40 characters' };
+  }
+
+  const nameLower = trimmed.toLowerCase();
+  const duplicate = state.hubs.find(
+    h => h.id !== hubId && h.name.toLowerCase() === nameLower,
+  );
+  if (duplicate) {
+    return { success: false, error: `Hub name already exists: ${trimmed}` };
+  }
+
+  hub.name = trimmed;
+  return { success: true };
 }
 
 // ---------------------------------------------------------------------------

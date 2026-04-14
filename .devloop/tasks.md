@@ -91,7 +91,7 @@
 - **Verification**: `npx playwright test e2e/hub.spec.ts --reporter=line 2>/dev/null`
 
 ### TASK-015: Remove legacy Earth hub special cases
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013, TASK-014
 - **Description**: Final audit pass. Grep the entire `src/` and `e2e/` directories for: (1) `state\.facilities` — should have zero matches. (2) Any code paths that branch on `EARTH_HUB_ID` to choose between `state.facilities` and `hub.facilities` — these branches should be simplified to just use hub facilities. Earth-specific *gameplay* rules (zero maintenance, Earth-only facilities, no import tax) must remain. Only remove *code path duality*.
 - **Verification**: `grep -r "state\.facilities" src/ e2e/ --include="*.ts" --include="*.js" | grep -v node_modules | grep -v ".test." | wc -l` should output 0 (excluding test files which were handled in TASK-013). Then: `npx tsc --noEmit && npx vitest run src/tests/ --reporter=verbose 2>&1 | tail -5`
@@ -113,7 +113,7 @@
 - **Verification**: `npx vitest run src/tests/hubs.test.ts`
 
 ### TASK-018: Hub name uniqueness validation
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-017
 - **Description**: In `src/core/hubs.ts`: (1) In `createHub()`, add validation that the proposed name doesn't match any existing `state.hubs[].name` (case-insensitive comparison using `.toLowerCase()`). If duplicate, throw an error or return a result indicating failure. (2) Add new function `renameHub(state: GameState, hubId: string, newName: string): { success: boolean; error?: string }`. Validates: non-empty, max 40 chars, case-insensitive uniqueness. Updates `hub.name` on success. Earth hub can be renamed. Write unit tests: duplicate name rejected on create, duplicate name rejected on rename, case-insensitive check works, valid rename succeeds, Earth rename works.
 - **Verification**: `npx vitest run src/tests/hubs.test.ts`
@@ -193,13 +193,13 @@
 - **Verification**: `npx tsc --noEmit src/ui/logistics/_routeMap.ts`
 
 ### TASK-030: Dynamic SVG viewBox and scrolling
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-027
 - **Description**: In `_routeMap.ts`, update the SVG element creation to use a dynamic viewBox. The width comes from the layout's computed total width (from `computeSchematicLayout()`). Height stays ~220. Set the SVG viewBox attribute to `"0 0 {width} 220"`. In `src/ui/logistics.css` (or inline), ensure the SVG container has `overflow-x: auto` if the SVG width exceeds the panel width, and `overflow-y: hidden`. The SVG element itself should have `width: {computedWidth}px` (not 100%) and `height: 220px` so scrolling works correctly.
 - **Verification**: `npx tsc --noEmit src/ui/logistics/_routeMap.ts`
 
 ### TASK-031: SVG route curves — replace straight lines with Bezier
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-027
 - **Description**: In `_routeMap.ts`, update the route and proven leg rendering. Replace `<line>` elements with `<path>` elements using quadratic Bezier curves. For each route leg or proven leg: (1) Get origin and destination positions from the layout. (2) Compute midpoint. (3) Compute perpendicular offset direction (rotate line direction 90 degrees). (4) Control point = midpoint + perpendicular * 0.18 * distance. (5) Alternate offset direction per leg index (even legs curve in one direction, odd in the other) to prevent overlapping arcs. (6) Create `<path d="M x1,y1 Q cx,cy x2,y2">` with the same stroke styles as before (dashed for proven legs, solid for active routes, color by status). Give each path a unique ID (e.g. `route-leg-{index}`) for flow dot animation reference.
 - **Verification**: `npx tsc --noEmit src/ui/logistics/_routeMap.ts`
@@ -215,7 +215,7 @@
 ## Phase F: Hub-to-Hub Routing
 
 ### TASK-033: Add hubId to RouteLocation interface
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: In `src/core/gameState.ts`, add `hubId: string | null` to the `RouteLocation` interface. This field identifies the specific hub at the route location, or null if no hub is associated. Update the `ProvenLeg` and `RouteLeg` types if they have their own location fields (they use `RouteLocation`). This will cause TypeScript errors where RouteLocation objects are created without `hubId` — subsequent tasks fix those.
 - **Verification**: `npx tsc --noEmit src/core/gameState.ts`

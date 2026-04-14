@@ -33,8 +33,11 @@ export function renderRoutesTab(): void {
   const wrapper = document.createElement('div');
   wrapper.className = 'logistics-routes-content';
 
-  // --- Route map ---
-  wrapper.appendChild(renderRouteMap());
+  // --- Route map (in scrollable container) ---
+  const mapContainer = document.createElement('div');
+  mapContainer.className = 'logistics-route-map-container';
+  mapContainer.appendChild(renderRouteMap());
+  wrapper.appendChild(mapContainer);
 
   // --- Create Route button (always visible below the map) ---
   if (!ls.builderMode) {
