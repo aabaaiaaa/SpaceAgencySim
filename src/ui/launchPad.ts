@@ -33,7 +33,7 @@ import { getActiveCrew } from '../core/crew.ts';
 import { getFacilityTier } from '../core/construction.ts';
 import { getTotalMass } from '../core/rocketvalidator.ts';
 import { createFlightState } from '../core/gameState.ts';
-import { startFlightScene } from './flightController.ts';
+import { startFlightScene } from './flightController/_init.ts';
 import { showReturnResultsOverlay } from './hub.ts';
 import { buildRocketCard } from './rocketCardUtil.ts';
 import './launchPad.css';

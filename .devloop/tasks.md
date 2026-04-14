@@ -67,7 +67,7 @@
 - **Verification**: `npx vitest run src/tests/routes.test.ts` — all new chaining tests pass.
 
 ### TASK-011: Final typecheck, lint, and smoke test verification
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-004, TASK-006, TASK-007, TASK-008a, TASK-010
 - **Description**: Run the full verification suite to confirm all iteration 13 changes integrate cleanly. Fix any issues found.
 - **Verification**: `npx tsc --noEmit` (0 errors), `npm run lint` (0 errors), `npm run build` (no warnings), `npm run test:smoke:unit` (all pass).
