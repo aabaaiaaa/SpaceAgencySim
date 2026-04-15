@@ -1,252 +1,266 @@
-# Iteration 15 — Bug Fixes, Stabilization & Test Coverage
+# Iteration 16 — IndexedDB Migration, Cleanup & Dependency Upgrades
 
 **Date:** 2026-04-15
-**Scope:** Overflow save bug fix, E2E stabilization, notification guard, helper extraction, import cleanup
-**Builds on:** Iteration 14 (deterministic IDs, dynamic save slots, shared map geometry)
-**Review driving this iteration:** `.devloop/archive/iteration-14/review.md`
+**Scope:** Full IndexedDB migration (drop localStorage), remove backward-compat code, dependency major version jumps, bug fixes, notification queue, CLAUDE.md corrections, coverage exclusion maintenance
+**Builds on:** Iteration 15 (overflow save fix, notification guard, helper extraction, import cleanup)
+**Review driving this iteration:** `.devloop/archive/iteration-15/review.md`
 
 ---
 
-## 1. Fix Overflow Save Load/Export (BUG-1)
+## 1. Dependency Major Version Jumps (First)
 
-### The Bug
+These must be completed before all other tasks in this iteration so that everything is built and tested against the new versions. If breaking changes surface, they are resolved here rather than discovered mid-iteration.
 
-The dynamic save slot UI (iteration 14) correctly discovers and renders overflow saves (slots 5-99 and `spaceAgencySave_auto`), but the Load and Export actions fail for these saves. `loadGame()` and `exportSave()` in `saveload.ts` call `assertValidSlot(slotIndex)` which rejects any slot outside 0-4. Overflow save cards use `slotIndex = -1` with a separate `storageKey` field, but the storage key is never passed through to the core functions.
+### 1a. Vite 6 → 8
 
-Delete already works — `deleteSave()` accepts an optional `storageKey` parameter and bypasses slot validation when it's provided. Load and Export were not updated to match.
+Upgrade Vite to the latest v8 release. Review the Vite 7 and Vite 8 migration guides for breaking changes. Key areas to check:
 
-### The Flow (Current — Broken)
+- `vite.config.ts` — any deprecated config options, changed defaults, or removed APIs
+- `resolve.extensions` behavior — the codebase relies on this to resolve `.ts` files from `.js` import specifiers
+- Dev server and build output — verify `npm run dev` and `npm run build` both work
+- HMR behavior — spot-check that hot module replacement still functions
 
-1. **Load button:** `_handleLoad(-1, 'spaceAgencySave_7')` does the version check using the storage key correctly, then calls `loadGame(-1)`. `loadGame()` calls `assertValidSlot(-1)` → throws `RangeError`. User sees "Failed to load save: Save slot -1 is out of bounds..."
-2. **Export button:** `_handleExport(-1, _storageKey)` calls `exportSave(-1)`. Same `assertValidSlot` failure. Note: `_storageKey` is prefixed with underscore — it's explicitly unused.
-3. **Delete button:** Works — `deleteSave(-1, 'spaceAgencySave_7')` accepts and uses the `storageKey` parameter.
+### 1b. Vitest 3 → 4
 
-### Fix: saveload.ts
+Upgrade Vitest to the latest v4 release. Key areas to check:
 
-Add an optional `storageKey?: string` parameter to both `loadGame()` and `exportSave()`, following the exact same pattern as `deleteSave()`:
+- `vitest/config` re-export of `defineConfig` — `vite.config.ts` line 1 imports from `vitest/config`
+- Coverage provider (`@vitest/coverage-v8`) — ensure compatible version exists for Vitest 4
+- Test runner behavior — all 4,325+ unit tests must pass
+- Any changed CLI flags or config options used in `package.json` scripts
+
+### 1c. Patch/Minor Updates
+
+Update remaining dependencies to latest compatible versions:
+
+- `@playwright/test` — latest patch
+- `pixi.js` — latest patch within v8
+- `eslint` and `@typescript-eslint/*` — latest compatible
+- `jsdom`, `globals`, `lz-string` — latest compatible
+- `typescript` — latest compatible
+
+After all updates: `npm run build`, `npm run typecheck`, `npm run lint`, and `npm run test:unit` must all pass.
+
+---
+
+## 2. Full IndexedDB Migration (Drop localStorage)
+
+### Context
+
+The codebase currently uses localStorage as primary storage with IndexedDB as a mirror/fallback. This iteration makes IndexedDB the sole storage backend and removes all localStorage code. No backward compatibility with localStorage-based saves is needed — existing localStorage saves will simply not be found.
+
+Four systems use localStorage today:
+
+| System | File | localStorage key pattern |
+|--------|------|--------------------------|
+| Game saves | `saveload.ts` | `spaceAgencySave_0` through `spaceAgencySave_N` |
+| Auto-saves | `autoSave.ts` | `spaceAgencySave_auto`, overflow keys |
+| Settings | `settingsStore.ts` | `spaceAgencySettings` |
+| Design library | `designLibrary.ts` | `spaceAgencyDesignLibrary` |
+
+### 2a. Upgrade idbStorage.ts
+
+The existing `idbStorage.ts` provides `idbSet`, `idbGet`, `idbDelete`, and `isIdbAvailable`. These are sufficient for the migration. The module currently describes itself as a "mirror" of localStorage — update the comments to reflect that it's now the primary (and only) storage backend. Remove the fallback language and `isIdbAvailable` checks that gate IDB usage (IDB is required, not optional).
+
+### 2b. Migrate saveload.ts
+
+Replace all `localStorage.getItem`/`setItem`/`removeItem` calls with `idbGet`/`idbSet`/`idbDelete`. Key changes:
+
+- `_persistCompressed()` — remove localStorage write, keep only IDB write. Remove the "localStorage full — attempt IndexedDB as fallback" code path.
+- `loadGame()` — remove localStorage read. Load exclusively from IDB. Remove the "check both and pick newest" logic. Remove the "write back to localStorage if it came from IDB" sync-back code.
+- `deleteSave()` — remove `localStorage.removeItem`, use only `idbDelete`.
+- `exportSave()` — read from IDB instead of localStorage.
+- `listSaves()` / `discoverOverflowKeys()` — these currently scan localStorage keys. Rewrite to scan IDB keys. The IDB store will need a `getAllKeys()` or equivalent operation (add to `idbStorage.ts` if not present).
+- `loadGameAsync` alias (line 550) — delete entirely. This is a deprecated backward-compat shim.
+
+All public functions that read/write storage are already async or return Promises, so the async nature of IDB should not require API changes to callers.
+
+### 2c. Migrate autoSave.ts
+
+Replace all localStorage calls with IDB equivalents:
+
+- `_findAutoSaveKey()` — scans localStorage for auto-save key; rewrite to scan IDB
+- `triggerAutoSave()` — writes to localStorage then mirrors to IDB; write to IDB only
+- `hasAutoSave()` — checks localStorage; check IDB
+- `deleteAutoSave()` — removes from localStorage; remove from IDB
+
+`hasAutoSave()` is currently synchronous (`localStorage.getItem(...) !== null`). It will need to become async. Check callers and update them.
+
+### 2d. Migrate settingsStore.ts
+
+Replace localStorage with IDB for settings persistence:
+
+- `loadSettings()` — read from IDB instead of localStorage
+- `persistSettings()` — write to IDB instead of localStorage
+- `_hasExistingSettings()` — check IDB instead of localStorage
+
+**Async initialization:** Settings are currently loaded synchronously at startup. With IDB, `loadSettings()` becomes async. The settings module should load settings into an in-memory cache at app init (awaited before anything else runs), then serve reads from the cache synchronously. Only writes go to IDB. This preserves the current synchronous read pattern for consumers.
+
+### 2e. Migrate designLibrary.ts
+
+Replace localStorage with IDB:
+
+- `_loadSharedLibrary()` — read from IDB
+- `_saveSharedLibrary()` — write to IDB
+
+These are likely already called in async contexts. Check callers.
+
+### 2f. Update mainmenu.ts
+
+`mainmenu.ts` reads localStorage for save slot discovery in the load screen. Update to use the migrated `listSaves()` / `discoverOverflowKeys()` functions from saveload.ts (which now read from IDB).
+
+### 2g. Update E2E Test Helpers
+
+9 E2E spec files seed saves via `localStorage.setItem()` in `page.evaluate()` calls. The E2E save seeding helper (`e2e/helpers/_saveFactory.ts` or `_state.ts`) must be updated to seed saves into IndexedDB instead.
+
+Create or update a helper that writes save data to IndexedDB within `page.evaluate()`. IndexedDB operations in `page.evaluate()` are async, so the seeding calls will need `await`. Ensure all E2E specs that seed saves use the updated helper.
+
+### 2h. Update Unit Tests
+
+`saveload.test.ts` has 48 references to localStorage. The test setup likely mocks localStorage — replace with an IDB mock or use the `fake-indexeddb` package (or similar) that Vitest can use in Node.js. All existing save round-trip, corruption, version-check, and overflow tests must be updated to use IDB instead of localStorage.
+
+Similarly update tests in `autoSave.test.ts`, `designLibrary.test.ts`, `settingsStore.test.ts`, `storageErrors.test.ts`, `idbStorage.test.ts`, and `debugMode.test.ts`.
+
+---
+
+## 3. Remove Backward-Compatibility Code
+
+With localStorage gone and no need for backward compat, remove the following:
+
+### In saveload.ts
+
+- **`loadGameAsync` export** (line 550) — deprecated alias for `loadGame`. Delete.
+- **`_importLegacyJson()` function** (line 809) — imports saves from old JSON string format. Delete the function and the fallback call to it in the import flow.
+- **`decompressSaveData()` uncompressed fallback** (line 389) — the `if (!raw.startsWith(COMPRESSED_PREFIX)) return raw` path handles ancient uncompressed saves. All saves are now compressed. Remove the fallback — if the compressed prefix is missing, throw an error (treat as corrupt data).
+
+### In saveload.test.ts
+
+- **Line 1908** — `loadGame(0) without storageKey still works for manual slots (backward compat)` — delete.
+- **Lines 1417-1470ish** — `backward compatibility with uncompressed saves` describe block — delete the entire block.
+- **Line 1655** — `imports a legacy JSON envelope string (old-format backward compatibility)` — delete.
+
+### Keep (data integrity, not backward compat)
+
+- **Version check** in `loadGame()` (line 499) — rejects saves with incompatible version numbers. Keep.
+- **Version rejection tests** (lines 918, 1032, 1045) — test that old/future versions are rejected. Keep.
+- **Incompatible saves appear in UI** (test line 619) — verifies the UI shows incompatible saves as non-loadable. Keep.
+
+---
+
+## 4. `totalMass > 0` Guard in physics.ts
+
+**Location:** `src/core/physics.ts:1214-1215`
 
 ```typescript
-// deleteSave already does this:
-export function deleteSave(slotIndex: number, storageKey?: string): void {
-  const key = storageKey ?? (assertValidSlot(slotIndex), slotKey(slotIndex));
-  // ...
-}
-
-// Apply the same pattern to loadGame and exportSave:
-export async function loadGame(slotIndex: number, storageKey?: string): Promise<GameState> {
-  const key = storageKey ?? (assertValidSlot(slotIndex), slotKey(slotIndex));
-  // ... use `key` instead of `slotKey(slotIndex)` throughout
-}
-
-export function exportSave(slotIndex: number, storageKey?: string): void {
-  const key = storageKey ?? (assertValidSlot(slotIndex), slotKey(slotIndex));
-  // ... use `key` instead of `slotKey(slotIndex)` throughout
-}
+let accX: number = netFX / totalMass;
+let accY: number = netFY / totalMass;
 ```
 
-When `storageKey` is provided, use it directly (skip `assertValidSlot` + `slotKey` derivation). When not provided, validate slot index and derive key as before. Fully backward compatible.
+Add a guard: if `totalMass <= 0`, set `accX` and `accY` to `0` instead of dividing. This matches the defensive pattern used at lines 1023, 1081, 1127, and 1463 in the same file.
 
-### Fix: mainmenu.ts
-
-**`_handleLoad()`** (around line 599): Pass `storageKey` through to `loadGame()`:
-```typescript
-const state = await loadGame(slotIndex, storageKey);
-```
-
-**`_handleExport()`** (around line 634): Rename `_storageKey` to `storageKey` and pass it through:
-```typescript
-function _handleExport(slotIndex: number, storageKey?: string): void {
-  exportSave(slotIndex, storageKey);
-}
-```
-
-### Tests
-
-**Unit tests in `saveload.test.ts`:**
-- Round-trip: write a save to slot 7, then `loadGame(-1, 'spaceAgencySave_7')` — returns valid GameState
-- Round-trip: write to `spaceAgencySave_auto` key, load via storage key — returns valid GameState
-- Export from overflow slot: `exportSave(-1, 'spaceAgencySave_7')` produces a downloadable blob (mock `URL.createObjectURL`)
-- Backward compatibility: `loadGame(0)` (no storage key) still works for manual slots
-
-**E2E test in `auto-save.spec.ts`:**
-- Seed 5 full manual slots + trigger auto-save after a flight
-- Verify the auto-save card appears in the load screen (existing test)
-- Click Load on the auto-save card
-- Verify the game starts: hub overlay visible, agency name matches the seeded save
+Add a unit test: given a physics state where `totalMass` computes to 0, verify that `tick()` produces finite position/velocity values (no NaN/Infinity propagation).
 
 ---
 
-## 2. Stabilize Flaky Asteroid Belt E2E Test
+## 5. HTML-Escape `data-key` Attribute in mainmenu.ts
 
-### The Problem
+**Location:** `src/ui/mainmenu.ts:390-392`
 
-`e2e/asteroid-belt.spec.ts:386` — test "belt zones are defined on the Sun body with correct boundaries" failed once and passed on retry during the iteration 14 smoke run. Pre-existing intermittent failure, not a regression.
-
-### Root Cause Analysis
-
-The test calls `page.evaluate()` to read `window.__celestialBodies?.SUN` immediately after `seedAndLoadSave()` returns. `seedAndLoadSave()` waits for the hub overlay to appear, but `__celestialBodies` may not be fully populated at that point — it's a race condition between the hub UI rendering and the celestial body data initialization.
-
-### Fix
-
-Add `page.waitForFunction(() => window.__celestialBodies?.SUN?.altitudeBands?.length > 0)` before the `page.evaluate()` call that reads belt zone data. This ensures the Sun body's altitude bands are loaded before asserting on their contents.
-
-The wait should use a reasonable timeout (10 seconds) to avoid masking real failures with infinite waits.
+The `data-key="${summary.storageKey}"` interpolation doesn't use the `escapeHtml` utility (which is already imported). Apply `escapeHtml()` to `summary.storageKey` in all three button template literals (Load, Export, Delete). Zero-cost defense-in-depth.
 
 ---
 
-## 3. Notification Stacking Guard
+## 6. Notification Queue
 
-### The Problem
+Replace the current single-toast notification system with a stacking queue.
 
-`showNotification()` in `src/ui/notification.ts` creates toasts at a fixed position (`bottom: 24px`, `left: 50%`). If multiple notifications fire in rapid succession, they overlap at the same position. Only the topmost toast is readable.
+### Current Behavior (notification.ts)
 
-### Fix
+`showNotification()` removes any existing toast before creating a new one. Only one toast is ever visible.
 
-Before creating a new toast, remove any existing toast. This ensures only one notification is visible at a time.
+### New Behavior
 
-**Implementation in `notification.ts`:**
-1. Add a `data-notification-toast` attribute to the toast `<div>` when creating it
-2. At the top of `showNotification()`, query for any existing toast: `document.querySelector('[data-notification-toast]')?.remove()`
-3. This removes the previous toast (including cancelling its visual presence) before showing the new one
+- Multiple toasts can be visible simultaneously, stacked vertically from the bottom of the screen.
+- Each toast auto-dismisses after 4 seconds (same as current).
+- New toasts appear at the bottom of the stack; existing toasts shift up.
+- When a toast dismisses, remaining toasts shift down to fill the gap.
+- Cap at a reasonable maximum (e.g., 5 visible toasts). If the cap is reached, the oldest toast is removed when a new one arrives.
+- The fade-out animation (0.3s opacity transition) remains.
 
-The fade-out timeout from the removed toast will fire on a detached element — `toast.remove()` on an already-removed element is a no-op, so no cleanup is needed.
+### Unit Tests
 
----
+Add unit tests for `notification.ts`:
 
-## 4. Extract & Test Pure Helpers for Coverage
-
-The iteration 14 review noted render coverage at 34% and UI coverage at 43%. `vite.config.ts:110-121` identifies 10 extractable helpers. `computeStageDeltaV` was already extracted in a prior iteration. This iteration extracts 2 more.
-
-### 4a. Export cloneStaging / restoreStaging
-
-**File:** `src/ui/vab/_undoActions.ts`
-
-These two functions are already pure (no DOM access, no global state reads). They operate on `StagingConfig` objects:
-
-- `cloneStaging(config)` — deep-copies a staging config (maps stages, spreads arrays, copies scalar)
-- `restoreStaging(target, source)` — overwrites target in-place from source (preserves object reference for VAB state)
-
-**Changes:**
-- Export both functions from `_undoActions.ts`
-- Re-export from the `src/ui/vab.ts` barrel (or from `_undoActions.ts` directly if the barrel doesn't re-export internals)
-- Add unit tests in a new `src/tests/undoActions.test.ts`:
-  - `cloneStaging`: produces independent copy; mutating original doesn't affect clone; handles empty stages array; handles empty unstaged array
-  - `restoreStaging`: overwrites target properties; preserves target object reference; handles empty config
-
-### 4b. Extract computeFrameStats from fpsMonitor.ts
-
-**File:** `src/ui/fpsMonitor.ts`
-
-The stats computation in `recordFrame()` (lines 138-149) is a pure loop over a `Float64Array`:
-
-```typescript
-let sum = 0, min = Infinity, max = 0;
-for (let i = 0; i < count; i++) {
-  const t = _frameTimes[i];
-  sum += t; if (t < min) min = t; if (t > max) max = t;
-}
-const avgFrameTime = sum / count;
-const fps = avgFrameTime > 0 ? 1000 / avgFrameTime : 0;
-```
-
-**Changes:**
-- Extract into a named export: `export function computeFrameStats(frameTimes: Float64Array, count: number): { fps: number; avgFrameTime: number; minFrameTime: number; maxFrameTime: number }`
-- `recordFrame()` calls `computeFrameStats(_frameTimes, _frameCount)` instead of inlining the loop
-- Add unit tests in a new `src/tests/fpsMonitor.test.ts`:
-  - Empty buffer (count = 0): returns zeros
-  - Single frame: fps = 1000/frameTime
-  - Full buffer with varying times: correct min/max/avg
-  - Constant frame times: min === max === avg
+- Single notification creates one toast element
+- Two notifications in sequence create two toast elements
+- Toasts are stacked (different bottom positions)
+- After 4+ seconds, toasts are removed from DOM
+- Maximum cap is enforced — adding beyond the cap removes the oldest
 
 ---
 
-## 5. Fix Mixed Dynamic/Static Import Warnings
+## 7. Fix CLAUDE.md Inaccuracies
 
-### The Problem
+The root `CLAUDE.md` has several statements that no longer reflect reality:
 
-Vite produces chunk-splitting warnings for `src/render/vab.ts` and `src/ui/vab.ts` because both are imported statically by some modules and dynamically by others. This creates ambiguous code-splitting boundaries.
+1. **Line 98** — References a `jsToTsResolve` Vite plugin that doesn't exist. The actual mechanism is `resolve.extensions: ['.ts', '.js', ...]` in `vite.config.ts` line 5. Fix the description.
 
-### Analysis
+2. **Multiple references to JS modules** — The Architecture section says modules "remain JS" and references `.js` file extensions. The entire codebase is now TypeScript. Update all affected sections:
+   - Core section: remove "the rest remain JS with JSDoc types"
+   - File references: update `.js` extensions to `.ts` where they appear in the module listing
+   - TypeScript & Linting section: remove "Four core modules are TypeScript. The rest of the codebase remains JavaScript."
+   - Remove any references to `checkJs`, `allowJs` being relevant for source files
 
-**`src/ui/vab.ts`** has two static importers that can be deferred:
+3. **Testing section** — E2E test references may say `.spec.js`; update to `.spec.ts`.
 
-| File | Function | Called when | Can defer? |
-|------|----------|------------|-----------|
-| `src/ui/topbar.ts:33` | `syncVabToGameState()` | Explicit save action | Yes — save is a user action, not app init |
-| `src/ui/flightController/_init.ts:20` | `getVabInventoryUsedParts()` | Flight start | Yes — VAB module is already loaded by then |
+4. After dependency upgrades, update any version-specific references if applicable.
 
-**`src/render/vab.ts`** has one static importer and one redundant dynamic importer:
+---
 
-| File | Function | Import type | Issue |
-|------|----------|-------------|-------|
-| `src/main.ts:7` | `initVabRenderer()` | Static | Necessary — creates hidden PixiJS scene at startup |
-| `src/ui/index.ts:341` | (all exports) | Dynamic | Redundant — module is already loaded via static import |
+## 8. Coverage Exclusion List Maintenance
 
-### Fix for src/ui/vab.ts — Convert Static Imports to Dynamic
+**Location:** `vite.config.ts:34-94`
 
-**In `src/ui/topbar.ts`:**
-- Remove the static import of `syncVabToGameState` at the top of the file
-- At the call site (around line 979), use a dynamic import:
-  ```typescript
-  const { syncVabToGameState } = await import('./vab.ts');
-  syncVabToGameState();
-  ```
-- The containing function is likely already async (it calls `saveGame()` which returns a Promise). If not, make the save handler async.
+The explicit exclusion list requires manual updates as modules are added or split. Review the current list against the actual file tree:
 
-**In `src/ui/flightController/_init.ts`:**
-- Remove the static import of `getVabInventoryUsedParts` at the top
-- At the call site (around line 180), use a dynamic import:
-  ```typescript
-  const { getVabInventoryUsedParts } = await import('../vab.ts');
-  ps._usedInventoryParts = getVabInventoryUsedParts();
-  ```
-- The containing function (`startFlightScene`) is likely already async. If not, make it async.
+- Check for files in the exclusion list that no longer exist (stale entries)
+- Check for new DOM-heavy or PixiJS-heavy files that should be excluded but aren't
+- Verify that no testable pure-logic modules are incorrectly excluded
 
-### Fix for src/render/vab.ts — Remove Redundant Dynamic Import
-
-**In `src/ui/index.ts`:**
-- Remove `render/vab.ts` from the dynamic `Promise.all` import on line 341
-- Import the needed render/vab exports directly (the module is already in the bundle via `main.ts`)
-- Update `_cachedVabRender` usage — it's no longer needed since the module is always available
-- The `_cachedVab` pattern for `ui/vab.ts` stays as-is (it's correctly lazy-loaded)
-
-### Result
-
-After these changes:
-- `src/render/vab.ts` — static import only (in `main.ts` + its VAB submodule consumers). No dynamic import.
-- `src/ui/vab.ts` — dynamic import only (in `index.ts`, `hub.ts` preload, `topbar.ts` on save, `_init.ts` on flight start). No static import.
-- Vite chunk-splitting warnings eliminated.
+If there are many stale entries or the list is hard to maintain, consider switching to a pattern-based exclusion (e.g., exclude barrel re-export files matching `**/index.ts`) where feasible, while keeping explicit entries for files that don't fit a pattern.
 
 ---
 
 ## Testing Strategy
 
-### New Unit Tests
+### Unit Tests
 
-| Test file | What it covers |
-|---|---|
-| `saveload.test.ts` (additions) | Overflow slot load round-trip, overflow export, backward compat |
-| `undoActions.test.ts` (new) | cloneStaging independence, restoreStaging in-place mutation, edge cases |
-| `fpsMonitor.test.ts` (new) | computeFrameStats with empty/single/full/varied buffers |
+| Area | What changes |
+|------|-------------|
+| `saveload.test.ts` | Rewrite all 48 localStorage references to use IDB mock; remove backward-compat tests; keep version-check tests |
+| `autoSave.test.ts` | Update storage mocking from localStorage to IDB |
+| `settingsStore.test.ts` | Update storage mocking from localStorage to IDB |
+| `designLibrary.test.ts` | Update storage mocking from localStorage to IDB |
+| `storageErrors.test.ts` | Update error scenarios for IDB instead of localStorage |
+| `idbStorage.test.ts` | May need updates if `idbStorage.ts` API changes (e.g., `getAllKeys`) |
+| `debugMode.test.ts` | Update if it references localStorage |
+| `physics.test.ts` | Add test for totalMass=0 guard |
+| `notification.test.ts` (new) | Stacking queue behavior tests |
 
-### Updated E2E Tests
+### E2E Tests
 
-| Spec | What it covers |
-|---|---|
-| `auto-save.spec.ts` (addition) | Click Load on overflow save card, verify game starts |
-| `asteroid-belt.spec.ts` (fix) | Add waitForFunction before reading celestial body data |
+All 9 E2E spec files that seed saves via localStorage must be updated to seed via IDB. The seeding helper should abstract this so individual specs don't need IDB boilerplate.
 
-### No New E2E Specs
+### Verification
 
-All E2E changes are additions to existing specs or fixes to existing tests. No new spec files needed.
+After all changes: `npm run build`, `npm run typecheck`, `npm run lint`, `npm run test:unit`, and `npm run test:smoke:e2e` must all pass.
 
 ---
 
 ## Technical Decisions
 
-- **Same pattern as deleteSave.** Applying the identical `storageKey ?? (assertValidSlot, slotKey)` pattern to loadGame and exportSave. Consistent, minimal diff, backward compatible.
-- **Replace existing toast, not stack.** Simpler, prevents visual clutter. Multiple simultaneous notifications are unlikely in normal gameplay.
-- **Export existing pure functions, don't rewrite.** `cloneStaging`/`restoreStaging` are already pure — just need export and tests. No refactoring.
-- **Extract computeFrameStats in-place.** The function stays in `fpsMonitor.ts` as a named export. No need for a separate utility file for one function.
-- **Dynamic imports for VAB UI consumers.** Both `topbar.ts` and `_init.ts` call VAB functions in async contexts (save action, flight start). Dynamic import adds negligible latency since the module is preloaded.
-- **Remove redundant render/vab.ts dynamic import.** Since `main.ts` already loads it statically, the dynamic import in `index.ts` is a no-op that generates warnings.
+- **IDB is required, not optional.** No feature detection or localStorage fallback. All modern browsers support IndexedDB. If IDB is unavailable, the game cannot save (fail loudly).
+- **Settings use in-memory cache.** Loaded async from IDB at init, served synchronously from cache thereafter. Only writes touch IDB.
+- **No backward compat.** Old localStorage saves are not migrated. Old save formats (uncompressed, legacy JSON) are not supported. Version-incompatible saves are rejected (data integrity, not compat).
+- **Dependency upgrades first.** Vite and Vitest major jumps happen before any functional changes so the entire iteration is built and tested on the new toolchain.
+- **Notification stacking, not replacing.** Multiple toasts stack from bottom with auto-dismiss. Capped at a reasonable maximum.
