@@ -7,7 +7,7 @@
 - **Verification**: `npm run build` succeeds with 0 errors/warnings and `npm run dev` starts without errors. Run `npx vite --version` to confirm v8.
 
 ### TASK-002: Upgrade Vitest from v3 to v4
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001
 - **Description**: Upgrade Vitest to the latest v4 release. Upgrade `@vitest/coverage-v8` to the matching version. Update `vite.config.ts` line 1 import if the `vitest/config` re-export changed. Update any changed CLI flags in `package.json` scripts. See requirements.md section 1b.
 - **Verification**: `npm run test:unit` — all unit tests pass. `npx vitest --version` confirms v4.
