@@ -79,7 +79,7 @@
 - **Verification**: `npx vitest run src/tests/saveload.test.ts && npm run typecheck` — all tests pass, no type errors. Grep for `loadGameAsync`, `_importLegacyJson`, and `legacy` in `saveload.ts` returns no results.
 
 ### TASK-014: Add totalMass guard in physics.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-002
 - **Description**: At `src/core/physics.ts:1214-1215`, add a guard against `totalMass <= 0` to prevent NaN/Infinity from division by zero. Use the same pattern as lines 1023, 1081, 1127, 1463: `if (totalMass <= 0)` set `accX = 0; accY = 0` instead of dividing. Add a unit test: create a physics state where `totalMass` is 0 and verify `tick()` produces finite position/velocity values. See requirements.md section 4.
 - **Verification**: `npx vitest run src/tests/physics.test.ts --testNamePattern "totalMass"` — new test passes.

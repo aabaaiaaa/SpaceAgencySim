@@ -3131,3 +3131,28 @@ describe('CapturedBody — MoI dampens angular acceleration', () => {
     expect(psA.angularVelocity).toBeGreaterThan(psB.angularVelocity);
   });
 });
+
+// ---------------------------------------------------------------------------
+// tick() — totalMass zero guard
+// ---------------------------------------------------------------------------
+
+describe('tick() — totalMass zero guard', () => {
+  it('produces finite position/velocity when totalMass is 0', () => {
+    // Create an empty assembly (no parts) so _computeTotalMass returns 0.
+    const assembly = createRocketAssembly();
+    const staging = createStagingConfig();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Clear activeParts to guarantee totalMass === 0.
+    ps.activeParts.clear();
+    ps.fuelStore.clear();
+
+    tick(ps, assembly, staging, fs, 1.0);
+
+    expect(Number.isFinite(ps.posX)).toBe(true);
+    expect(Number.isFinite(ps.posY)).toBe(true);
+    expect(Number.isFinite(ps.velX)).toBe(true);
+    expect(Number.isFinite(ps.velY)).toBe(true);
+  });
+});

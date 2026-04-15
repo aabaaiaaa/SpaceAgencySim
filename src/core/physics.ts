@@ -1211,8 +1211,15 @@ function _integrate(ps: PhysicsState, assembly: RocketAssembly, flightState: Fli
   const netFX: number = thrustX + gravFX + dragFX + windFX;
   const netFY: number = thrustY + gravFY + dragFY + windFY;
 
-  let accX: number = netFX / totalMass;
-  let accY: number = netFY / totalMass;
+  let accX: number;
+  let accY: number;
+  if (totalMass <= 0) {
+    accX = 0;
+    accY = 0;
+  } else {
+    accX = netFX / totalMass;
+    accY = netFY / totalMass;
+  }
 
   // Ground reaction: prevent downward acceleration while on launch pad.
   if (ps.grounded && accY < 0) {
