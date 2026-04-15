@@ -43,7 +43,7 @@
 - **Verification**: `npx vitest run src/tests/settingsStore.test.ts` — all tests pass.
 
 ### TASK-008: Migrate designLibrary.ts from localStorage to IndexedDB
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-004
 - **Description**: Replace localStorage with IDB in `loadSharedLibrary()` and `saveSharedLibrary()`. These become async — update callers (`saveDesignToSharedLibrary`, `deleteDesignFromSharedLibrary`, `getAllDesigns`, etc.) to await. See requirements.md section 2e.
 - **Verification**: `npx vitest run src/tests/designLibrary.test.ts` — all tests pass.

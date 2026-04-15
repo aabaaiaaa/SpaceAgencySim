@@ -91,7 +91,7 @@ export function showToast(msg: string): void {
 /**
  * Show a save-name prompt and persist the current assembly as a saved design.
  */
-export function handleSaveDesign(): void {
+export async function handleSaveDesign(): Promise<void> {
   const S = getVabState();
   if (!S.assembly || S.assembly.parts.size === 0 || !S.gameState) {
     alert('Nothing to save.');
@@ -105,8 +105,9 @@ export function handleSaveDesign(): void {
 
   const defaultName = S.currentDesignName || 'Rocket Design ' + new Date().toLocaleDateString();
 
+  const allDesigns = S.currentDesignId ? await getAllDesigns(S.gameState) : [];
   const existingDesign = S.currentDesignId
-    ? getAllDesigns(S.gameState).find((d: RocketDesign) => d.id === S.currentDesignId)
+    ? allDesigns.find((d: RocketDesign) => d.id === S.currentDesignId)
     : null;
   const wasPrivate = existingDesign?.savePrivate ?? false;
 
@@ -146,7 +147,7 @@ export function handleSaveDesign(): void {
 
   overlay.querySelector('#vab-save-cancel')?.addEventListener('click', () => overlay.remove());
 
-  const doSave = (): void => {
+  const doSave = async (): Promise<void> => {
     const name = nameInput?.value.trim() || defaultName;
     const designId = S.currentDesignId || ('design-' + Date.now());
     const isPrivate = (overlay.querySelector('#vab-save-private') as HTMLInputElement | null)?.checked ?? false;
@@ -164,7 +165,7 @@ export function handleSaveDesign(): void {
       savePrivate: isPrivate,
     });
 
-    saveDesignToLibrary(S.gameState!, design);
+    await saveDesignToLibrary(S.gameState!, design);
     S.currentDesignId   = designId;
     S.currentDesignName = name;
 
@@ -172,9 +173,9 @@ export function handleSaveDesign(): void {
     showToast('Design saved.');
   };
 
-  overlay.querySelector('#vab-save-confirm')?.addEventListener('click', doSave);
+  overlay.querySelector('#vab-save-confirm')?.addEventListener('click', () => { void doSave(); });
   nameInput?.addEventListener('keydown', (e: KeyboardEvent) => {
-    if (e.key === 'Enter') doSave();
+    if (e.key === 'Enter') void doSave();
   });
 }
 
@@ -225,7 +226,7 @@ export function handleLoadDesign(): void {
   allBtn.addEventListener('click', () => {
     activeGroupId = null;
     _updateGroupBtns();
-    renderList();
+    void renderList();
   });
   groupBar.appendChild(allBtn);
 
@@ -238,7 +239,7 @@ export function handleLoadDesign(): void {
     btn.addEventListener('click', () => {
       activeGroupId = activeGroupId === gd.id ? null : gd.id;
       _updateGroupBtns();
-      renderList();
+      void renderList();
     });
     groupBar.appendChild(btn);
   }
@@ -258,9 +259,9 @@ export function handleLoadDesign(): void {
   list.className = 'vab-load-list';
   overlay.appendChild(list);
 
-  const renderList = (): void => {
+  const renderList = async (): Promise<void> => {
     list.innerHTML = '';
-    let designs = getAllDesigns(S.gameState!);
+    let designs = await getAllDesigns(S.gameState!);
 
     designs = filterDesignsByGroup(designs, activeGroupId);
 
@@ -269,7 +270,7 @@ export function handleLoadDesign(): void {
       designs = designs.filter((d: RocketDesign) => d.name.toLowerCase().includes(query));
     }
 
-    const allDesigns = getAllDesigns(S.gameState!);
+    const allDesigns = await getAllDesigns(S.gameState!);
     const grouped = groupDesigns(allDesigns);
     const activeGroups = new Set(grouped.map((g) => g.groupId));
     groupBar.querySelectorAll('.vab-lib-group-btn[data-group-id]').forEach((btn) => {
@@ -294,9 +295,9 @@ export function handleLoadDesign(): void {
     }
   };
 
-  searchInput.addEventListener('input', renderList);
+  searchInput.addEventListener('input', () => { void renderList(); });
 
-  renderList();
+  void renderList();
 
   const closeBtn = document.createElement('button');
   closeBtn.className = 'vab-load-close';
@@ -317,7 +318,7 @@ function buildLibraryCard(
   compat: CompatibilityResult,
   costInfo: CostBreakdown,
   overlay: HTMLDivElement,
-  rerender: () => void,
+  rerender: () => Promise<void>,
 ): HTMLElement {
   const S = getVabState();
   const card = buildRocketCard(design, []);
@@ -387,9 +388,10 @@ function buildLibraryCard(
   dupBtn.addEventListener('click', (e: MouseEvent) => {
     e.stopPropagation();
     const copy = duplicateDesign(design, S.gameState!);
-    saveDesignToLibrary(S.gameState!, copy);
-    rerender();
-    showToast('Design duplicated.');
+    void saveDesignToLibrary(S.gameState!, copy).then(() => {
+      void rerender();
+      showToast('Design duplicated.');
+    });
   });
   actionsEl.appendChild(dupBtn);
 
@@ -400,12 +402,13 @@ function buildLibraryCard(
   delBtn.addEventListener('click', (e: MouseEvent) => {
     e.stopPropagation();
     if (!confirm(`Delete "${design.name}"?`)) return;
-    deleteDesignFromLibrary(S.gameState!, design.id);
-    if (S.currentDesignId === design.id) {
-      S.currentDesignId = null;
-      S.currentDesignName = '';
-    }
-    rerender();
+    void deleteDesignFromLibrary(S.gameState!, design.id).then(() => {
+      if (S.currentDesignId === design.id) {
+        S.currentDesignId = null;
+        S.currentDesignName = '';
+      }
+      void rerender();
+    });
   });
   actionsEl.appendChild(delBtn);
 

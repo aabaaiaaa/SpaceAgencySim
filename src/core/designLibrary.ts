@@ -2,7 +2,7 @@
  * designLibrary.ts — Rocket design library system.
  *
  * Manages saved rocket designs with features for:
- *   - Shared storage across save slots (localStorage) with save-private toggle
+ *   - Shared storage across save slots (IndexedDB) with save-private toggle
  *   - Cost breakdown (parts + fuel, excluding crew salaries)
  *   - Design classification / grouping (stage count, crewed, probe, etc.)
  *   - Compatibility checking against current tech tree unlocks
@@ -10,7 +10,7 @@
  *
  * STORAGE
  * =======
- *   - Shared designs live in localStorage key `spaceAgencyDesignLibrary`
+ *   - Shared designs live in IndexedDB under key `spaceAgencyDesignLibrary`
  *   - Save-private designs live in each save slot's `savedDesigns` array
  *   - On load, both pools are merged for display; writes target the correct pool
  *
@@ -20,6 +20,7 @@
 import { getPartById } from '../data/parts.ts';
 import { PartType } from './constants.ts';
 import { logger } from './logger.ts';
+import { idbGet, idbSet } from './idbStorage.ts';
 import { TECH_NODES } from '../data/techtree.ts';
 import type { TechNodeDef } from '../data/techtree.ts';
 import type { GameState, RocketDesign } from './gameState.ts';
@@ -28,7 +29,7 @@ import type { GameState, RocketDesign } from './gameState.ts';
 // Constants
 // ---------------------------------------------------------------------------
 
-/** localStorage key for shared (cross-save) designs. */
+/** IDB key for shared (cross-save) designs. */
 const SHARED_LIBRARY_KEY = 'spaceAgencyDesignLibrary';
 
 // ---------------------------------------------------------------------------
@@ -98,47 +99,40 @@ function _hasPartOfType(design: RocketDesign, partType: string): boolean {
 // Shared Library Storage
 // ---------------------------------------------------------------------------
 
-export function loadSharedLibrary(): RocketDesign[] {
+export async function loadSharedLibrary(): Promise<RocketDesign[]> {
   try {
-    const raw = localStorage.getItem(SHARED_LIBRARY_KEY);
+    const raw = await idbGet(SHARED_LIBRARY_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
   } catch (err) {
-    logger.warn('designLibrary', 'Failed to parse shared library from localStorage', { error: String(err) });
+    logger.warn('designLibrary', 'Failed to parse shared library from IndexedDB', { error: String(err) });
     return [];
   }
 }
 
-export function saveSharedLibrary(designs: RocketDesign[]): void {
-  try {
-    localStorage.setItem(SHARED_LIBRARY_KEY, JSON.stringify(designs));
-  } catch (err: unknown) {
-    if (err instanceof DOMException && err.name === 'QuotaExceededError') {
-      throw new Error('Storage full — unable to save design library. Delete old saves or designs to free space.', { cause: err });
-    }
-    throw err;
-  }
+export async function saveSharedLibrary(designs: RocketDesign[]): Promise<void> {
+  await idbSet(SHARED_LIBRARY_KEY, JSON.stringify(designs));
 }
 
-export function saveDesignToSharedLibrary(design: RocketDesign): void {
-  const lib = loadSharedLibrary();
+export async function saveDesignToSharedLibrary(design: RocketDesign): Promise<void> {
+  const lib = await loadSharedLibrary();
   const idx = lib.findIndex((d) => d.id === design.id);
   if (idx >= 0) { lib[idx] = design; } else { lib.push(design); }
-  saveSharedLibrary(lib);
+  await saveSharedLibrary(lib);
 }
 
-export function deleteDesignFromSharedLibrary(designId: string): void {
-  const lib = loadSharedLibrary();
-  saveSharedLibrary(lib.filter((d) => d.id !== designId));
+export async function deleteDesignFromSharedLibrary(designId: string): Promise<void> {
+  const lib = await loadSharedLibrary();
+  await saveSharedLibrary(lib.filter((d) => d.id !== designId));
 }
 
 // ---------------------------------------------------------------------------
 // Unified Library Access
 // ---------------------------------------------------------------------------
 
-export function getAllDesigns(state: GameState): RocketDesign[] {
-  const shared = loadSharedLibrary();
+export async function getAllDesigns(state: GameState): Promise<RocketDesign[]> {
+  const shared = await loadSharedLibrary();
   const priv = (state.savedDesigns ?? []).filter((d) => d.savePrivate);
   const byId = new Map<string, RocketDesign>();
   for (const d of shared) byId.set(d.id, d);
@@ -146,22 +140,22 @@ export function getAllDesigns(state: GameState): RocketDesign[] {
   return [...byId.values()];
 }
 
-export function saveDesignToLibrary(state: GameState, design: RocketDesign): void {
+export async function saveDesignToLibrary(state: GameState, design: RocketDesign): Promise<void> {
   if (!Array.isArray(state.savedDesigns)) state.savedDesigns = [];
   if (design.savePrivate) {
     const idx = state.savedDesigns.findIndex((d) => d.id === design.id);
     if (idx >= 0) { state.savedDesigns[idx] = design; } else { state.savedDesigns.push(design); }
-    deleteDesignFromSharedLibrary(design.id);
+    await deleteDesignFromSharedLibrary(design.id);
   } else {
-    saveDesignToSharedLibrary(design);
+    await saveDesignToSharedLibrary(design);
     state.savedDesigns = state.savedDesigns.filter((d) => d.id !== design.id);
   }
 }
 
-export function deleteDesignFromLibrary(state: GameState, designId: string): void {
+export async function deleteDesignFromLibrary(state: GameState, designId: string): Promise<void> {
   if (!Array.isArray(state.savedDesigns)) state.savedDesigns = [];
   state.savedDesigns = state.savedDesigns.filter((d) => d.id !== designId);
-  deleteDesignFromSharedLibrary(designId);
+  await deleteDesignFromSharedLibrary(designId);
 }
 
 export function duplicateDesign(original: RocketDesign, state: GameState): RocketDesign {

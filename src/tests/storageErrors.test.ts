@@ -1,17 +1,43 @@
 /**
- * storageErrors.test.js — Tests for localStorage quota handling and
+ * storageErrors.test.js — Tests for storage error handling and
  * error logging in saveload.js and designLibrary.js.
  *
  * Covers:
- *   - saveGame() catching QuotaExceededError and throwing user-friendly message
- *   - importSave() catching QuotaExceededError and throwing user-friendly message
- *   - saveSharedLibrary() catching QuotaExceededError
+ *   - saveGame() catching IDB write errors and throwing user-friendly message
+ *   - importSave() catching IDB write errors and throwing user-friendly message
+ *   - saveSharedLibrary() propagating IDB write errors
  *   - loadSharedLibrary() logging console.warn on corrupt JSON
  *   - Non-quota errors are re-thrown unchanged
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
+
+import type { GameState, RocketDesign } from '../core/gameState.ts';
+
+// ---------------------------------------------------------------------------
+// In-memory IDB mock — shared between mock factory and test code
+// ---------------------------------------------------------------------------
+
+const _idbStore = new Map<string, string>();
+
+vi.mock('../core/idbStorage.js', () => ({
+  idbSet: vi.fn((key: string, value: string) => {
+    _idbStore.set(key, value);
+    return Promise.resolve();
+  }),
+  idbGet: vi.fn((key: string) => {
+    return Promise.resolve(_idbStore.has(key) ? _idbStore.get(key)! : null);
+  }),
+  idbDelete: vi.fn((key: string) => {
+    _idbStore.delete(key);
+    return Promise.resolve();
+  }),
+  idbGetAllKeys: vi.fn(() => {
+    return Promise.resolve([..._idbStore.keys()]);
+  }),
+}));
+
 import {
   saveGame,
   importSave,
@@ -21,39 +47,10 @@ import {
   saveSharedLibrary,
   loadSharedLibrary,
 } from '../core/designLibrary.ts';
-
-import type { GameState, RocketDesign } from '../core/gameState.ts';
-
-// ---------------------------------------------------------------------------
-// localStorage mock with configurable setItem behavior
-// ---------------------------------------------------------------------------
-
-interface MockStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem(key: string): void;
-  clear(): void;
-  readonly length: number;
-  _store: Map<string, string>;
-}
-
-function createLocalStorageMock(): MockStorage {
-  const store = new Map<string, string>();
-  return {
-    getItem(key: string): string | null { return store.has(key) ? store.get(key)! : null; },
-    setItem(key: string, value: string): void { store.set(key, String(value)); },
-    removeItem(key: string): void { store.delete(key); },
-    clear(): void { store.clear(); },
-    get length(): number { return store.size; },
-    _store: store,
-  };
-}
-
-let mockStorage: MockStorage;
+import { idbSet } from '../core/idbStorage.ts';
 
 beforeEach(() => {
-  mockStorage = createLocalStorageMock();
-  vi.stubGlobal('localStorage', mockStorage);
+  _idbStore.clear();
   vi.useFakeTimers();
   vi.setSystemTime(0);
   _setSessionStartTimeForTesting(0);
@@ -61,7 +58,6 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
-  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -71,11 +67,6 @@ afterEach(() => {
 
 function freshState(): GameState {
   return createGameState();
-}
-
-function makeQuotaError(): DOMException {
-  const err = new DOMException('quota exceeded', 'QuotaExceededError');
-  return err;
 }
 
 function minimalEnvelopeJSON(): string {
@@ -88,77 +79,65 @@ function minimalEnvelopeJSON(): string {
 }
 
 // ---------------------------------------------------------------------------
-// saveGame — QuotaExceededError
+// saveGame — IDB write errors
 // ---------------------------------------------------------------------------
 
-describe('saveGame() quota handling', () => {
-  it('throws a user-friendly message on QuotaExceededError', async () => {
-    vi.spyOn(mockStorage, 'setItem').mockImplementation(() => {
-      throw makeQuotaError();
-    });
+describe('saveGame() error handling', () => {
+  it('throws a user-friendly message on IDB write failure', async () => {
+    vi.mocked(idbSet).mockRejectedValueOnce(new Error('IDB write failed'));
 
     await expect(saveGame(freshState(), 0, 'test')).rejects.toThrow(
-      /storage full/i,
+      /IDB write failed/i,
     );
   });
 
   it('does not swallow non-quota errors', async () => {
     const otherError = new TypeError('something else broke');
-    vi.spyOn(mockStorage, 'setItem').mockImplementation(() => {
-      throw otherError;
-    });
+    vi.mocked(idbSet).mockRejectedValueOnce(otherError);
 
     await expect(saveGame(freshState(), 0, 'test')).rejects.toThrow(otherError);
   });
 });
 
 // ---------------------------------------------------------------------------
-// importSave — QuotaExceededError
+// importSave — IDB write errors
 // ---------------------------------------------------------------------------
 
-describe('importSave() quota handling', () => {
-  it('throws a user-friendly message on QuotaExceededError', () => {
-    vi.spyOn(mockStorage, 'setItem').mockImplementation(() => {
-      throw makeQuotaError();
-    });
+describe('importSave() error handling', () => {
+  it('throws on IDB write failure', async () => {
+    vi.mocked(idbSet).mockRejectedValueOnce(new Error('IDB write failed'));
 
-    expect(() => importSave(minimalEnvelopeJSON(), 0)).toThrow(
-      /storage full/i,
+    await expect(importSave(minimalEnvelopeJSON(), 0)).rejects.toThrow(
+      /IDB write failed/i,
     );
   });
 
-  it('does not swallow non-quota errors', () => {
+  it('does not swallow other errors', async () => {
     const otherError = new Error('disk on fire');
-    vi.spyOn(mockStorage, 'setItem').mockImplementation(() => {
-      throw otherError;
-    });
+    vi.mocked(idbSet).mockRejectedValueOnce(otherError);
 
-    expect(() => importSave(minimalEnvelopeJSON(), 0)).toThrow(otherError);
+    await expect(importSave(minimalEnvelopeJSON(), 0)).rejects.toThrow(otherError);
   });
 });
 
 // ---------------------------------------------------------------------------
-// saveSharedLibrary — QuotaExceededError
+// saveSharedLibrary — IDB write errors
 // ---------------------------------------------------------------------------
 
-describe('saveSharedLibrary() quota handling', () => {
-  it('throws a user-friendly message on QuotaExceededError', () => {
-    vi.spyOn(mockStorage, 'setItem').mockImplementation(() => {
-      throw makeQuotaError();
-    });
+describe('saveSharedLibrary() error handling', () => {
+  it('propagates IDB write errors', async () => {
+    vi.mocked(idbSet).mockRejectedValueOnce(new Error('IDB write failed'));
 
-    expect(() => saveSharedLibrary([{ id: 'd1', name: 'Test' } as RocketDesign])).toThrow(
-      /storage full/i,
+    await expect(saveSharedLibrary([{ id: 'd1', name: 'Test' } as RocketDesign])).rejects.toThrow(
+      /IDB write failed/i,
     );
   });
 
-  it('does not swallow non-quota errors', () => {
+  it('does not swallow other errors', async () => {
     const otherError = new RangeError('boom');
-    vi.spyOn(mockStorage, 'setItem').mockImplementation(() => {
-      throw otherError;
-    });
+    vi.mocked(idbSet).mockRejectedValueOnce(otherError);
 
-    expect(() => saveSharedLibrary([])).toThrow(otherError);
+    await expect(saveSharedLibrary([])).rejects.toThrow(otherError);
   });
 });
 
@@ -167,31 +146,31 @@ describe('saveSharedLibrary() quota handling', () => {
 // ---------------------------------------------------------------------------
 
 describe('loadSharedLibrary() error logging', () => {
-  it('returns empty array on corrupt JSON', () => {
-    mockStorage._store.set('spaceAgencyDesignLibrary', '{not valid json!!!');
+  it('returns empty array on corrupt JSON', async () => {
+    _idbStore.set('spaceAgencyDesignLibrary', '{not valid json!!!');
 
-    const result = loadSharedLibrary();
+    const result = await loadSharedLibrary();
     expect(result).toEqual([]);
   });
 
-  it('logs a console.warn when JSON parse fails', () => {
+  it('logs a console.warn when JSON parse fails', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    mockStorage._store.set('spaceAgencyDesignLibrary', '{corrupt}}}');
+    _idbStore.set('spaceAgencyDesignLibrary', '{corrupt}}}');
 
-    loadSharedLibrary();
+    await loadSharedLibrary();
 
     expect(warnSpy).toHaveBeenCalledTimes(1);
     expect(warnSpy.mock.calls[0][0]).toMatch(/designLibrary/i);
   });
 
-  it('does not warn when data is valid', () => {
+  it('does not warn when data is valid', async () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    mockStorage._store.set(
+    _idbStore.set(
       'spaceAgencyDesignLibrary',
       JSON.stringify([{ id: 'd1', name: 'Good Design' }]),
     );
 
-    const result = loadSharedLibrary();
+    const result = await loadSharedLibrary();
     expect(result).toHaveLength(1);
     expect(warnSpy).not.toHaveBeenCalled();
   });

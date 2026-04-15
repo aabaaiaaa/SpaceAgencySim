@@ -1,5 +1,29 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
+
+// ---------------------------------------------------------------------------
+// In-memory IDB mock — shared between mock factory and test code
+// ---------------------------------------------------------------------------
+
+const _idbStore = new Map<string, string>();
+
+vi.mock('../core/idbStorage.js', () => ({
+  idbSet: vi.fn((key: string, value: string) => {
+    _idbStore.set(key, value);
+    return Promise.resolve();
+  }),
+  idbGet: vi.fn((key: string) => {
+    return Promise.resolve(_idbStore.has(key) ? _idbStore.get(key)! : null);
+  }),
+  idbDelete: vi.fn((key: string) => {
+    _idbStore.delete(key);
+    return Promise.resolve();
+  }),
+  idbGetAllKeys: vi.fn(() => {
+    return Promise.resolve([..._idbStore.keys()]);
+  }),
+}));
+
 import {
   loadSharedLibrary,
   saveSharedLibrary,
@@ -18,39 +42,14 @@ import {
 import type { GameState, RocketDesign } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
-// localStorage mock
+// Setup / teardown
 // ---------------------------------------------------------------------------
 
-interface MockStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem(key: string): void;
-  clear(): void;
-  readonly length: number;
-  _store: Map<string, string>;
-}
-
-function createLocalStorageMock(): MockStorage {
-  const store = new Map<string, string>();
-  return {
-    getItem(key: string): string | null { return store.has(key) ? store.get(key)! : null; },
-    setItem(key: string, value: string): void { store.set(key, String(value)); },
-    removeItem(key: string): void { store.delete(key); },
-    clear(): void { store.clear(); },
-    get length(): number { return store.size; },
-    _store: store,
-  };
-}
-
-let mockStorage: MockStorage;
-
 beforeEach(() => {
-  mockStorage = createLocalStorageMock();
-  vi.stubGlobal('localStorage', mockStorage);
+  _idbStore.clear();
 });
 
 afterEach(() => {
-  vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
@@ -109,7 +108,7 @@ function makeSatelliteDesign(overrides: Partial<RocketDesign> = {}): RocketDesig
 }
 
 function seedSharedLibrary(designs: RocketDesign[]): void {
-  mockStorage.setItem('spaceAgencyDesignLibrary', JSON.stringify(designs));
+  _idbStore.set('spaceAgencyDesignLibrary', JSON.stringify(designs));
 }
 
 // ---------------------------------------------------------------------------
@@ -121,283 +120,277 @@ describe('Design Library', () => {
   // ── Shared Library Storage ──────────────────────────────────────────────
 
   describe('loadSharedLibrary', () => {
-    it('returns empty array when nothing stored', () => {
-      expect(loadSharedLibrary()).toEqual([]);
+    it('returns empty array when nothing stored', async () => {
+      expect(await loadSharedLibrary()).toEqual([]);
     });
 
-    it('loads stored designs', () => {
+    it('loads stored designs', async () => {
       const designs = [makeDesign()];
       seedSharedLibrary(designs);
-      const loaded = loadSharedLibrary();
+      const loaded = await loadSharedLibrary();
       expect(loaded).toHaveLength(1);
       expect(loaded[0].id).toBe('design-test-1');
     });
 
-    it('returns empty array for corrupt JSON and logs a warning', () => {
-      mockStorage.setItem('spaceAgencyDesignLibrary', 'not { valid json');
+    it('returns empty array for corrupt JSON and logs a warning', async () => {
+      _idbStore.set('spaceAgencyDesignLibrary', 'not { valid json');
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const result = loadSharedLibrary();
+      const result = await loadSharedLibrary();
       expect(result).toEqual([]);
       expect(warnSpy).toHaveBeenCalledOnce();
       // @ts-expect-error .calls fallback for alternate spy API shape
       expect(warnSpy.calls?.[0]?.[0] ?? warnSpy.mock.calls[0][0]).toContain('designLibrary');
     });
 
-    it('returns empty array for non-array JSON', () => {
-      mockStorage.setItem('spaceAgencyDesignLibrary', JSON.stringify({ not: 'array' }));
-      expect(loadSharedLibrary()).toEqual([]);
+    it('returns empty array for non-array JSON', async () => {
+      _idbStore.set('spaceAgencyDesignLibrary', JSON.stringify({ not: 'array' }));
+      expect(await loadSharedLibrary()).toEqual([]);
     });
 
-    it('returns empty array for null JSON', () => {
-      mockStorage.setItem('spaceAgencyDesignLibrary', 'null');
-      expect(loadSharedLibrary()).toEqual([]);
+    it('returns empty array for null JSON', async () => {
+      _idbStore.set('spaceAgencyDesignLibrary', 'null');
+      expect(await loadSharedLibrary()).toEqual([]);
     });
   });
 
   describe('saveSharedLibrary', () => {
-    it('persists designs to localStorage', () => {
+    it('persists designs to IDB', async () => {
       const designs = [makeDesign()];
-      saveSharedLibrary(designs);
-      const raw = mockStorage.getItem('spaceAgencyDesignLibrary');
+      await saveSharedLibrary(designs);
+      const raw = _idbStore.get('spaceAgencyDesignLibrary');
       expect(raw).toBeTruthy();
       const parsed = JSON.parse(raw!);
       expect(parsed).toHaveLength(1);
       expect(parsed[0].id).toBe('design-test-1');
     });
 
-    it('overwrites existing data', () => {
+    it('overwrites existing data', async () => {
       seedSharedLibrary([makeDesign()]);
-      saveSharedLibrary([makeDesign({ id: 'design-new' })]);
-      const parsed = JSON.parse(mockStorage.getItem('spaceAgencyDesignLibrary')!);
+      await saveSharedLibrary([makeDesign({ id: 'design-new' })]);
+      const parsed = JSON.parse(_idbStore.get('spaceAgencyDesignLibrary')!);
       expect(parsed).toHaveLength(1);
       expect(parsed[0].id).toBe('design-new');
     });
 
-    it('throws user-friendly message on QuotaExceededError', () => {
-      mockStorage.setItem = () => {
-        throw new DOMException('quota exceeded', 'QuotaExceededError');
-      };
-      expect(() => saveSharedLibrary([makeDesign()])).toThrowError(/Storage full/);
-    });
-
-    it('re-throws non-quota errors unchanged', () => {
-      mockStorage.setItem = () => { throw new TypeError('test error'); };
-      expect(() => saveSharedLibrary([makeDesign()])).toThrowError(TypeError);
+    it('propagates IDB write errors', async () => {
+      const { idbSet } = await import('../core/idbStorage.ts');
+      vi.mocked(idbSet).mockRejectedValueOnce(new Error('IDB write failed'));
+      await expect(saveSharedLibrary([makeDesign()])).rejects.toThrow(/IDB write failed/);
     });
   });
 
   describe('saveDesignToSharedLibrary', () => {
-    it('adds a new design', () => {
-      saveDesignToSharedLibrary(makeDesign());
-      const lib = loadSharedLibrary();
+    it('adds a new design', async () => {
+      await saveDesignToSharedLibrary(makeDesign());
+      const lib = await loadSharedLibrary();
       expect(lib).toHaveLength(1);
       expect(lib[0].name).toBe('Test Rocket');
     });
 
-    it('overwrites existing design with same ID', () => {
-      saveDesignToSharedLibrary(makeDesign());
-      saveDesignToSharedLibrary(makeDesign({ name: 'Updated Rocket' }));
-      const lib = loadSharedLibrary();
+    it('overwrites existing design with same ID', async () => {
+      await saveDesignToSharedLibrary(makeDesign());
+      await saveDesignToSharedLibrary(makeDesign({ name: 'Updated Rocket' }));
+      const lib = await loadSharedLibrary();
       expect(lib).toHaveLength(1);
       expect(lib[0].name).toBe('Updated Rocket');
     });
 
-    it('appends when IDs differ', () => {
-      saveDesignToSharedLibrary(makeDesign({ id: 'a' }));
-      saveDesignToSharedLibrary(makeDesign({ id: 'b' }));
-      expect(loadSharedLibrary()).toHaveLength(2);
+    it('appends when IDs differ', async () => {
+      await saveDesignToSharedLibrary(makeDesign({ id: 'a' }));
+      await saveDesignToSharedLibrary(makeDesign({ id: 'b' }));
+      expect(await loadSharedLibrary()).toHaveLength(2);
     });
   });
 
   describe('deleteDesignFromSharedLibrary', () => {
-    it('removes design by ID', () => {
+    it('removes design by ID', async () => {
       seedSharedLibrary([makeDesign({ id: 'a' }), makeDesign({ id: 'b' })]);
-      deleteDesignFromSharedLibrary('a');
-      const lib = loadSharedLibrary();
+      await deleteDesignFromSharedLibrary('a');
+      const lib = await loadSharedLibrary();
       expect(lib).toHaveLength(1);
       expect(lib[0].id).toBe('b');
     });
 
-    it('no-ops for nonexistent ID', () => {
+    it('no-ops for nonexistent ID', async () => {
       seedSharedLibrary([makeDesign()]);
-      deleteDesignFromSharedLibrary('nonexistent');
-      expect(loadSharedLibrary()).toHaveLength(1);
+      await deleteDesignFromSharedLibrary('nonexistent');
+      expect(await loadSharedLibrary()).toHaveLength(1);
     });
   });
 
   // ── Unified Library Access ──────────────────────────────────────────────
 
   describe('getAllDesigns', () => {
-    it('returns shared designs when no private designs exist', () => {
+    it('returns shared designs when no private designs exist', async () => {
       seedSharedLibrary([makeDesign()]);
       const state = freshState();
-      const all = getAllDesigns(state);
+      const all = await getAllDesigns(state);
       expect(all).toHaveLength(1);
       expect(all[0].id).toBe('design-test-1');
     });
 
-    it('includes private designs from state', () => {
+    it('includes private designs from state', async () => {
       const state = freshState();
       state.savedDesigns = [makeDesign({ id: 'priv-1', savePrivate: true })];
-      const all = getAllDesigns(state);
+      const all = await getAllDesigns(state);
       expect(all).toHaveLength(1);
       expect(all[0].id).toBe('priv-1');
     });
 
-    it('@smoke merges shared and private designs', () => {
+    it('@smoke merges shared and private designs', async () => {
       seedSharedLibrary([makeDesign({ id: 'shared-1' })]);
       const state = freshState();
       state.savedDesigns = [makeDesign({ id: 'priv-1', savePrivate: true })];
-      const all = getAllDesigns(state);
+      const all = await getAllDesigns(state);
       expect(all).toHaveLength(2);
     });
 
-    it('private overrides shared when IDs collide', () => {
+    it('private overrides shared when IDs collide', async () => {
       seedSharedLibrary([makeDesign({ id: 'same-id', name: 'Shared Version' })]);
       const state = freshState();
       state.savedDesigns = [makeDesign({ id: 'same-id', name: 'Private Version', savePrivate: true })];
-      const all = getAllDesigns(state);
+      const all = await getAllDesigns(state);
       expect(all).toHaveLength(1);
       expect(all[0].name).toBe('Private Version');
     });
 
-    it('excludes non-private designs from savedDesigns', () => {
+    it('excludes non-private designs from savedDesigns', async () => {
       const state = freshState();
       state.savedDesigns = [
         makeDesign({ id: 'public-in-state', savePrivate: false }),
         makeDesign({ id: 'private-in-state', savePrivate: true }),
       ];
-      const all = getAllDesigns(state);
+      const all = await getAllDesigns(state);
       // Only private designs from savedDesigns are included
       expect(all).toHaveLength(1);
       expect(all[0].id).toBe('private-in-state');
     });
 
-    it('handles undefined savedDesigns gracefully', () => {
+    it('handles undefined savedDesigns gracefully', async () => {
       const state = freshState();
       // @ts-expect-error testing defensive handling of undefined
       state.savedDesigns = undefined;
-      expect(() => getAllDesigns(state)).not.toThrow();
-      expect(getAllDesigns(state)).toEqual([]);
+      await expect(getAllDesigns(state)).resolves.not.toThrow();
+      expect(await getAllDesigns(state)).toEqual([]);
     });
   });
 
   // ── Save/Delete Routing ─────────────────────────────────────────────────
 
   describe('saveDesignToLibrary', () => {
-    it('saves shared design to localStorage', () => {
+    it('saves shared design to IDB', async () => {
       const state = freshState();
       const design = makeDesign({ savePrivate: false });
-      saveDesignToLibrary(state, design);
-      expect(loadSharedLibrary()).toHaveLength(1);
+      await saveDesignToLibrary(state, design);
+      expect(await loadSharedLibrary()).toHaveLength(1);
       expect(state.savedDesigns).toHaveLength(0);
     });
 
-    it('saves private design to state.savedDesigns', () => {
+    it('saves private design to state.savedDesigns', async () => {
       const state = freshState();
       const design = makeDesign({ savePrivate: true });
-      saveDesignToLibrary(state, design);
+      await saveDesignToLibrary(state, design);
       expect(state.savedDesigns).toHaveLength(1);
       expect(state.savedDesigns[0].id).toBe('design-test-1');
       // Should NOT be in shared library
-      expect(loadSharedLibrary()).toHaveLength(0);
+      expect(await loadSharedLibrary()).toHaveLength(0);
     });
 
-    it('moves design from shared to private', () => {
+    it('moves design from shared to private', async () => {
       seedSharedLibrary([makeDesign()]);
       const state = freshState();
-      saveDesignToLibrary(state, makeDesign({ savePrivate: true }));
+      await saveDesignToLibrary(state, makeDesign({ savePrivate: true }));
       // Removed from shared
-      expect(loadSharedLibrary()).toHaveLength(0);
+      expect(await loadSharedLibrary()).toHaveLength(0);
       // Added to private
       expect(state.savedDesigns).toHaveLength(1);
     });
 
-    it('moves design from private to shared', () => {
+    it('moves design from private to shared', async () => {
       const state = freshState();
       state.savedDesigns = [makeDesign({ savePrivate: true })];
-      saveDesignToLibrary(state, makeDesign({ savePrivate: false }));
+      await saveDesignToLibrary(state, makeDesign({ savePrivate: false }));
       // Added to shared
-      expect(loadSharedLibrary()).toHaveLength(1);
+      expect(await loadSharedLibrary()).toHaveLength(1);
       // Removed from private
       expect(state.savedDesigns).toHaveLength(0);
     });
 
-    it('handles undefined savedDesigns when saving private design', () => {
+    it('handles undefined savedDesigns when saving private design', async () => {
       const state = freshState();
       // @ts-expect-error testing defensive handling of undefined
       state.savedDesigns = undefined;
       const design = makeDesign({ savePrivate: true });
-      expect(() => saveDesignToLibrary(state, design)).not.toThrow();
+      await expect(saveDesignToLibrary(state, design)).resolves.not.toThrow();
       expect(state.savedDesigns).toHaveLength(1);
       expect(state.savedDesigns[0].id).toBe('design-test-1');
     });
 
-    it('handles null savedDesigns when saving private design', () => {
+    it('handles null savedDesigns when saving private design', async () => {
       const state = freshState();
       // @ts-expect-error testing defensive handling of null
       state.savedDesigns = null;
       const design = makeDesign({ savePrivate: true });
-      expect(() => saveDesignToLibrary(state, design)).not.toThrow();
+      await expect(saveDesignToLibrary(state, design)).resolves.not.toThrow();
       expect(state.savedDesigns).toHaveLength(1);
     });
 
-    it('handles undefined savedDesigns when saving shared design', () => {
+    it('handles undefined savedDesigns when saving shared design', async () => {
       const state = freshState();
       // @ts-expect-error testing defensive handling of undefined
       state.savedDesigns = undefined;
       const design = makeDesign({ savePrivate: false });
-      expect(() => saveDesignToLibrary(state, design)).not.toThrow();
-      expect(loadSharedLibrary()).toHaveLength(1);
+      await expect(saveDesignToLibrary(state, design)).resolves.not.toThrow();
+      expect(await loadSharedLibrary()).toHaveLength(1);
       expect(state.savedDesigns).toEqual([]);
     });
 
-    it('overwrites existing private design with same ID', () => {
+    it('overwrites existing private design with same ID', async () => {
       const state = freshState();
       state.savedDesigns = [makeDesign({ savePrivate: true, name: 'Old' })];
-      saveDesignToLibrary(state, makeDesign({ savePrivate: true, name: 'New' }));
+      await saveDesignToLibrary(state, makeDesign({ savePrivate: true, name: 'New' }));
       expect(state.savedDesigns).toHaveLength(1);
       expect(state.savedDesigns[0].name).toBe('New');
     });
   });
 
   describe('deleteDesignFromLibrary', () => {
-    it('removes from both shared and private storage', () => {
+    it('removes from both shared and private storage', async () => {
       seedSharedLibrary([makeDesign()]);
       const state = freshState();
       state.savedDesigns = [makeDesign({ savePrivate: true })];
-      deleteDesignFromLibrary(state, 'design-test-1');
-      expect(loadSharedLibrary()).toHaveLength(0);
+      await deleteDesignFromLibrary(state, 'design-test-1');
+      expect(await loadSharedLibrary()).toHaveLength(0);
       expect(state.savedDesigns).toHaveLength(0);
     });
 
-    it('handles design only in shared', () => {
+    it('handles design only in shared', async () => {
       seedSharedLibrary([makeDesign()]);
       const state = freshState();
-      deleteDesignFromLibrary(state, 'design-test-1');
-      expect(loadSharedLibrary()).toHaveLength(0);
+      await deleteDesignFromLibrary(state, 'design-test-1');
+      expect(await loadSharedLibrary()).toHaveLength(0);
     });
 
-    it('handles design only in private', () => {
+    it('handles design only in private', async () => {
       const state = freshState();
       state.savedDesigns = [makeDesign()];
-      deleteDesignFromLibrary(state, 'design-test-1');
+      await deleteDesignFromLibrary(state, 'design-test-1');
       expect(state.savedDesigns).toHaveLength(0);
     });
 
-    it('handles undefined savedDesigns', () => {
+    it('handles undefined savedDesigns', async () => {
       const state = freshState();
       // @ts-expect-error testing defensive handling of undefined
       state.savedDesigns = undefined;
-      expect(() => deleteDesignFromLibrary(state, 'design-test-1')).not.toThrow();
+      await expect(deleteDesignFromLibrary(state, 'design-test-1')).resolves.not.toThrow();
       expect(state.savedDesigns).toEqual([]);
     });
 
-    it('handles null savedDesigns', () => {
+    it('handles null savedDesigns', async () => {
       const state = freshState();
       // @ts-expect-error testing defensive handling of null
       state.savedDesigns = null;
-      expect(() => deleteDesignFromLibrary(state, 'design-test-1')).not.toThrow();
+      await expect(deleteDesignFromLibrary(state, 'design-test-1')).resolves.not.toThrow();
       expect(state.savedDesigns).toEqual([]);
     });
   });
