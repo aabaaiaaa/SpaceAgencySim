@@ -388,9 +388,9 @@ function _buildSaveCard(summary: SaveSlotSummary): HTMLDivElement {
       </div>
     </div>
     <div class="mm-save-card-actions">
-      <button class="mm-btn mm-btn-primary" data-action="load" data-slot="${summary.slotIndex}" data-key="${summary.storageKey}">Load</button>
-      <button class="mm-btn mm-btn-secondary" data-action="export" data-slot="${summary.slotIndex}" data-key="${summary.storageKey}">Export</button>
-      <button class="mm-btn mm-btn-danger" data-action="delete" data-slot="${summary.slotIndex}" data-key="${summary.storageKey}">Delete</button>
+      <button class="mm-btn mm-btn-primary" data-action="load" data-slot="${summary.slotIndex}" data-key="${escapeHtml(summary.storageKey)}">Load</button>
+      <button class="mm-btn mm-btn-secondary" data-action="export" data-slot="${summary.slotIndex}" data-key="${escapeHtml(summary.storageKey)}">Export</button>
+      <button class="mm-btn mm-btn-danger" data-action="delete" data-slot="${summary.slotIndex}" data-key="${escapeHtml(summary.storageKey)}">Delete</button>
     </div>
   `;
 

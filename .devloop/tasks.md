@@ -85,7 +85,7 @@
 - **Verification**: `npx vitest run src/tests/physics.test.ts --testNamePattern "totalMass"` — new test passes.
 
 ### TASK-015: HTML-escape data-key attributes in mainmenu.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: At `src/ui/mainmenu.ts:390-392`, the `data-key="${summary.storageKey}"` interpolation doesn't use `escapeHtml()` (which is already imported). Wrap `summary.storageKey` with `escapeHtml()` in all three button template literals (Load, Export, Delete). See requirements.md section 5.
 - **Verification**: `npm run typecheck` passes. Grep for `data-key=` in `mainmenu.ts` shows `escapeHtml` applied to all instances.
