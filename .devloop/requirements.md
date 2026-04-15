@@ -1,142 +1,213 @@
-# Iteration 13 — Bug Fixes, Coverage Hardening & Architectural Cleanup
+# Iteration 14 — Cleanup, Auto-Save Fix, Deterministic IDs & Shared Map Geometry
 
-This iteration addresses the single bug and all technical debt identified in the iteration 12 review, plus architectural cleanup items to improve code quality and test determinism. No new features — this is a hardening pass.
-
----
-
-## 1. Fix `deployOutpostCore()` Environment Scaling (BUG-1)
-
-**Problem:** In `src/core/hubs.ts` at line 268, `deployOutpostCore()` deducts the base Crew Hab money cost without applying the environment cost multiplier. When deploying on Mars (1.3x), the player pays the Earth-rate cost upfront, but the construction project queued by `createHub()` records the environment-scaled cost — an inconsistency.
-
-**Context:** The same bug was fixed in `createHub()` (line 116) and `startFacilityUpgrade()` (line 457) during iteration 12 TASK-002. This occurrence was missed.
-
-**Fix:** At line 268, compute the environment multiplier and apply it:
-```typescript
-const envMultiplier = getEnvironmentCostMultiplier(flight.bodyId);
-const moneyCost = (crewHabCost?.moneyCost ?? 200_000) * envMultiplier;
-```
-
-**Tests:** Add unit tests in the relevant hub test file verifying:
-- Deploying on Mars deducts 1.3x the base Crew Hab cost.
-- Deploying on the Moon deducts 1.0x the base cost.
-- The deducted amount matches the construction project's recorded `moneyCost`.
+**Date:** 2026-04-15
+**Scope:** Review cleanup, auto-save slot visibility bug, Date.now() ID migration, shared geometry/color extraction
+**Builds on:** Iteration 13 (bug fixes, coverage hardening, architectural cleanup)
+**Full design spec:** `docs/superpowers/specs/2026-04-15-iteration-14-design.md`
+**Implementation plan:** `docs/superpowers/plans/2026-04-15-iteration-14.md`
 
 ---
 
-## 2. Coverage Threshold Hardening
+## 1. Review Cleanup
 
-**Problem:** `npm run test:unit` reports 5 coverage threshold violations after iteration 12 added substantial UI and render code:
+Five small items carried forward from the iteration 13 review.
 
-| Metric | Area | Actual | Threshold |
+### 1a. Fix Lint Warnings
+
+Remove unused imports `pressStage` and `pressThrottleUp` from `e2e/destinations.spec.ts:32-33`. These are imported from `./helpers.js` but never used.
+
+### 1b. Extract `loadScreen()` Helper + User Error Feedback
+
+The 9 identical catch blocks in `src/ui/index.ts` (lines 344-610) each do `hideLoadingIndicator(); console.error(...)`. Users see the loading indicator vanish with no explanation when a dynamic import fails.
+
+Create a shared `src/ui/notification.ts` with a `showNotification()` toast utility (styled `<div>` appended to `document.body`, auto-removes after ~4 seconds). Then create a `loadScreen()` async helper in `src/ui/index.ts` that wraps the dynamic import in try/catch, calls `showNotification` on failure, and returns null so the caller can abort. Replace all 9 catch blocks with `loadScreen()` calls.
+
+### 1c. Document Altitude Non-Check
+
+Add a JSDoc comment above `validateLegChaining` in `src/core/routes.ts:104` explaining that altitude is intentionally not checked because route legs connect bodies and location types, not specific orbits.
+
+### 1d. Un-Skip Loading Indicator Tests
+
+Install `jsdom` as a devDependency. Add `// @vitest-environment jsdom` at the top of `src/tests/ui-helpers.test.ts`. Change `describe.skip` to `describe` for the 4 loading indicator tests (lines 206-234), implementing the actual test bodies with dynamic imports.
+
+---
+
+## 2. Auto-Save & Dynamic Save Slots
+
+### The Bug
+
+Auto-save fires correctly after post-flight. It finds the first empty localStorage slot (searching 0-99). But the load screen in `src/ui/mainmenu.ts` only renders slots 0-4 (`SAVE_SLOT_COUNT = 5`). Saves written to slots 5+ are invisible and unloadable from the UI.
+
+### Fix: Dynamic Load Screen
+
+**In `src/ui/mainmenu.ts`:** Instead of iterating `0..SAVE_SLOT_COUNT-1`, scan localStorage for all keys matching `spaceAgencySave_*` (including the `spaceAgencySave_auto` fallback key). Build the slot list from what actually exists in storage.
+
+**Display rules:**
+- Slots 0-4 always render (as "Empty Slot" placeholders if empty), so the user always sees at least 5 save-to targets.
+- Any additional saves beyond slot 4 (slots 5+, auto key) appear as extra cards below the base 5.
+- All save cards — manual or auto — have identical actions: Load, Export, Delete.
+- Auto-saves display their save name (e.g. "Auto-Save") in the card header.
+- If many saves exist, the slot container gets `max-height` with `overflow-y: auto` for scrolling.
+
+### Auto-Save Slot Reuse
+
+Refine `_getAutoSaveKey()` in `src/core/autoSave.ts` to prevent auto-save slot accumulation:
+
+1. Scan existing slots for a save named "Auto-Save" matching the current agency name. If found, reuse that slot (overwrite).
+2. Otherwise, find the first empty slot (0-99).
+3. Fallback to dedicated `spaceAgencySave_auto` key.
+
+This means each game only ever has one auto-save slot at a time, which gets overwritten on each auto-save.
+
+### Save Version Incompatibility
+
+`SAVE_VERSION` bumps from 5 to 6 (for the new GameState counter fields — see Section 3). Old saves remain incompatible:
+- The load screen slot card already shows a version warning badge for incompatible saves (this exists).
+- Attempting to load an incompatible save must fail with a user-visible error message (new behavior).
+- No migration code — this is early dev stage.
+
+### Changes to saveload.ts
+
+`SaveSlotSummary` gets a new `storageKey: string` field so the UI knows which localStorage key to use for load/export/delete on overflow slots. `summaryFromEnvelope()` accepts and passes through the storage key. `listSaves()` is rewritten to scan slots 0-4 (always, with null for empty), then 5-99 and `spaceAgencySave_auto` (only if populated). `deleteSave` is updated to accept a storage key for overflow slots.
+
+---
+
+## 3. Sequential ID Migration
+
+### Problem
+
+14 ID generators across 9 files use `Date.now() + Math.random()`, producing non-deterministic IDs. Hub IDs were already migrated to sequential counters in iteration 13. This iteration completes the migration for all remaining entity types, plus one module-level counter in `surfaceOps.ts`.
+
+### New GameState Counter Fields
+
+All 15 fields initialize to `1` in `createGameState()`:
+
+| Counter field | ID prefix | Source file | Current generator |
 |---|---|---|---|
-| Lines | `src/render/**` | 35.15% | 39% |
-| Functions | `src/render/**` | 50.87% | 56% |
-| Branches | `src/render/**` | 90.55% | 91% |
-| Lines | `src/ui/**` | 44.54% | 64% |
-| Functions | `src/ui/**` | 78.57% | 87% |
+| `nextContractId` | `contract-N` | `contracts.ts:83` | `_generateId()` with crypto.randomUUID fallback |
+| `nextChallengeId` | `custom-N` | `customChallenges.ts:193` | `_generateId()` |
+| `nextDesignId` | `design-N` | `designLibrary.ts:171` | inline in `duplicateDesign()` |
+| `nextFlightResultId` | `flight-N` | `flightReturn.ts:316` | `_generateId()` with crypto.randomUUID fallback |
+| `nextAsteroidId` | `AST-P-N` | `grabbing.ts:462` | inline, `AST-P-${asteroid.id}-${Date.now()}` |
+| `nextCrewId` | `crew-N` | `hubCrew.ts:116` | inline in `hireCrewAtHub()` |
+| `nextFieldCraftId` | `fc-N` | `lifeSupport.ts:224` | `_generateId()` with crypto.randomUUID fallback |
+| `nextMiningSiteId` | `mining-site-N` | `mining.ts:41` | `generateSiteId()` with crypto.randomUUID fallback |
+| `nextMiningModuleId` | `module-N` | `mining.ts:117` | `generateModuleId()` with crypto.randomUUID fallback |
+| `nextInventoryId` | `inv-N` | `partInventory.ts:77` | `_generateId()` with crypto.randomUUID fallback |
+| `nextRouteId` | `route-N` | `routes.ts:146` | `generateRouteId()` |
+| `nextRouteLegId` | `route-leg-N` | `routes.ts:150` | `generateRouteLegId()` |
+| `nextProvenLegId` | `proven-leg-N` | `routes.ts:44` | inline in `proveRouteLeg()` |
+| `nextSatelliteId` | `sat-N` | `satellites.ts:123` | inline in `deploySatellite()` |
+| `nextSurfaceOpId` | `surface-N` | `surfaceOps.ts:58` | module-level `_nextId` counter with `Date.now()` |
 
-**Approach:** Two-pronged: add targeted unit tests for the simpler, testable helpers in the new UI/render code, then lower the remaining thresholds to match actual coverage.
+### Migration Pattern
 
-### Tests to Add — UI Helpers
+Each generator becomes `const id = \`prefix-${state.nextPrefixId++}\`;`. For files with `_generateId()` helpers that had `crypto.randomUUID` fallbacks, the entire helper is deleted. The caller inlines the counter expression.
 
-Focus on pure logic and DOM-light helpers that can be tested without a full browser:
-- **Loading indicator** (`src/ui/loadingIndicator.ts`): `showLoadingIndicator()` / `hideLoadingIndicator()` — verify DOM element creation/removal, idempotent behavior.
-- **Hub management info display helpers**: `_formatMoney()`, `_getStatusInfo()`, `_addGridRow()` — verify formatting and return values.
-- **Schematic layout helpers** in `src/ui/logistics/_schematicLayout.ts` (if any pure computation functions are not yet tested).
-- **Body color helper** (`getBodyColor()`) — if not already covered (was listed in iteration 12 but verify).
+### Special Cases
 
-### Tests to Add — Render Helpers
+- **`grabbing.ts` (asteroids):** Current format `AST-P-${asteroid.id}-${Date.now()}` embeds the parent asteroid ID. New format is `AST-P-${state.nextAsteroidId++}` — the parent relationship is already tracked in the object's data fields.
+- **`surfaceOps.ts`:** Currently uses a module-level `_nextId` counter seeded with `Date.now()`. Migrate to `state.nextSurfaceOpId` so the counter persists across saves.
+- **`designLibrary.ts`:** `duplicateDesign()` needs a `state: GameState` parameter added to its signature. All callers must be updated.
 
-Focus on render utility functions that don't require a PixiJS context:
-- Any pure math/computation helpers used by render modules.
-- Layout calculation functions that return positions/sizes without touching the canvas.
+### SAVE_VERSION
 
-### Threshold Adjustment
+Bump from 5 to 6. Old saves are incompatible (no migration).
 
-After adding the new tests, measure the actual coverage and set thresholds 1-2% below the measured values. This gives a buffer against minor fluctuations while still catching regressions. The thresholds are in `vite.config.ts` lines 122-138.
+### Factory Updates
 
----
-
-## 3. Suppress Chunk Size Warning
-
-**Problem:** The `vendor-pixi` chunk is 504 KB, slightly above Vite's default 500 KB warning. This is PixiJS itself — not reducible without switching renderers.
-
-**Fix:** Add `chunkSizeWarningLimit: 600` to the `build` config in `vite.config.ts`, as a sibling to `rollupOptions`.
-
----
-
-## 4. Split Hub Management Panel into Sub-Modules
-
-**Problem:** `src/ui/hubManagement.ts` is 533 lines. The project convention (documented in CLAUDE.md) is to split large UI modules into sub-module directories with barrel re-exports.
-
-**Target structure:**
-```
-src/ui/hubManagement.ts           → barrel re-export (minimal, just re-exports public API)
-src/ui/hubManagement/_panel.ts    → main panel orchestration: show/hide, build, refresh, module state
-src/ui/hubManagement/_header.ts   → header section with name editing, blur-to-save, validation display
-src/ui/hubManagement/_sections.ts → info grid, facilities, population, economy section builders
-src/ui/hubManagement/_dialogs.ts  → reactivate and abandon confirmation dialogs
-```
-
-**Rules:**
-- The public API (`showHubManagementPanel`, `hideHubManagementPanel`) stays exported from the barrel at the original import path so no external callers need changes.
-- Internal sub-modules use `_` prefix naming convention (consistent with other split modules like `vab/`, `flightController/`, `logistics/`).
-- Shared state variables (`_backdrop`, `_state`, `_hubId`) and utility functions (`_formatMoney`) live in `_panel.ts` and are imported by other sub-modules as needed.
+Both `src/tests/_factories.ts` and `e2e/helpers/_saveFactory.ts` gain all 15 new counter fields initialized to `1`, plus `SAVE_VERSION = 6`.
 
 ---
 
-## 5. Sequential Hub ID Generation
+## 4. Shared Geometry & Color Extraction
 
-**Problem:** Hub IDs are generated as `'hub-' + Date.now() + '-' + random6chars` in `createHub()` at line 91 of `src/core/hubs.ts`. This is non-deterministic, making test assertions that depend on hub order or ID format fragile.
+### Problem
 
-**Changes:**
+The SVG logistics map (`src/ui/logistics/_routeMap.ts`) and the PixiJS flight map (`src/render/map.ts`) independently implement identical quadratic Bézier curve math and maintain separate, inconsistent body/route color palettes.
 
-1. **Add `nextHubId` counter to `GameState`** in `src/core/gameState.ts`:
-   - New field: `nextHubId: number` (starts at 1).
-   - Initialize to `1` in `createGameState()`.
-   - Earth hub keeps its hardcoded `EARTH_HUB_ID` ('earth') — the counter is for dynamically-created hubs only.
+### New Module: `src/core/mapGeometry.ts`
 
-2. **Update `createHub()` in `src/core/hubs.ts`**:
-   - Replace `'hub-' + Date.now() + '-' + random` with `'hub-' + state.nextHubId`.
-   - Increment `state.nextHubId` after generating the ID.
-   - Produces IDs like `hub-1`, `hub-2`, `hub-3`.
+A pure-logic TypeScript module with no DOM or rendering dependencies. Exports:
 
-3. **Update tests**: Any tests that assert on hub ID format (e.g., regex matching `hub-\d+-\w+`) need to be updated for the new `hub-N` format. Tests that create hubs in `_factories.ts` may need to set/increment `nextHubId` on the mock state.
+**Bézier utilities:**
+- `BEZIER_OFFSET_FACTOR = 0.18`
+- `bezierControlPoint(x1, y1, x2, y2, legIndex)` → `{ cx, cy }` — perpendicular offset, alternating direction
+- `evalQuadBezier(x1, y1, cx, cy, x2, y2, t)` → `{ x, y }` — evaluate curve at parameter t
 
-4. **Save version**: Bump `SAVE_VERSION` since the state shape changed (new `nextHubId` field). Old saves remain incompatible (no migration per project policy).
+**Body colors (single source of truth):**
+- `BODY_COLORS: Record<string, string>` — hex map: `{ sun: '#FFD700', earth: '#4488CC', ... }`
+- `DEFAULT_BODY_COLOR = '#888888'`
+- `getBodyColorHex(bodyId)` → CSS hex string, case-insensitive
+- `getBodyColorNum(bodyId)` → numeric value for PixiJS
+
+**Route status colors (consolidated — both maps use the same colors now):**
+- `ROUTE_STATUS_COLORS = { active: { hex, num }, paused: { hex, num }, broken: { hex, num } }`
+- Active: `#64B4FF` (cyan — chosen over the PixiJS green for distinctness from craft markers)
+- Paused: `#666666`
+- Broken: `#CC3333`
+
+### Changes to SVG logistics map (`_routeMap.ts`)
+
+- Import `bezierControlPoint`, `getBodyColorHex`, `ROUTE_STATUS_COLORS` from `mapGeometry.ts`
+- Delete local `bezierPath()` function — build SVG path string inline from shared control point
+- Delete `getBodyColor()` (CSS computed style reader) — replaced by `getBodyColorHex()`
+- Delete `--body-color-*` CSS custom properties from `logistics.css`
+- Update route status color literals to use `ROUTE_STATUS_COLORS[status].hex`
+- Paused routes: use `opacity` attribute instead of `rgba()` since hex colors don't support alpha
+
+If `getBodyColor` is exported and imported by other files, add a re-export alias or update callers.
+
+### Changes to PixiJS flight map (`map.ts`)
+
+- Import `bezierControlPoint`, `evalQuadBezier`, `getBodyColorNum`, `ROUTE_STATUS_COLORS` from `mapGeometry.ts`
+- Delete local `_bezierControlPoint()`, `_evalQuadBezier()`, `BEZIER_OFFSET_FACTOR`
+- Delete `ROUTE_ACTIVE_COLOR`, `ROUTE_PAUSED_COLOR`, `ROUTE_BROKEN_COLOR` constants
+- Keep `PROVEN_LEG_COLOR` (render-specific, not shared)
+- Keep all non-route color constants (hub markers, craft, orbits, etc.)
+- Update destructuring: old `{ cpx, cpy }` → rename to match `{ cx, cy }` or use `{ cx: cpx, cy: cpy }`
+
+### Unit tests (`mapGeometry.test.ts`)
+
+- Bézier control point: horizontal/diagonal/zero-distance cases, alternating direction
+- evalQuadBezier: t=0 returns start, t=1 returns end, t=0.5 returns weighted midpoint
+- Body colors: all known bodies present, hex/num consistency, case-insensitive lookup, default for unknown
+- Route status colors: all 3 statuses present, hex/num consistency
 
 ---
 
-## 6. Route Leg Chaining Validation
+## 5. Testing Strategy
 
-**Problem:** In `src/core/routes.ts`, `processRoutes()` validates that all hub references in route legs point to existing hubs, but it does NOT validate leg continuity — that leg N's destination matches leg N+1's origin. This could allow invalid multi-leg routes to exist.
+### New Unit Tests
 
-**Changes:**
+| Test file | What it covers |
+|---|---|
+| `mapGeometry.test.ts` (new) | Bézier control point math, eval at t=0/0.5/1, color hex/num consistency, route status colors |
+| `autoSave.test.ts` (additions) | Slot reuse for same agency, empty slot discovery beyond slot 4 |
+| `saveload.test.ts` (additions) | Dynamic slot enumeration, overflow slot discovery, storageKey on summaries, incompatible version handling |
+| `ui-helpers.test.ts` (un-skip) | 4 loading indicator DOM tests with jsdom environment |
 
-1. **Add validation helper:**
-   ```typescript
-   function validateLegChaining(legs: RouteLeg[]): boolean
-   ```
-   Returns `true` if for every adjacent pair of legs, `legs[n].destination.bodyId === legs[n+1].origin.bodyId` and `legs[n].destination.locationType === legs[n+1].origin.locationType`. Hub IDs are checked if both are non-null.
+### Updated Unit Tests
 
-2. **Apply in `createRoute()`**: Before creating a route, validate leg chaining. Return an error if legs don't form a continuous chain.
+- All tests asserting on old ID formats (regex like `route-\d+-\w+`) updated for `prefix-N` format
+- Factory files (`_factories.ts`, `_saveFactory.ts`) gain 15 new `next*Id` counters at `1` and `SAVE_VERSION = 6`
 
-3. **Apply in `processRoutes()`**: Add a chaining check alongside the existing hub-existence check. Mark routes with broken chains as `status: 'broken'`.
+### New E2E Tests
 
-4. **Unit tests**: Test cases for:
-   - Valid 2-leg chain (A→B, B→C) — passes.
-   - Valid 3-leg chain (A→B, B→C, C→D) — passes.
-   - Broken chain (A→B, C→D where B≠C) — rejected/broken.
-   - Single leg route — always valid (no chaining needed).
-   - Hub ID mismatch in otherwise valid body chain — handled correctly.
+| Spec | What it covers |
+|---|---|
+| `auto-save.spec.ts` (additions) | Auto-save after flight creates a visible save on the load screen; with 5 manual slots full, auto-save still appears |
+| `saveload.spec.ts` (additions) | Slot with old SAVE_VERSION shows warning badge and cannot be loaded |
 
 ---
 
 ## Technical Decisions
 
-- **No new features.** This iteration is purely bug fixes, test hardening, and code quality improvements.
-- **Coverage strategy: test + lower.** Add tests for the easy wins (pure helpers), lower thresholds for inherently hard-to-test DOM/canvas code.
-- **Sequential hub IDs over UUIDs.** Deterministic, human-readable, easy to test. Counter lives in game state and persists across saves.
-- **Hub management split follows existing convention.** Same sub-module directory pattern used by `vab/`, `flightController/`, `missionControl/`, `logistics/`.
-- **Save version bump for GameState shape change.** `nextHubId` field addition requires version bump. No migration (per project policy).
-- **Route chaining validated at creation AND processing.** Defense in depth — catch invalid routes early (creation) and handle corruption gracefully (processing).
+- **Dynamic load screen over fixed slots.** Shows all saves that exist, not an arbitrary cap. Scrolls if needed.
+- **Auto-save slot reuse by agency name.** Prevents slot accumulation — one auto-save per game at a time.
+- **One counter per entity prefix.** 15 fields is more than grouping would require, but each entity type gets self-documenting IDs (`contract-1`, `crew-3`, `route-5`).
+- **No save migration.** Early dev stage. Old saves show a warning badge and fail to load.
+- **Shared geometry in `src/core/`.** Pure math module with no rendering dependencies, consistent with the three-layer architecture (core = logic, render = drawing, UI = DOM).
+- **Consolidated route colors (cyan).** Chosen over green because cyan is distinct from craft markers and hub markers in the PixiJS map.
+- **CSS custom properties removed.** Body colors move from CSS runtime lookups to a static TypeScript map. Simpler, testable, and works in non-DOM contexts (unit tests).
+- **`showNotification` in shared `src/ui/notification.ts`.** Used by both `index.ts` (load failures) and `mainmenu.ts` (incompatible save version). Separate from the auto-save toast which has cancel/countdown logic.

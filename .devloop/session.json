@@ -1,9 +1,8 @@
 {
-  "phase": "run",
+  "phase": "init",
   "sessionId": null,
-  "lastIteration": 4,
-  "startedAt": "2026-04-14T19:34:05.521Z",
-  "iteration": 13,
-  "devloopVersion": "4.0.2",
-  "activeTask": null
+  "lastIteration": 0,
+  "startedAt": "2026-04-15T09:09:40.314Z",
+  "iteration": 14,
+  "devloopVersion": "4.0.2"
 }
