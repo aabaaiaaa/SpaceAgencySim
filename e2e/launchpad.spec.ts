@@ -3,6 +3,7 @@ import {
   VP_W, VP_H,
   SAVE_KEY, STARTING_MONEY,
   FIRST_FLIGHT_MISSION, buildSaveEnvelope,
+  seedIdb,
 } from './helpers.js';
 
 /**
@@ -12,7 +13,7 @@ import {
  * designs appear in the list, and that a rocket can be relaunched from the
  * launch pad directly.
  *
- * A pre-built save is seeded into localStorage with one rocket design
+ * A pre-built save is seeded into IndexedDB with one rocket design
  * already present in `gameState.rockets` (simulating a previous VAB launch).
  *
  * Each test seeds its own save and gets its own page instance.
@@ -98,10 +99,8 @@ test.describe('Launch Pad', () => {
   test('(1) launch pad displays previously launched rocket designs', async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     // Seed a save with one rocket design.
-    await page.addInitScript(({ key, envelope }: { key: string; envelope: ReturnType<typeof buildSaveEnvelope> }) => {
-      localStorage.setItem(key, JSON.stringify(envelope));
-    }, { key: SAVE_KEY, envelope: lpSaveEnvelope([SEEDED_DESIGN]) });
-
+    await page.goto('/');
+    await seedIdb(page, SAVE_KEY, JSON.stringify(lpSaveEnvelope([SEEDED_DESIGN])));
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
@@ -143,11 +142,9 @@ test.describe('Launch Pad', () => {
 
   test('(2) launch pad shows empty state when no rockets exist', async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    // Seed a save with NO rocket designs (overwrite the previous seed).
-    await page.addInitScript(({ key, envelope }: { key: string; envelope: ReturnType<typeof buildSaveEnvelope> }) => {
-      localStorage.setItem(key, JSON.stringify(envelope));
-    }, { key: SAVE_KEY, envelope: lpSaveEnvelope([]) });
-
+    // Seed a save with NO rocket designs.
+    await page.goto('/');
+    await seedIdb(page, SAVE_KEY, JSON.stringify(lpSaveEnvelope([])));
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
@@ -173,10 +170,8 @@ test.describe('Launch Pad', () => {
   test('(3) clicking Launch on a design starts the flight scene', async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     // Seed a save with the test rocket design.
-    await page.addInitScript(({ key, envelope }: { key: string; envelope: ReturnType<typeof buildSaveEnvelope> }) => {
-      localStorage.setItem(key, JSON.stringify(envelope));
-    }, { key: SAVE_KEY, envelope: lpSaveEnvelope([SEEDED_DESIGN]) });
-
+    await page.goto('/');
+    await seedIdb(page, SAVE_KEY, JSON.stringify(lpSaveEnvelope([SEEDED_DESIGN])));
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
@@ -236,10 +231,8 @@ test.describe('Launch Pad', () => {
     const poorEnvelope: ReturnType<typeof buildSaveEnvelope> = lpSaveEnvelope([SEEDED_DESIGN]);
     poorEnvelope.state.money = 5_000;
 
-    await page.addInitScript(({ key, envelope }: { key: string; envelope: ReturnType<typeof buildSaveEnvelope> }) => {
-      localStorage.setItem(key, JSON.stringify(envelope));
-    }, { key: SAVE_KEY, envelope: poorEnvelope });
-
+    await page.goto('/');
+    await seedIdb(page, SAVE_KEY, JSON.stringify(poorEnvelope));
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 

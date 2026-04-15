@@ -14,6 +14,7 @@ import {
   SAVE_KEY, STARTING_MONEY,
   buildSaveEnvelope, dismissWelcomeModal,
   dragPartToCanvas,
+  seedIdb, seedIdbMulti,
 } from './helpers.js';
 
 /**
@@ -48,12 +49,11 @@ async function startNewGameAndGoToVab(page: Page): Promise<void> {
   await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 10_000 });
 }
 
-/** Seed a save in slot 0 and navigate to the load screen. */
+/** Seed a save in slot 0 via IndexedDB and navigate to the load screen. */
 async function seedSaveAndGoToLoadScreen(page: Page, envelope: ReturnType<typeof buildSaveEnvelope>): Promise<void> {
   await page.setViewportSize({ width: VP_W, height: VP_H });
-  await page.addInitScript(({ key, envelope }) => {
-    localStorage.setItem(key, JSON.stringify(envelope));
-  }, { key: SAVE_KEY, envelope });
+  await page.goto('/');
+  await seedIdb(page, SAVE_KEY, JSON.stringify(envelope));
   await page.goto('/');
   await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 }
@@ -111,13 +111,11 @@ test.describe('Save & Load Flow', () => {
   test('(5) deleting a save slot removes it from the load screen list', async ({ page }) => {
     // Seed TWO saves so deleting one doesn't empty the list.
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await page.addInitScript(({ key0, env0, key1, env1 }) => {
-      localStorage.setItem(key0, JSON.stringify(env0));
-      localStorage.setItem(key1, JSON.stringify(env1));
-    }, {
-      key0: 'spaceAgencySave_0', env0: makeEnvelope({ saveName: 'Save A' }),
-      key1: 'spaceAgencySave_1', env1: makeEnvelope({ saveName: 'Save B' }),
-    });
+    await page.goto('/');
+    await seedIdbMulti(page, [
+      { key: 'spaceAgencySave_0', value: JSON.stringify(makeEnvelope({ saveName: 'Save A' })) },
+      { key: 'spaceAgencySave_1', value: JSON.stringify(makeEnvelope({ saveName: 'Save B' })) },
+    ]);
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
@@ -134,12 +132,10 @@ test.describe('Save & Load Flow', () => {
 
   test('(6) after deleting the only save, navigating to the app root shows the New Game screen', async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    // Seed via evaluate AFTER page loads (not addInitScript which re-seeds on every goto).
+    // Seed IDB after page loads to establish origin.
     await page.goto('/');
     await page.waitForSelector('#mm-newgame-screen', { state: 'visible', timeout: 10_000 });
-    await page.evaluate(({ key, envelope }) => {
-      localStorage.setItem(key, JSON.stringify(envelope));
-    }, { key: SAVE_KEY, envelope: makeEnvelope() });
+    await seedIdb(page, SAVE_KEY, JSON.stringify(makeEnvelope()));
 
     // Reload to pick up the seeded save.
     await page.goto('/');
@@ -238,15 +234,13 @@ test.describe('Save & Load Flow', () => {
     const oldEnvelope = makeEnvelope({ saveName: 'Old Save', version: 3 });
 
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await page.addInitScript(({ key0, env0, key1, env1 }) => {
-      localStorage.setItem(key0, JSON.stringify(env0));
-      localStorage.setItem(key1, JSON.stringify(env1));
-    }, {
-      key0: 'spaceAgencySave_0', env0: currentEnvelope,
-      key1: 'spaceAgencySave_1', env1: oldEnvelope,
-    });
+    await page.goto('/');
+    await seedIdbMulti(page, [
+      { key: 'spaceAgencySave_0', value: JSON.stringify(currentEnvelope) },
+      { key: 'spaceAgencySave_1', value: JSON.stringify(oldEnvelope) },
+    ]);
 
-    // Load the current-version save to get into the game.
+    // Reload to pick up the seeded saves.
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
     await page.click('[data-action="load"][data-slot="0"]');
@@ -284,10 +278,8 @@ test.describe('Save & Load Flow', () => {
     const oldEnvelope = makeEnvelope({ saveName: 'Old Save', version: 1 });
 
     await page.setViewportSize({ width: VP_W, height: VP_H });
-    await page.addInitScript(({ key, env }) => {
-      localStorage.setItem(key, JSON.stringify(env));
-    }, { key: 'spaceAgencySave_0', env: oldEnvelope });
-
+    await page.goto('/');
+    await seedIdb(page, 'spaceAgencySave_0', JSON.stringify(oldEnvelope));
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 

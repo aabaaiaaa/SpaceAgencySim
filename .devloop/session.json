@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 10,
+  "lastIteration": 11,
   "startedAt": "2026-04-15T21:31:22.340Z",
   "iteration": 16,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-011",
-    "taskTitle": "Update remaining unit tests for IDB",
-    "iterationNumber": 11,
-    "startedAt": "2026-04-15T22:38:24.159Z"
+    "taskId": "TASK-012",
+    "taskTitle": "Update E2E test helpers for IDB save seeding",
+    "iterationNumber": 12,
+    "startedAt": "2026-04-15T22:41:10.818Z"
   }
 }

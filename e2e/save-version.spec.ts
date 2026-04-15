@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { buildSaveEnvelope, SAVE_KEY } from './helpers.js';
+import { buildSaveEnvelope, SAVE_KEY, seedIdb, seedIdbMulti } from './helpers.js';
 import type { SaveEnvelope } from './helpers.js';
 
 /**
@@ -13,12 +13,10 @@ import type { SaveEnvelope } from './helpers.js';
 test.describe('Save Version Indicator', () => {
 
   test('main menu: current-version save shows no version warning', async ({ page }) => {
-    // Seed a save with version 1 (the current SAVE_VERSION).
+    // Seed a save with the current SAVE_VERSION.
     const envelope: SaveEnvelope = buildSaveEnvelope({ saveName: 'Current Version' });
-    await page.addInitScript(({ key, env }: { key: string; env: SaveEnvelope }) => {
-      localStorage.setItem(key, JSON.stringify(env));
-    }, { key: SAVE_KEY, env: envelope });
-
+    await page.goto('/');
+    await seedIdb(page, SAVE_KEY, JSON.stringify(envelope));
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
@@ -33,10 +31,8 @@ test.describe('Save Version Indicator', () => {
   test('main menu: mismatched-version save shows version warning badge', async ({ page }) => {
     // Seed a save with version 0 (simulating a pre-versioning save).
     const envelope: SaveEnvelope = buildSaveEnvelope({ version: 0, saveName: 'Old Version' });
-    await page.addInitScript(({ key, env }: { key: string; env: SaveEnvelope }) => {
-      localStorage.setItem(key, JSON.stringify(env));
-    }, { key: SAVE_KEY, env: envelope });
-
+    await page.goto('/');
+    await seedIdb(page, SAVE_KEY, JSON.stringify(envelope));
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
@@ -55,11 +51,11 @@ test.describe('Save Version Indicator', () => {
     // and slot 1 with a mismatched-version save (to verify warning display).
     const currentEnvelope: SaveEnvelope = buildSaveEnvelope({ saveName: 'Current Save' });
     const oldEnvelope: SaveEnvelope = buildSaveEnvelope({ version: 0, saveName: 'Old Save' });
-    await page.addInitScript(({ key0, env0, key1, env1 }: { key0: string; env0: SaveEnvelope; key1: string; env1: SaveEnvelope }) => {
-      localStorage.setItem(key0, JSON.stringify(env0));
-      localStorage.setItem(key1, JSON.stringify(env1));
-    }, { key0: SAVE_KEY, env0: currentEnvelope, key1: 'spaceAgencySave_1', env1: oldEnvelope });
-
+    await page.goto('/');
+    await seedIdbMulti(page, [
+      { key: SAVE_KEY, value: JSON.stringify(currentEnvelope) },
+      { key: 'spaceAgencySave_1', value: JSON.stringify(oldEnvelope) },
+    ]);
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
@@ -84,10 +80,8 @@ test.describe('Save Version Indicator', () => {
   test('topbar load modal: current-version save shows no version warning', async ({ page }) => {
     // Seed a save with the current version.
     const envelope: SaveEnvelope = buildSaveEnvelope({ saveName: 'Current Save' });
-    await page.addInitScript(({ key, env }: { key: string; env: SaveEnvelope }) => {
-      localStorage.setItem(key, JSON.stringify(env));
-    }, { key: SAVE_KEY, env: envelope });
-
+    await page.goto('/');
+    await seedIdb(page, SAVE_KEY, JSON.stringify(envelope));
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 

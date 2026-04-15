@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 20
-- **Completed**: 11
-- **Remaining**: 9
-- **Last Updated**: 2026-04-15T22:41:08.879Z
+- **Completed**: 12
+- **Remaining**: 8
+- **Last Updated**: 2026-04-15T22:50:07.386Z
 
 ## Iteration Log
 
@@ -106,4 +106,13 @@
 - **Exit Status**: success
 - **Tokens**: 941,478 total (18 in, 5,088 out, 62,845 cache-create, 873,527 cache-read)
 - **Cost**: $0.9568
+
+### Iteration 12 - 2026-04-15T22:50:07.384Z
+- **Task Attempted**: TASK-012
+- **Task Completed**: TASK-012
+- **Summary**: Completed Update E2E test helpers for IDB save seeding
+- **Duration**: 8m 57s
+- **Exit Status**: success
+- **Tokens**: 5,696,071 total (4,324 in, 24,347 out, 97,431 cache-create, 5,569,969 cache-read)
+- **Cost**: $4.0242
 

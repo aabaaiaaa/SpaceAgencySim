@@ -23,6 +23,7 @@ import {
   VP_W, VP_H,
   buildSaveEnvelope,
   seedAndLoadSave,
+  seedIdb, readIdb,
   startTestFlight,
   getGameState,
   waitForAltitude,
@@ -1468,8 +1469,8 @@ test.describe('Design library cross-save sharing', () => {
 
   test.afterAll(async () => { await page.close(); });
 
-  test('(1) shared designs stored in localStorage are accessible', async () => {
-    // Save a shared design to localStorage
+  test('(1) shared designs stored in IndexedDB are accessible', async () => {
+    // Save a shared design to IndexedDB
     const sharedDesign = {
       id: 'design-shared-1',
       name: 'Shared Rocket',
@@ -1485,15 +1486,11 @@ test.describe('Design library cross-save sharing', () => {
       updatedDate: new Date().toISOString(),
     };
 
-    await page.evaluate((design: Record<string, unknown>) => {
-      localStorage.setItem('spaceAgencyDesignLibrary', JSON.stringify([design]));
-    }, sharedDesign as Record<string, unknown>);
+    await seedIdb(page, 'spaceAgencyDesignLibrary', JSON.stringify([sharedDesign]));
 
-    // Verify the shared library can be read
-    const sharedLib = await page.evaluate(() => {
-      const raw = localStorage.getItem('spaceAgencyDesignLibrary');
-      return raw ? JSON.parse(raw) as Record<string, unknown>[] : [];
-    });
+    // Verify the shared library can be read from IDB
+    const raw = await readIdb(page, 'spaceAgencyDesignLibrary');
+    const sharedLib = raw ? JSON.parse(raw) as Record<string, unknown>[] : [];
 
     expect(sharedLib.length).toBe(1);
     expect((sharedLib[0] as Record<string, unknown>).name).toBe('Shared Rocket');
@@ -1519,18 +1516,20 @@ test.describe('Design library cross-save sharing', () => {
     });
 
     // Verify both pools exist
-    const result = await page.evaluate(() => {
+    const sharedRaw = await readIdb(page, 'spaceAgencyDesignLibrary');
+    const shared = sharedRaw ? JSON.parse(sharedRaw) as { id: string }[] : [];
+    const privateResult = await page.evaluate(() => {
       const gs = window.__gameState as
         { savedDesigns: { id: string; savePrivate?: boolean }[] } | undefined;
-      if (!gs) return { sharedCount: 0, privateCount: 0, totalUnique: 0 };
-      const shared = JSON.parse(localStorage.getItem('spaceAgencyDesignLibrary') || '[]') as { id: string }[];
+      if (!gs) return { privateCount: 0, privateIds: [] as string[] };
       const priv = gs.savedDesigns.filter(d => d.savePrivate);
-      return {
-        sharedCount: shared.length,
-        privateCount: priv.length,
-        totalUnique: new Set([...shared.map(d => d.id), ...priv.map(d => d.id)]).size,
-      };
+      return { privateCount: priv.length, privateIds: priv.map(d => d.id) };
     });
+    const result = {
+      sharedCount: shared.length,
+      privateCount: privateResult.privateCount,
+      totalUnique: new Set([...shared.map(d => d.id), ...privateResult.privateIds]).size,
+    };
 
     expect(result.sharedCount).toBe(1);
     expect(result.privateCount).toBe(1);

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import type { Browser, BrowserContext, Page } from '@playwright/test';
 import {
   VP_W, VP_H, SAVE_KEY, STARTING_MONEY,
-  buildSaveEnvelope, seedAndLoadSave, dismissWelcomeModal,
+  buildSaveEnvelope, seedAndLoadSave, seedIdb, dismissWelcomeModal,
 } from './helpers.js';
 import type { SaveEnvelope } from './helpers.js';
 
@@ -99,7 +99,7 @@ test.describe('App Load & New Game Flow', () => {
 
   // ── (6) Existing save → load screen shown by default ────────────────────
 
-  test('(6) with a save present in localStorage, the app shows the load screen and lists the save stats', async ({ browser }: { browser: Browser }) => {
+  test('(6) with a save present in IndexedDB, the app shows the load screen and lists the save stats', async ({ browser }: { browser: Browser }) => {
     test.setTimeout(60_000);
     const SAVE_NAME: string   = 'Test Save';
     const AGENCY_NAME: string = 'Stardust Corp';
@@ -108,13 +108,11 @@ test.describe('App Load & New Game Flow', () => {
     const ctx: BrowserContext = await browser.newContext();
     const p: Page             = await ctx.newPage();
 
-    await p.addInitScript(({ key, envelope }: { key: string; envelope: SaveEnvelope }) => {
-      localStorage.setItem(key, JSON.stringify(envelope));
-    }, {
-      key: SAVE_KEY,
-      envelope: buildSaveEnvelope({ saveName: SAVE_NAME, agencyName: AGENCY_NAME, money: MONEY }),
-    });
-
+    // Navigate first to establish origin for IDB access, then seed and reload.
+    await p.goto('/');
+    await seedIdb(p, SAVE_KEY, JSON.stringify(
+      buildSaveEnvelope({ saveName: SAVE_NAME, agencyName: AGENCY_NAME, money: MONEY }),
+    ));
     await p.goto('/');
     await p.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 

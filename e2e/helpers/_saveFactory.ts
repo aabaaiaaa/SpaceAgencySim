@@ -193,7 +193,7 @@ export interface SaveEnvelope {
 // ---------------------------------------------------------------------------
 
 /**
- * Build a localStorage save-slot envelope.
+ * Build a save-slot envelope for IndexedDB seeding.
  *
  * Every field has a sensible default so callers only override what they need.
  * Supports the FULL game state shape — any progression point can be expressed

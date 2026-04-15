@@ -3,6 +3,8 @@ import {
   VP_W, VP_H,
   buildSaveEnvelope,
   seedAndLoadSave,
+  seedIdbMulti,
+  readIdb, readIdbAllKeys,
   startTestFlight,
   teleportCraft,
   openSettingsPanel,
@@ -44,21 +46,15 @@ test.describe('Auto-Save System', () => {
       { timeout: 5_000 },
     );
 
-    // Verify the auto-save was written to localStorage.
+    // Verify the auto-save was written to IndexedDB.
     // Auto-save picks the first empty slot (spaceAgencySave_0, _1, etc.)
     // Saves are LZ-compressed (prefixed with "LZC:"), so we just check existence and non-empty.
-    const autoSaveInfo = await page.evaluate((): { exists: boolean; length: number } => {
-      // Check all possible slots for an auto-save.
-      for (let i = 0; i < 10; i++) {
-        const raw = localStorage.getItem(`spaceAgencySave_${i}`);
-        if (raw !== null) return { exists: true, length: raw.length };
-      }
-      // Also check the legacy dedicated key.
-      const legacy = localStorage.getItem('spaceAgencySave_auto');
-      return { exists: legacy !== null, length: legacy?.length ?? 0 };
-    });
-    expect(autoSaveInfo.exists).toBe(true);
-    expect(autoSaveInfo.length).toBeGreaterThan(10);
+    const allKeys = await readIdbAllKeys(page);
+    const saveKey = allKeys.find(k => k.startsWith('spaceAgencySave_'));
+    expect(saveKey).toBeTruthy();
+    const raw = await readIdb(page, saveKey!);
+    expect(raw).toBeTruthy();
+    expect(raw!.length).toBeGreaterThan(10);
   });
 
   test('cancel button prevents auto-save', async ({ page }) => {
@@ -77,8 +73,8 @@ test.describe('Auto-Save System', () => {
 
     await page.waitForFunction((): boolean => !document.getElementById('auto-save-toast'), { timeout: 5_000 });
 
-    const hasAutoSave: boolean = await page.evaluate((): boolean => localStorage.getItem('spaceAgencySave_auto') !== null);
-    expect(hasAutoSave).toBe(false);
+    const autoSaveRaw = await readIdb(page, 'spaceAgencySave_auto');
+    expect(autoSaveRaw).toBeNull();
   });
 
   test('auto-save appears on load screen when all manual slots are full @smoke', async ({ page }) => {
@@ -93,13 +89,14 @@ test.describe('Auto-Save System', () => {
       }),
     );
 
-    await page.addInitScript((envs: ReturnType<typeof buildSaveEnvelope>[]) => {
-      for (let i = 0; i < envs.length; i++) {
-        localStorage.setItem(`spaceAgencySave_${i}`, JSON.stringify(envs[i]));
-      }
-    }, envelopes);
+    // Seed all 5 manual saves into IndexedDB.
+    await page.goto('/');
+    await seedIdbMulti(page, envelopes.map((env, i) => ({
+      key: `spaceAgencySave_${i}`,
+      value: JSON.stringify(env),
+    })));
 
-    // Load slot 0 into the game.
+    // Reload so the app discovers the seeded saves.
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
     await page.click('[data-action="load"][data-slot="0"]');
@@ -156,18 +153,17 @@ test.describe('Auto-Save System', () => {
       autoSave: true,
     };
 
-    // Seed all saves into localStorage before navigating.
-    await page.addInitScript(
-      ({ manuals, autoSave }: { manuals: ReturnType<typeof buildSaveEnvelope>[]; autoSave: Record<string, unknown> }) => {
-        for (let i = 0; i < manuals.length; i++) {
-          localStorage.setItem(`spaceAgencySave_${i}`, JSON.stringify(manuals[i]));
-        }
-        localStorage.setItem('spaceAgencySave_auto', JSON.stringify(autoSave));
-      },
-      { manuals: manualEnvelopes, autoSave: autoSaveEnvelope },
-    );
+    // Seed all saves into IndexedDB before navigating.
+    await page.goto('/');
+    await seedIdbMulti(page, [
+      ...manualEnvelopes.map((env, i) => ({
+        key: `spaceAgencySave_${i}`,
+        value: JSON.stringify(env),
+      })),
+      { key: 'spaceAgencySave_auto', value: JSON.stringify(autoSaveEnvelope) },
+    ]);
 
-    // Navigate to the load screen.
+    // Reload to pick up the seeded saves.
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 

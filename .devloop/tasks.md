@@ -67,7 +67,7 @@
 - **Verification**: `npx vitest run src/tests/autoSave.test.ts src/tests/settingsStore.test.ts src/tests/designLibrary.test.ts src/tests/storageErrors.test.ts src/tests/debugMode.test.ts` — all pass.
 
 ### TASK-012: Update E2E test helpers for IDB save seeding
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-005
 - **Description**: 9 E2E spec files seed saves via `localStorage.setItem()` in `page.evaluate()`. Update the E2E save seeding helper in `e2e/helpers/_saveFactory.ts` and/or `e2e/helpers/_state.ts` to seed saves into IndexedDB instead. IDB operations in `page.evaluate()` are async — ensure all seeding calls use `await`. Update all 9 E2E specs that seed saves: `auto-save.spec.ts`, `saveload.spec.ts`, `agency-depth.spec.ts`, `mission-progression.spec.ts`, `save-version.spec.ts`, `launchpad.spec.ts`, `newgame.spec.ts`, and any others found in `e2e/helpers/_saveFactory.ts` or `_state.ts`. See requirements.md section 2g.
 - **Verification**: `npx playwright test e2e/saveload.spec.ts e2e/auto-save.spec.ts` — both pass.

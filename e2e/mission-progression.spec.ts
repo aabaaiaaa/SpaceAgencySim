@@ -14,7 +14,7 @@ import type { CrewMember } from './helpers.js';
  * E2E — Mission Progression
  *
  * Tests all 15 missions in the Desert R&D campaign.  Each test is fully
- * independent: it seeds localStorage with the exact game state needed
+ * independent: it seeds IndexedDB with the exact game state needed
  * (previous missions completed, parts unlocked, money, crew, accepted mission),
  * builds a rocket in the VAB, flies it, and verifies the mission completes
  * and that any unlocked parts appear in the game state (and in the VAB panel
