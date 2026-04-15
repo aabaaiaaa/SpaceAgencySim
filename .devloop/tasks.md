@@ -7,7 +7,7 @@
 - **Verification**: `npx vitest run src/tests/saveload.test.ts`
 
 ### TASK-002: Wire mainmenu handlers to pass storageKey through
-- **Status**: in-progress
+- **Status**: done
 - **Dependencies**: TASK-001
 - **Description**: In `src/ui/mainmenu.ts`: (1) In `_handleLoad()` (line ~599), change `loadGame(slotIndex)` to `loadGame(slotIndex, storageKey)`. (2) In `_handleExport()` (line ~634), rename the parameter from `_storageKey` to `storageKey` and change `exportSave(slotIndex)` to `exportSave(slotIndex, storageKey)`. See requirements.md Section 1 for the bug flow.
 - **Verification**: `npx tsc --noEmit src/ui/mainmenu.ts && npx vitest run src/tests/saveload.test.ts`
