@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 0,
+  "lastIteration": 3,
   "startedAt": "2026-04-15T17:28:16.944Z",
   "iteration": 15,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-002",
-    "taskTitle": "Wire mainmenu handlers to pass storageKey through",
-    "iterationNumber": 3,
-    "startedAt": "2026-04-15T17:28:16.986Z"
+    "taskId": "TASK-006",
+    "taskTitle": "Notification stacking guard",
+    "iterationNumber": 4,
+    "startedAt": "2026-04-15T17:30:31.187Z"
   }
 }

@@ -31,7 +31,7 @@
 - **Verification**: `npx playwright test e2e/asteroid-belt.spec.ts --grep "belt zones"`
 
 ### TASK-006: Notification stacking guard
-- **Status**: in-progress
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/ui/notification.ts`, fix the `showNotification()` function so that only one toast is visible at a time. (1) Add a `data-notification-toast` attribute to the toast div when creating it (e.g., `toast.setAttribute('data-notification-toast', '')`). (2) At the top of `showNotification()`, before creating the new toast element, remove any existing toast: `document.querySelector('[data-notification-toast]')?.remove()`. See requirements.md Section 3.
 - **Verification**: `npx vitest run src/tests/ui-helpers.test.ts`
