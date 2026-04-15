@@ -91,7 +91,7 @@
 - **Verification**: `npm run typecheck` passes. Grep for `data-key=` in `mainmenu.ts` shows `escapeHtml` applied to all instances.
 
 ### TASK-016: Implement notification stacking queue
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-002
 - **Description**: Replace the single-toast notification system in `src/ui/notification.ts` with a stacking queue. Multiple toasts stack vertically from the bottom of the screen. Each auto-dismisses after 4 seconds with the existing 0.3s fade-out. New toasts appear at the bottom; existing toasts shift up. When a toast dismisses, remaining toasts shift down. Cap at 5 visible toasts — oldest removed when cap is exceeded. See requirements.md section 6.
 - **Verification**: `npx vitest run src/tests/notification.test.ts` — all tests pass.
