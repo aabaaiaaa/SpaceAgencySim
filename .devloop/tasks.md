@@ -103,7 +103,7 @@
 - **Verification**: `npx vitest run src/tests/notification.test.ts` — all tests pass.
 
 ### TASK-018: Fix CLAUDE.md inaccuracies
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-002
 - **Description**: Update the root `CLAUDE.md` to reflect current reality: (1) Line 98 — replace `jsToTsResolve` plugin reference with `resolve.extensions` in `vite.config.ts`. (2) Architecture section — remove "the rest remain JS with JSDoc types"; all modules are TypeScript. (3) Module listings — update any `.js` extensions to `.ts`. (4) TypeScript & Linting section — remove "Four core modules are TypeScript. The rest of the codebase remains JavaScript." (5) Testing section — update `.spec.js` references to `.spec.ts`. (6) Update any version-specific references to match new Vite/Vitest versions. See requirements.md section 7.
 - **Verification**: Grep CLAUDE.md for `\.js`, `remain JS`, `jsToTsResolve`, `remains JavaScript` — no matches (except in code examples where `.js` in import specifiers is still accurate if applicable).

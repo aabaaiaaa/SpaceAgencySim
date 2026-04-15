@@ -32,7 +32,7 @@ npx vitest run src/tests/physics.test.ts
 
 To run a single E2E spec:
 ```bash
-npx playwright test e2e/flight.spec.js
+npx playwright test e2e/flight.spec.ts
 ```
 
 To run affected tests for a specific branch:
@@ -46,41 +46,41 @@ node scripts/run-affected.mjs --base main             # run smoke tests in affec
 The codebase has a strict three-layer separation:
 
 ### Core (`src/core/`)
-Pure game logic — no DOM, no canvas. Each module exports functions that read/mutate the central `gameState` object. Four key modules have been converted to TypeScript; the rest remain JS with JSDoc types.
+Pure game logic — no DOM, no canvas. Each module exports functions that read/mutate the central `gameState` object.
 
 - **gameState.ts** — Central in-memory state with TypeScript interfaces for all game types. All persistent data lives here.
 - **physics.ts** — Flight physics: gravity, drag, fuel consumption, staging
 - **orbit.ts** — Keplerian orbital mechanics, Kepler solver, transfers
 - **constants.ts** — Enums (`PartType`, `MissionState`, `CrewStatus`, etc.) as `as const` objects with companion types
-- **missions.js** / **finance.js** / **crew.js** — Agency management systems
-- **rocketbuilder.js** + **rocketvalidator.js** — Rocket assembly and validation
-- **saveload.js** — Serialization to/from `localStorage`
+- **missions.ts** / **finance.ts** / **crew.ts** — Agency management systems
+- **rocketbuilder.ts** + **rocketvalidator.ts** — Rocket assembly and validation
+- **saveload.ts** — Serialization to/from IndexedDB
 
 ### Render (`src/render/`)
 PixiJS WebGL rendering — **read-only access to state, never mutates it**. Receives state snapshots and draws them.
 
-- **flight.js** — Barrel re-export; implementation split into `flight/` sub-modules (rocket, camera, sky, trails, debris, etc.)
-- **vab.js** — Vehicle Assembly Building editor grid
-- **hub.js** — Space agency hub buildings
-- **map.js** — Orbital map view renderer
+- **flight.ts** — Barrel re-export; implementation split into `flight/` sub-modules (rocket, camera, sky, trails, debris, etc.)
+- **vab.ts** — Vehicle Assembly Building editor grid
+- **hub.ts** — Space agency hub buildings
+- **map.ts** — Orbital map view renderer
 
 ### UI (`src/ui/`)
 DOM overlay panels layered on top of the canvas. Each panel module handles its own event listeners and calls core functions to mutate state, then re-renders. Large modules have been split into sub-module directories with barrel re-exports.
 
-- **flightController.js** — Barrel; implementation in `flightController/` (loop, keyboard, map, docking, post-flight, etc.)
-- **vab.js** — Barrel; implementation in `vab/` (parts panel, canvas interaction, staging, design library, etc.)
-- **missionControl.js** — Barrel; implementation in `missionControl/` (missions, contracts, challenges, achievements tabs)
-- **crewAdmin.js** — Crew management screen
-- **topbar.js** — Persistent top bar with hamburger menu (save, load, help, exit)
-- **help.js** — In-game help panel with 11 content sections, accessible from the hamburger menu
+- **flightController.ts** — Barrel; implementation in `flightController/` (loop, keyboard, map, docking, post-flight, etc.)
+- **vab.ts** — Barrel; implementation in `vab/` (parts panel, canvas interaction, staging, design library, etc.)
+- **missionControl.ts** — Barrel; implementation in `missionControl/` (missions, contracts, challenges, achievements tabs)
+- **crewAdmin.ts** — Crew management screen
+- **topbar.ts** — Persistent top bar with hamburger menu (save, load, help, exit)
+- **help.ts** — In-game help panel with 11 content sections, accessible from the hamburger menu
 
 ### Data (`src/data/`)
-Immutable static catalogs: `parts.js` (part definitions), `missions.js` (mission templates), `bodies.js` (celestial bodies), `contracts.js`, `techtree.js`.
+Immutable static catalogs: `parts.ts` (part definitions), `missions.ts` (mission templates), `bodies.ts` (celestial bodies), `contracts.ts`, `techtree.ts`.
 
 ## Testing
 
 - **Unit tests** (`src/tests/`) use Vitest + Chai. Environment is Node.js (no browser). Tests import core modules directly.
-- **E2E tests** (`e2e/`) use Playwright targeting Chromium only. They run against the live Vite dev server which Playwright starts automatically. E2E helpers are split into sub-modules in `e2e/helpers/` with a barrel re-export at `e2e/helpers.js`.
+- **E2E tests** (`e2e/`) use Playwright targeting Chromium only. They run against the live Vite dev server which Playwright starts automatically. E2E helpers are split into sub-modules in `e2e/helpers/` with a barrel re-export at `e2e/helpers.ts`.
 - Playwright config retries 2× on CI (`process.env.CI`), no retries in dev.
 
 ## Smoke Tests & Affected Tests
@@ -94,8 +94,7 @@ Tests tagged with `@smoke` in their description are curated for fast coverage of
 
 ## TypeScript & Linting
 
-- Four core modules (`constants.ts`, `gameState.ts`, `physics.ts`, `orbit.ts`) are TypeScript. The rest of the codebase remains JavaScript.
-- A Vite plugin (`jsToTsResolve` in `vite.config.js`) resolves `.js` import specifiers to `.ts` files, so no consuming files need import path changes.
+- The entire codebase is TypeScript. `resolve.extensions` in `vite.config.ts` resolves `.js` import specifiers to `.ts` files, so no consuming files need import path changes.
 - `tsconfig.json` uses `moduleResolution: "bundler"` with `allowJs: true` and `checkJs: false`.
 - ESLint is configured for correctness rules only (no formatting). Config is in `eslint.config.js` (flat config format). TypeScript files use `@typescript-eslint` parser/plugin.
 
