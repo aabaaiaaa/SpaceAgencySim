@@ -869,6 +869,38 @@ export interface GameState {
   activeHubId: string;
   /** Counter for generating sequential hub IDs. Earth hub uses EARTH_HUB_ID; this is for dynamic hubs only. */
   nextHubId: number;
+
+  // --- Sequential ID counters (deterministic, testable) ---
+  /** Counter for contract IDs: contract-1, contract-2, ... */
+  nextContractId: number;
+  /** Counter for custom challenge IDs: custom-1, custom-2, ... */
+  nextChallengeId: number;
+  /** Counter for design library IDs: design-1, design-2, ... */
+  nextDesignId: number;
+  /** Counter for flight result IDs: flight-1, flight-2, ... */
+  nextFlightResultId: number;
+  /** Counter for persistent asteroid IDs: AST-P-1, AST-P-2, ... */
+  nextAsteroidId: number;
+  /** Counter for crew member IDs: crew-1, crew-2, ... */
+  nextCrewId: number;
+  /** Counter for field craft IDs: fc-1, fc-2, ... */
+  nextFieldCraftId: number;
+  /** Counter for mining site IDs: mining-site-1, mining-site-2, ... */
+  nextMiningSiteId: number;
+  /** Counter for mining module IDs: module-1, module-2, ... */
+  nextMiningModuleId: number;
+  /** Counter for part inventory IDs: inv-1, inv-2, ... */
+  nextInventoryId: number;
+  /** Counter for route IDs: route-1, route-2, ... */
+  nextRouteId: number;
+  /** Counter for route leg IDs: route-leg-1, route-leg-2, ... */
+  nextRouteLegId: number;
+  /** Counter for proven leg IDs: proven-leg-1, proven-leg-2, ... */
+  nextProvenLegId: number;
+  /** Counter for satellite IDs: sat-1, sat-2, ... */
+  nextSatelliteId: number;
+  /** Counter for surface operation IDs: surface-1, surface-2, ... */
+  nextSurfaceOpId: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -1025,6 +1057,21 @@ export function createGameState(): GameState {
     }],
     activeHubId: EARTH_HUB_ID,
     nextHubId: 1,
+    nextContractId: 1,
+    nextChallengeId: 1,
+    nextDesignId: 1,
+    nextFlightResultId: 1,
+    nextAsteroidId: 1,
+    nextCrewId: 1,
+    nextFieldCraftId: 1,
+    nextMiningSiteId: 1,
+    nextMiningModuleId: 1,
+    nextInventoryId: 1,
+    nextRouteId: 1,
+    nextRouteLegId: 1,
+    nextProvenLegId: 1,
+    nextSatelliteId: 1,
+    nextSurfaceOpId: 1,
   };
 }
 

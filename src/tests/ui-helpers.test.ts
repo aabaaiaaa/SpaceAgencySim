@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 /**
  * ui-helpers.test.ts — Unit tests for testable UI helper functions.
  *
@@ -197,38 +198,37 @@ describe('getBodyColor (logistics route map helper)', () => {
 
 // ---------------------------------------------------------------------------
 // 4. showLoadingIndicator / hideLoadingIndicator
-//    These functions require a DOM environment (document.body, createElement).
-//    The default vitest environment is Node.js and neither happy-dom nor
-//    jsdom is installed in this project's devDependencies, so DOM-dependent
-//    tests are skipped.
 // ---------------------------------------------------------------------------
 
-describe.skip('showLoadingIndicator / hideLoadingIndicator (requires DOM env)', () => {
-  // These tests would validate:
-  // - showLoadingIndicator adds an element with id='loading-indicator' to document.body
-  // - Calling show twice reuses the same element (idempotent)
-  // - hideLoadingIndicator sets display to 'none'
-  // - Calling hide when nothing is shown does not throw
-
-  it('show adds a loading overlay to document.body', () => {
-    // Would import { showLoadingIndicator } from '../ui/loadingIndicator.ts';
-    // showLoadingIndicator();
-    // expect(document.getElementById('loading-indicator')).not.toBeNull();
+describe('showLoadingIndicator / hideLoadingIndicator', () => {
+  beforeEach(() => {
+    // Clean up any leftover overlay from previous tests.
+    const existing = document.getElementById('loading-indicator');
+    if (existing) existing.remove();
   });
 
-  it('show is idempotent — calling twice reuses the same element', () => {
-    // showLoadingIndicator();
-    // showLoadingIndicator();
-    // expect(document.querySelectorAll('#loading-indicator').length).toBe(1);
+  it('show adds a loading overlay to document.body', async () => {
+    const { showLoadingIndicator } = await import('../ui/loadingIndicator.ts');
+    showLoadingIndicator();
+    expect(document.getElementById('loading-indicator')).not.toBeNull();
   });
 
-  it('hide sets display to none', () => {
-    // showLoadingIndicator();
-    // hideLoadingIndicator();
-    // expect(document.getElementById('loading-indicator')?.style.display).toBe('none');
+  it('show is idempotent — calling twice reuses the same element', async () => {
+    const { showLoadingIndicator } = await import('../ui/loadingIndicator.ts');
+    showLoadingIndicator();
+    showLoadingIndicator();
+    expect(document.querySelectorAll('#loading-indicator').length).toBe(1);
   });
 
-  it('hide does not throw when nothing is shown', () => {
-    // expect(() => hideLoadingIndicator()).not.toThrow();
+  it('hide sets display to none', async () => {
+    const { showLoadingIndicator, hideLoadingIndicator } = await import('../ui/loadingIndicator.ts');
+    showLoadingIndicator();
+    hideLoadingIndicator();
+    expect(document.getElementById('loading-indicator')?.style.display).toBe('none');
+  });
+
+  it('hide does not throw when nothing is shown', async () => {
+    const { hideLoadingIndicator } = await import('../ui/loadingIndicator.ts');
+    expect(() => hideLoadingIndicator()).not.toThrow();
   });
 });

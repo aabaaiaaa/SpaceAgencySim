@@ -7,31 +7,31 @@ Implementation plan: `docs/superpowers/plans/2026-04-15-iteration-14.md`
 ---
 
 ### TASK-001: Fix lint warnings in destinations.spec.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Remove unused imports `pressStage` and `pressThrottleUp` from `e2e/destinations.spec.ts:32-33`. These are imported from `./helpers.js` but never referenced in the test file. See implementation plan Task 1 for exact code.
 - **Verification**: `npx eslint e2e/destinations.spec.ts` — 0 errors, 0 warnings.
 
 ### TASK-002: Document altitude non-check in validateLegChaining
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add a JSDoc comment above `validateLegChaining` in `src/core/routes.ts:104` explaining that altitude is intentionally not checked because route legs connect bodies and location types, not specific orbits. See implementation plan Task 2 for exact comment text.
 - **Verification**: `npx tsc --noEmit src/core/routes.ts` — 0 errors.
 
 ### TASK-003: Install jsdom and un-skip loading indicator tests
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Install `jsdom` as a devDependency. Add `// @vitest-environment jsdom` at the top of `src/tests/ui-helpers.test.ts`. Replace the `describe.skip` block (lines 206-234) with working tests that use dynamic `import()` for the loading indicator module. The 4 tests verify: show adds overlay to body, show is idempotent, hide sets display to none, hide doesn't throw when nothing shown. Each test needs a `beforeEach` that cleans up leftover overlays. See implementation plan Task 3 for exact test code.
 - **Verification**: `npx vitest run src/tests/ui-helpers.test.ts` — all tests pass including the 4 previously skipped ones.
 
 ### TASK-004: Extract loadScreen() helper and notification utility
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create `src/ui/notification.ts` with an exported `showNotification(message, type)` function that creates a brief DOM toast overlay (styled div, auto-removes after 4 seconds). Then in `src/ui/index.ts`, import `showNotification` and add an async `loadScreen<T>(importFn, screenName)` helper that wraps dynamic imports in try/catch — on failure it hides the loading indicator, shows a notification, logs to console, and returns null. Replace all 9 catch blocks in `_handleNavigation` with `loadScreen()` calls. If the import returns null, abort navigation for that screen. See implementation plan Task 4 for exact code.
 - **Verification**: `npx tsc --noEmit src/ui/index.ts src/ui/notification.ts && npx eslint src/ui/index.ts src/ui/notification.ts` — 0 errors.
 
 ### TASK-005: Add 15 sequential ID counter fields to GameState
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/core/gameState.ts`, add 15 new number fields to the `GameState` interface (after `nextHubId`): `nextContractId`, `nextChallengeId`, `nextDesignId`, `nextFlightResultId`, `nextAsteroidId`, `nextCrewId`, `nextFieldCraftId`, `nextMiningSiteId`, `nextMiningModuleId`, `nextInventoryId`, `nextRouteId`, `nextRouteLegId`, `nextProvenLegId`, `nextSatelliteId`, `nextSurfaceOpId`. All initialize to `1` in `createGameState()`. Also bump `SAVE_VERSION` from 5 to 6 in `src/core/saveload.ts:40`. See implementation plan Task 5 for exact code.
 - **Verification**: `npx tsc --noEmit src/core/gameState.ts src/core/saveload.ts` — may show errors in factory files (expected, fixed in TASK-006).

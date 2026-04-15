@@ -98,8 +98,12 @@ export function getProvenLegsForOriginDestination(
 // ---------------------------------------------------------------------------
 
 /**
- * Validate that route legs form a continuous chain — each leg's destination
- * matches the next leg's origin.
+ * Validates that adjacent route legs form a continuous chain: each leg's
+ * destination matches the next leg's origin by bodyId, locationType, and
+ * hubId (when both are non-null).
+ *
+ * Altitude is intentionally NOT checked — route legs connect bodies and
+ * location types (surface/orbit), not specific orbital altitudes.
  */
 export function validateLegChaining(legs: RouteLeg[]): boolean {
   if (legs.length <= 1) return true;

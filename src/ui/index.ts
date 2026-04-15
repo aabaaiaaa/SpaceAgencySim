@@ -15,6 +15,7 @@ import { GameMode } from '../core/constants.ts';
 import './design-tokens.css';
 import { triggerAutoSave } from './autoSaveToast.ts';
 import { showLoadingIndicator, hideLoadingIndicator } from './loadingIndicator.ts';
+import { showNotification } from './notification.ts';
 
 // ---------------------------------------------------------------------------
 // Cached dynamic-import module references
@@ -285,6 +286,26 @@ function _handleLoadGame(loadedState: GameState): void {
 }
 
 // ---------------------------------------------------------------------------
+// Private — dynamic import helper
+// ---------------------------------------------------------------------------
+
+/**
+ * Dynamically import a screen module with error handling.
+ * On failure, hides the loading indicator and shows a user-visible notification.
+ * Returns null if the import fails so the caller can abort navigation.
+ */
+async function loadScreen<T>(importFn: () => Promise<T>, screenName: string): Promise<T | null> {
+  try {
+    return await importFn();
+  } catch (err) {
+    hideLoadingIndicator();
+    showNotification(`Failed to load ${screenName}. Please try again.`, 'error');
+    console.error(`Failed to load ${screenName}:`, err);
+    return null;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Private — navigation handler
 // ---------------------------------------------------------------------------
 
@@ -315,11 +336,12 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
 
     if (!_vabInitialized) {
       showLoadingIndicator();
-      try {
-        const [vabMod, vabRender] = await Promise.all([
-          import('./vab.ts'),
-          import('../render/vab.ts'),
-        ]);
+      const vabResult = await loadScreen(() => Promise.all([
+        import('./vab.ts'),
+        import('../render/vab.ts'),
+      ]), 'VAB');
+      if (vabResult) {
+        const [vabMod, vabRender] = vabResult;
         _cachedVab = vabMod;
         _cachedVabRender = vabRender;
         hideLoadingIndicator();
@@ -327,7 +349,6 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
         vabRender.showVabScene();
         vabMod.initVabUI(container, state, {
           onBack: () => {
-            // Remove the VAB overlay and return to the hub.
             const vabRoot = document.getElementById('vab-root');
             if (vabRoot) vabRoot.remove();
             _vabInitialized = false;
@@ -341,9 +362,6 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
           },
         });
         _vabInitialized = true;
-      } catch (err) {
-        hideLoadingIndicator();
-        console.error('Failed to load VAB:', err);
       }
     } else {
       _cachedVabRender?.showVabScene();
@@ -359,8 +377,8 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
 
     if (!_crewAdminOpen) {
       showLoadingIndicator();
-      try {
-        const mod = await import('./crewAdmin.ts');
+      const mod = await loadScreen(() => import('./crewAdmin.ts'), 'Crew Admin');
+      if (mod) {
         _cachedCrewAdmin = mod;
         hideLoadingIndicator();
 
@@ -375,9 +393,6 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
           },
         });
         _crewAdminOpen = true;
-      } catch (err) {
-        hideLoadingIndicator();
-        console.error('Failed to load Crew Admin:', err);
       }
     }
 
@@ -391,8 +406,8 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
 
     if (!_missionControlOpen) {
       showLoadingIndicator();
-      try {
-        const mod = await import('./missionControl.ts');
+      const mod = await loadScreen(() => import('./missionControl.ts'), 'Mission Control');
+      if (mod) {
         _cachedMissionControl = mod;
         hideLoadingIndicator();
 
@@ -407,9 +422,6 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
           },
         });
         _missionControlOpen = true;
-      } catch (err) {
-        hideLoadingIndicator();
-        console.error('Failed to load Mission Control:', err);
       }
     }
 
@@ -423,8 +435,8 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
 
     if (!_launchPadOpen) {
       showLoadingIndicator();
-      try {
-        const mod = await import('./launchPad.ts');
+      const mod = await loadScreen(() => import('./launchPad.ts'), 'Launch Pad');
+      if (mod) {
         _cachedLaunchPad = mod;
         hideLoadingIndicator();
 
@@ -439,9 +451,6 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
           },
         });
         _launchPadOpen = true;
-      } catch (err) {
-        hideLoadingIndicator();
-        console.error('Failed to load Launch Pad:', err);
       }
     }
 
@@ -455,8 +464,8 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
 
     if (!_satelliteOpsOpen) {
       showLoadingIndicator();
-      try {
-        const mod = await import('./satelliteOps.ts');
+      const mod = await loadScreen(() => import('./satelliteOps.ts'), 'Satellite Ops');
+      if (mod) {
         _cachedSatelliteOps = mod;
         hideLoadingIndicator();
 
@@ -471,9 +480,6 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
           },
         });
         _satelliteOpsOpen = true;
-      } catch (err) {
-        hideLoadingIndicator();
-        console.error('Failed to load Satellite Ops:', err);
       }
     }
 
@@ -487,8 +493,8 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
 
     if (!_trackingStationOpen) {
       showLoadingIndicator();
-      try {
-        const mod = await import('./trackingStation.ts');
+      const mod = await loadScreen(() => import('./trackingStation.ts'), 'Tracking Station');
+      if (mod) {
         _cachedTrackingStation = mod;
         hideLoadingIndicator();
 
@@ -503,9 +509,6 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
           },
         });
         _trackingStationOpen = true;
-      } catch (err) {
-        hideLoadingIndicator();
-        console.error('Failed to load Tracking Station:', err);
       }
     }
 
@@ -518,8 +521,8 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
 
     if (!_libraryOpen) {
       showLoadingIndicator();
-      try {
-        const mod = await import('./library.ts');
+      const mod = await loadScreen(() => import('./library.ts'), 'Library');
+      if (mod) {
         _cachedLibrary = mod;
         hideLoadingIndicator();
 
@@ -534,9 +537,6 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
           },
         });
         _libraryOpen = true;
-      } catch (err) {
-        hideLoadingIndicator();
-        console.error('Failed to load Library:', err);
       }
     }
 
@@ -549,8 +549,8 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
 
     if (!_rdLabOpen) {
       showLoadingIndicator();
-      try {
-        const mod = await import('./rdLab.ts');
+      const mod = await loadScreen(() => import('./rdLab.ts'), 'R&D Lab');
+      if (mod) {
         _cachedRdLab = mod;
         hideLoadingIndicator();
 
@@ -565,9 +565,6 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
           },
         });
         _rdLabOpen = true;
-      } catch (err) {
-        hideLoadingIndicator();
-        console.error('Failed to load R&D Lab:', err);
       }
     }
 
@@ -580,8 +577,8 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
 
     if (!_logisticsOpen) {
       showLoadingIndicator();
-      try {
-        const mod = await import('./logistics/index.ts');
+      const mod = await loadScreen(() => import('./logistics/index.ts'), 'Logistics Center');
+      if (mod) {
         _cachedLogistics = mod;
         hideLoadingIndicator();
 
@@ -604,9 +601,6 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
             });
           });
         }
-      } catch (err) {
-        hideLoadingIndicator();
-        console.error('Failed to load Logistics Center:', err);
       }
     }
 

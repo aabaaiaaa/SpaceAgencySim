@@ -29,8 +29,6 @@ import {
   ALL_FACILITIES,
   teleportCraft,
   waitForOrbit,
-  pressStage,
-  pressThrottleUp,
   stageAndLaunch,
 } from './helpers.js';
 import type { SaveEnvelope, SaveEnvelopeParams } from './helpers.js';

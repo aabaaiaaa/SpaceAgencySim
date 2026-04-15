@@ -37,7 +37,7 @@ const SAVE_KEY_PREFIX = 'spaceAgencySave_';
  * Current save format version. Bump this whenever the save envelope or
  * state schema changes in a way that requires new migration logic.
  */
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 // ---------------------------------------------------------------------------
 // Session Time Tracking
