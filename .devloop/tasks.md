@@ -13,7 +13,7 @@
 - **Verification**: `npm run test:unit` — all unit tests pass. `npx vitest --version` confirms v4.
 
 ### TASK-003: Update remaining dependencies to latest versions
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-002
 - **Description**: Update `@playwright/test`, `pixi.js`, `eslint`, `@typescript-eslint/*`, `jsdom`, `globals`, `lz-string`, and `typescript` to their latest compatible versions. Run `npx playwright install` if Playwright was updated. See requirements.md section 1c.
 - **Verification**: `npm run build && npm run typecheck && npm run lint && npm run test:unit` — all pass.

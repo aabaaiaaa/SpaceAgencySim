@@ -8,6 +8,7 @@ import {
   stageAndLaunch,
   buildSaveEnvelope,
 } from './helpers.js';
+import type { CrewMember } from './helpers.js';
 
 /**
  * E2E — Mission Progression
@@ -41,22 +42,6 @@ interface MissionTemplate {
   reward: number;
   unlocksAfter: string[];
   unlockedParts: string[];
-}
-
-// ---------------------------------------------------------------------------
-// Crew member type
-// ---------------------------------------------------------------------------
-
-interface CrewMember {
-  id: string;
-  name: string;
-  hireDate: string;
-  status: string;
-  missionsFlown: number;
-  flightsFlown: number;
-  deathDate: string | null;
-  deathCause: string | null;
-  assignedRocketId: string | null;
 }
 
 // ---------------------------------------------------------------------------
