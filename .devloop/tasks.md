@@ -13,7 +13,7 @@
 - **Verification**: `npx tsc --noEmit src/ui/mainmenu.ts && npx vitest run src/tests/saveload.test.ts`
 
 ### TASK-003: Unit tests for overflow save load and export
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-002
 - **Description**: Add unit tests to `src/tests/saveload.test.ts` covering: (1) Write a save to slot 7 via localStorage, then `loadGame(-1, 'spaceAgencySave_7')` returns a valid GameState. (2) Write to `spaceAgencySave_auto` key, load via `loadGame(-1, 'spaceAgencySave_auto')`. (3) `exportSave(-1, 'spaceAgencySave_7')` does not throw (mock `URL.createObjectURL` and `document.createElement('a')`). (4) Backward compat: `loadGame(0)` without storageKey still works for manual slots. See requirements.md Section 1 for details.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts`

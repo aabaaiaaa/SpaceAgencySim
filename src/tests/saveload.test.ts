@@ -1826,3 +1826,94 @@ describe('Save/load round-trip for mining/route fields', () => {
   });
 
 });
+
+// ---------------------------------------------------------------------------
+// Overflow save load & export (storageKey parameter)
+// ---------------------------------------------------------------------------
+
+describe('Overflow saves via storageKey parameter', () => {
+  /**
+   * Writes a compressed save envelope directly to localStorage under the
+   * given key, bypassing saveGame() (which only accepts slots 0-4).
+   */
+  function seedOverflowSave(key: string, state: GameState, saveName = 'Overflow Save'): void {
+    const envelope = {
+      saveName,
+      timestamp: new Date(0).toISOString(),
+      version: SAVE_VERSION,
+      state: JSON.parse(JSON.stringify(state)),
+    };
+    const json = JSON.stringify(envelope);
+    const compressed = compressSaveData(json);
+    localStorage.setItem(key, compressed);
+  }
+
+  it('loads a save from overflow slot 7 via storageKey', async () => {
+    const state = freshState();
+    state.money = 77_777;
+    state.agencyName = 'Overflow Agency 7';
+
+    seedOverflowSave('spaceAgencySave_7', state, 'Slot 7 Save');
+    const loaded = await loadGame(-1, 'spaceAgencySave_7');
+
+    expect(loaded.money).toBe(77_777);
+    expect(loaded.agencyName).toBe('Overflow Agency 7');
+  });
+
+  it('loads a save from auto-save key via storageKey', async () => {
+    const state = freshState();
+    state.money = 99_999;
+    state.agencyName = 'Auto Agency';
+
+    seedOverflowSave('spaceAgencySave_auto', state, 'Auto Save');
+    const loaded = await loadGame(-1, 'spaceAgencySave_auto');
+
+    expect(loaded.money).toBe(99_999);
+    expect(loaded.agencyName).toBe('Auto Agency');
+  });
+
+  it('exports an overflow save without throwing (browser mocks)', () => {
+    const state = freshState();
+    state.money = 42_000;
+    seedOverflowSave('spaceAgencySave_7', state, 'Export Overflow');
+
+    // Mock the minimum browser APIs needed for the export DOM path.
+    const mockAnchor: Record<string, unknown> = {
+      href: null, download: null,
+      click: vi.fn(),
+    };
+    const mockDocument = {
+      createElement: vi.fn().mockReturnValue(mockAnchor),
+      body: { appendChild: vi.fn(), removeChild: vi.fn() },
+    };
+    const MockBlob = class {
+      constructor(_parts: string[]) { /* no-op */ }
+    };
+    const mockCreateObjectURL = vi.fn().mockReturnValue('blob:mock-url');
+    const mockRevokeObjectURL = vi.fn();
+
+    vi.stubGlobal('document', mockDocument);
+    vi.stubGlobal('Blob', MockBlob);
+    vi.stubGlobal('URL', { createObjectURL: mockCreateObjectURL, revokeObjectURL: mockRevokeObjectURL });
+
+    expect(() => exportSave(-1, 'spaceAgencySave_7')).not.toThrow();
+    expect(mockDocument.createElement).toHaveBeenCalledWith('a');
+    expect(mockCreateObjectURL).toHaveBeenCalled();
+
+    // Clean up extra stubs, then re-apply the localStorage mock.
+    vi.unstubAllGlobals();
+    vi.stubGlobal('localStorage', mockStorage);
+  });
+
+  it('loadGame(0) without storageKey still works for manual slots (backward compat)', async () => {
+    const state = freshState();
+    state.money = 11_111;
+    state.agencyName = 'Manual Agency';
+
+    await saveGame(state, 0, 'Manual Save');
+    const loaded = await loadGame(0);
+
+    expect(loaded.money).toBe(11_111);
+    expect(loaded.agencyName).toBe('Manual Agency');
+  });
+});
