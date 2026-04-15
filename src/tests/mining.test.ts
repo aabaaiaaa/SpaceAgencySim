@@ -149,19 +149,20 @@ describe('findNearestSite', () => {
 describe('addModuleToSite', () => {
   function makeSite() {
     const state = createGameState();
-    return createMiningSite(state, {
+    const site = createMiningSite(state, {
       name: 'Test Site',
       bodyId: 'moon',
       coordinates: { x: 0, y: 0 },
       controlUnitPartId: 'ctrl-1',
     });
+    return { state, site };
   }
 
   it('adds a drill module and updates powerRequired', () => {
-    const site = makeSite();
+    const { state, site } = makeSite();
     expect(site.powerRequired).toBe(0);
 
-    addModuleToSite(site, {
+    addModuleToSite(state, site, {
       partId: 'drill-part-1',
       type: MiningModuleType.MINING_DRILL,
       powerDraw: 25,
@@ -171,10 +172,10 @@ describe('addModuleToSite', () => {
   });
 
   it('adds a power generator and updates powerGenerated', () => {
-    const site = makeSite();
+    const { state, site } = makeSite();
     expect(site.powerGenerated).toBe(0);
 
-    addModuleToSite(site, {
+    addModuleToSite(state, site, {
       partId: 'gen-part-1',
       type: MiningModuleType.POWER_GENERATOR,
       powerDraw: 0,
@@ -185,9 +186,9 @@ describe('addModuleToSite', () => {
   });
 
   it('pushes the created module to site.modules with correct fields', () => {
-    const site = makeSite();
+    const { state, site } = makeSite();
 
-    const mod = addModuleToSite(site, {
+    const mod = addModuleToSite(state, site, {
       partId: 'drill-part-2',
       type: MiningModuleType.MINING_DRILL,
       powerDraw: 30,
@@ -212,12 +213,12 @@ describe('toggleConnection', () => {
       coordinates: { x: 0, y: 0 },
       controlUnitPartId: 'ctrl-1',
     });
-    const modA = addModuleToSite(site, {
+    const modA = addModuleToSite(state, site, {
       partId: 'drill-1',
       type: MiningModuleType.MINING_DRILL,
       powerDraw: 25,
     });
-    const modB = addModuleToSite(site, {
+    const modB = addModuleToSite(state, site, {
       partId: 'silo-1',
       type: MiningModuleType.STORAGE_SILO,
       powerDraw: 5,
@@ -302,20 +303,20 @@ describe('processMiningSites', () => {
       controlUnitPartId: 'base-control-unit-mk1',
     });
 
-    const generator = addModuleToSite(site, {
+    const generator = addModuleToSite(state, site, {
       partId: 'power-generator-solar-mk1',
       type: MiningModuleType.POWER_GENERATOR,
       powerDraw: 0,
       powerOutput: 100,
     });
 
-    const drill = addModuleToSite(site, {
+    const drill = addModuleToSite(state, site, {
       partId: 'mining-drill-mk1',
       type: MiningModuleType.MINING_DRILL,
       powerDraw: 25,
     });
 
-    const silo = addModuleToSite(site, {
+    const silo = addModuleToSite(state, site, {
       partId: 'storage-silo-mk1',
       type: MiningModuleType.STORAGE_SILO,
       powerDraw: 2,
@@ -358,13 +359,13 @@ describe('processMiningSites', () => {
     });
 
     // Add drill and silo but NO power generator
-    const drill = addModuleToSite(site, {
+    const drill = addModuleToSite(state, site, {
       partId: 'mining-drill-mk1',
       type: MiningModuleType.MINING_DRILL,
       powerDraw: 25,
     });
 
-    const silo = addModuleToSite(site, {
+    const silo = addModuleToSite(state, site, {
       partId: 'storage-silo-mk1',
       type: MiningModuleType.STORAGE_SILO,
       powerDraw: 2,
@@ -392,20 +393,20 @@ describe('processMiningSites', () => {
     });
 
     // Power generator with output 10, but total draw will be 27 → efficiency ~ 10/27
-    addModuleToSite(site, {
+    addModuleToSite(state, site, {
       partId: 'power-generator-solar-mk1',
       type: MiningModuleType.POWER_GENERATOR,
       powerDraw: 0,
       powerOutput: 10,
     });
 
-    const drill = addModuleToSite(site, {
+    const drill = addModuleToSite(state, site, {
       partId: 'mining-drill-mk1',
       type: MiningModuleType.MINING_DRILL,
       powerDraw: 25,
     });
 
-    const silo = addModuleToSite(site, {
+    const silo = addModuleToSite(state, site, {
       partId: 'storage-silo-mk1',
       type: MiningModuleType.STORAGE_SILO,
       powerDraw: 2,
@@ -446,7 +447,7 @@ describe('processSurfaceLaunchPads', () => {
     });
 
     if (!opts?.noPower) {
-      addModuleToSite(site, {
+      addModuleToSite(state, site, {
         partId: 'power-generator-solar-mk1',
         type: MiningModuleType.POWER_GENERATOR,
         powerDraw: 0,
@@ -454,13 +455,13 @@ describe('processSurfaceLaunchPads', () => {
       });
     }
 
-    const launchPad = addModuleToSite(site, {
+    const launchPad = addModuleToSite(state, site, {
       partId: 'surface-launch-pad-mk1',
       type: MiningModuleType.SURFACE_LAUNCH_PAD,
       powerDraw: 50,
     });
 
-    const silo = addModuleToSite(site, {
+    const silo = addModuleToSite(state, site, {
       partId: 'storage-silo-mk1',
       type: MiningModuleType.STORAGE_SILO,
       powerDraw: 2,
@@ -537,7 +538,7 @@ describe('Integration: extraction → refining → launch chain', () => {
     });
 
     // Power generator: 100W output, 0W draw
-    addModuleToSite(site, {
+    addModuleToSite(state, site, {
       partId: 'power-generator-solar-mk1',
       type: MiningModuleType.POWER_GENERATOR,
       powerDraw: 0,
@@ -545,35 +546,35 @@ describe('Integration: extraction → refining → launch chain', () => {
     });
 
     // Mining drill: 25W draw
-    const drill = addModuleToSite(site, {
+    const drill = addModuleToSite(state, site, {
       partId: 'mining-drill-mk1',
       type: MiningModuleType.MINING_DRILL,
       powerDraw: 25,
     });
 
     // Storage silo (solid): 2W draw
-    const silo = addModuleToSite(site, {
+    const silo = addModuleToSite(state, site, {
       partId: 'storage-silo-mk1',
       type: MiningModuleType.STORAGE_SILO,
       powerDraw: 2,
     });
 
     // Refinery: 40W draw
-    const refinery = addModuleToSite(site, {
+    const refinery = addModuleToSite(state, site, {
       partId: 'refinery-mk1',
       type: MiningModuleType.REFINERY,
       powerDraw: 40,
     });
 
     // Pressure vessel (gas): 5W draw
-    const pressureVessel = addModuleToSite(site, {
+    const pressureVessel = addModuleToSite(state, site, {
       partId: 'pressure-vessel-mk1',
       type: MiningModuleType.PRESSURE_VESSEL,
       powerDraw: 5,
     });
 
     // Surface launch pad: 50W draw
-    const launchPad = addModuleToSite(site, {
+    const launchPad = addModuleToSite(state, site, {
       partId: 'surface-launch-pad-mk1',
       type: MiningModuleType.SURFACE_LAUNCH_PAD,
       powerDraw: 50,
@@ -681,7 +682,7 @@ describe('Multi-period accumulation', () => {
     });
 
     // 1. Power generator: 100W output, 0W draw
-    addModuleToSite(site, {
+    addModuleToSite(state, site, {
       partId: 'power-generator-solar-mk1',
       type: MiningModuleType.POWER_GENERATOR,
       powerDraw: 0,
@@ -689,35 +690,35 @@ describe('Multi-period accumulation', () => {
     });
 
     // 2. Mining drill: 25W draw
-    const drill = addModuleToSite(site, {
+    const drill = addModuleToSite(state, site, {
       partId: 'mining-drill-mk1',
       type: MiningModuleType.MINING_DRILL,
       powerDraw: 25,
     });
 
     // 3. Storage silo (solid): 2W draw, capacity 2000 kg
-    const silo = addModuleToSite(site, {
+    const silo = addModuleToSite(state, site, {
       partId: 'storage-silo-mk1',
       type: MiningModuleType.STORAGE_SILO,
       powerDraw: 2,
     });
 
     // 4. Refinery: 40W draw, recipe = water-electrolysis
-    const refinery = addModuleToSite(site, {
+    const refinery = addModuleToSite(state, site, {
       partId: 'refinery-mk1',
       type: MiningModuleType.REFINERY,
       powerDraw: 40,
     });
 
     // 5. Pressure vessel (gas): 5W draw, capacity 1000 kg
-    const pressureVessel = addModuleToSite(site, {
+    const pressureVessel = addModuleToSite(state, site, {
       partId: 'pressure-vessel-mk1',
       type: MiningModuleType.PRESSURE_VESSEL,
       powerDraw: 5,
     });
 
     // 6. Surface launch pad: 50W draw
-    const launchPad = addModuleToSite(site, {
+    const launchPad = addModuleToSite(state, site, {
       partId: 'surface-launch-pad-mk1',
       type: MiningModuleType.SURFACE_LAUNCH_PAD,
       powerDraw: 50,
@@ -824,7 +825,7 @@ describe('Storage capacity overflow', () => {
     });
 
     // Power generator: 100W output, 0W draw
-    addModuleToSite(site, {
+    addModuleToSite(state, site, {
       partId: 'power-generator-solar-mk1',
       type: MiningModuleType.POWER_GENERATOR,
       powerDraw: 0,
@@ -832,14 +833,14 @@ describe('Storage capacity overflow', () => {
     });
 
     // Mining drill: 25W draw
-    const drill = addModuleToSite(site, {
+    const drill = addModuleToSite(state, site, {
       partId: 'mining-drill-mk1',
       type: MiningModuleType.MINING_DRILL,
       powerDraw: 25,
     });
 
     // Storage silo (solid): 2W draw, capacity 2000 kg
-    const silo = addModuleToSite(site, {
+    const silo = addModuleToSite(state, site, {
       partId: 'storage-silo-mk1',
       type: MiningModuleType.STORAGE_SILO,
       powerDraw: 2,
@@ -886,7 +887,7 @@ describe('Multi-resource extraction competition', () => {
     });
 
     // Power generator: 100W output, 0W draw
-    addModuleToSite(site, {
+    addModuleToSite(state, site, {
       partId: 'power-generator-solar-mk1',
       type: MiningModuleType.POWER_GENERATOR,
       powerDraw: 0,
@@ -894,14 +895,14 @@ describe('Multi-resource extraction competition', () => {
     });
 
     // Mining drill: 25W draw (extracts SOLID resources: WATER_ICE on Mars)
-    const drill = addModuleToSite(site, {
+    const drill = addModuleToSite(state, site, {
       partId: 'mining-drill-mk1',
       type: MiningModuleType.MINING_DRILL,
       powerDraw: 25,
     });
 
     // Storage silo (solid): 2W draw
-    const silo = addModuleToSite(site, {
+    const silo = addModuleToSite(state, site, {
       partId: 'storage-silo-mk1',
       type: MiningModuleType.STORAGE_SILO,
       powerDraw: 2,
@@ -911,14 +912,14 @@ describe('Multi-resource extraction competition', () => {
     toggleConnection(site, drill.id, silo.id);
 
     // Gas collector: 20W draw (extracts GAS resources: CO2 on Mars)
-    const gasCollector = addModuleToSite(site, {
+    const gasCollector = addModuleToSite(state, site, {
       partId: 'gas-collector-mk1',
       type: MiningModuleType.GAS_COLLECTOR,
       powerDraw: 20,
     });
 
     // Pressure vessel (gas): 5W draw
-    const pressureVessel = addModuleToSite(site, {
+    const pressureVessel = addModuleToSite(state, site, {
       partId: 'pressure-vessel-mk1',
       type: MiningModuleType.PRESSURE_VESSEL,
       powerDraw: 5,
@@ -963,7 +964,7 @@ describe('orbital buffer accumulation', () => {
     });
 
     // Power generator: 100W output, 0W draw
-    addModuleToSite(site, {
+    addModuleToSite(state, site, {
       partId: 'power-generator-solar-mk1',
       type: MiningModuleType.POWER_GENERATOR,
       powerDraw: 0,
@@ -971,14 +972,14 @@ describe('orbital buffer accumulation', () => {
     });
 
     // Surface launch pad: 50W draw, 200 kg capacity per period
-    const launchPad = addModuleToSite(site, {
+    const launchPad = addModuleToSite(state, site, {
       partId: 'surface-launch-pad-mk1',
       type: MiningModuleType.SURFACE_LAUNCH_PAD,
       powerDraw: 50,
     });
 
     // Storage silo (solid): 2W draw, 2000 kg capacity
-    const silo = addModuleToSite(site, {
+    const silo = addModuleToSite(state, site, {
       partId: 'storage-silo-mk1',
       type: MiningModuleType.STORAGE_SILO,
       powerDraw: 2,
@@ -1050,17 +1051,18 @@ describe('Mk2 storage modules', () => {
   describe('addModuleToSite initializes Mk2 storage with correct capacity', () => {
     function makeSite() {
       const state = createGameState();
-      return createMiningSite(state, {
+      const site = createMiningSite(state, {
         name: 'Mk2 Test Site',
         bodyId: 'MOON',
         coordinates: { x: 0, y: 0 },
         controlUnitPartId: 'base-control-unit-mk1',
       });
+      return { state, site };
     }
 
     it('Storage Silo Mk2 gets storageCapacityKg = 5000', () => {
-      const site = makeSite();
-      const mod = addModuleToSite(site, {
+      const { state, site } = makeSite();
+      const mod = addModuleToSite(state, site, {
         partId: 'storage-silo-mk2',
         type: MiningModuleType.STORAGE_SILO,
         powerDraw: 3,
@@ -1072,8 +1074,8 @@ describe('Mk2 storage modules', () => {
     });
 
     it('Pressure Vessel Mk2 gets storageCapacityKg = 2500', () => {
-      const site = makeSite();
-      const mod = addModuleToSite(site, {
+      const { state, site } = makeSite();
+      const mod = addModuleToSite(state, site, {
         partId: 'pressure-vessel-mk2',
         type: MiningModuleType.PRESSURE_VESSEL,
         powerDraw: 8,
@@ -1085,8 +1087,8 @@ describe('Mk2 storage modules', () => {
     });
 
     it('Fluid Tank Mk2 gets storageCapacityKg = 3750', () => {
-      const site = makeSite();
-      const mod = addModuleToSite(site, {
+      const { state, site } = makeSite();
+      const mod = addModuleToSite(state, site, {
         partId: 'fluid-tank-mk2',
         type: MiningModuleType.FLUID_TANK,
         powerDraw: 8,
@@ -1110,7 +1112,7 @@ describe('Mk2 storage modules', () => {
       });
 
       // Power generator: 100W output
-      addModuleToSite(site, {
+      addModuleToSite(state, site, {
         partId: 'power-generator-solar-mk1',
         type: MiningModuleType.POWER_GENERATOR,
         powerDraw: 0,
@@ -1118,21 +1120,21 @@ describe('Mk2 storage modules', () => {
       });
 
       // Mining drill: 25W draw
-      const drill = addModuleToSite(site, {
+      const drill = addModuleToSite(state, site, {
         partId: 'mining-drill-mk1',
         type: MiningModuleType.MINING_DRILL,
         powerDraw: 25,
       });
 
       // Mk1 storage silo: 2W draw, 2000 kg capacity
-      const siloMk1 = addModuleToSite(site, {
+      const siloMk1 = addModuleToSite(state, site, {
         partId: 'storage-silo-mk1',
         type: MiningModuleType.STORAGE_SILO,
         powerDraw: 2,
       });
 
       // Mk2 storage silo: 3W draw, 5000 kg capacity
-      const siloMk2 = addModuleToSite(site, {
+      const siloMk2 = addModuleToSite(state, site, {
         partId: 'storage-silo-mk2',
         type: MiningModuleType.STORAGE_SILO,
         powerDraw: 3,
@@ -1180,7 +1182,7 @@ describe('Mk2 storage modules', () => {
       });
 
       // Power generator: 100W output
-      addModuleToSite(site, {
+      addModuleToSite(state, site, {
         partId: 'power-generator-solar-mk1',
         type: MiningModuleType.POWER_GENERATOR,
         powerDraw: 0,
@@ -1188,14 +1190,14 @@ describe('Mk2 storage modules', () => {
       });
 
       // Mining drill: 25W draw
-      const drill = addModuleToSite(site, {
+      const drill = addModuleToSite(state, site, {
         partId: 'mining-drill-mk1',
         type: MiningModuleType.MINING_DRILL,
         powerDraw: 25,
       });
 
       // Mk2 storage silo: 3W draw, 5000 kg capacity
-      const siloMk2 = addModuleToSite(site, {
+      const siloMk2 = addModuleToSite(state, site, {
         partId: 'storage-silo-mk2',
         type: MiningModuleType.STORAGE_SILO,
         powerDraw: 3,
@@ -1237,7 +1239,7 @@ describe('Mk2 storage modules', () => {
       });
 
       // Power generator: 200W output (enough for all modules)
-      addModuleToSite(site, {
+      addModuleToSite(state, site, {
         partId: 'power-generator-solar-mk1',
         type: MiningModuleType.POWER_GENERATOR,
         powerDraw: 0,
@@ -1245,21 +1247,21 @@ describe('Mk2 storage modules', () => {
       });
 
       // Mining drill: 25W draw
-      const drill = addModuleToSite(site, {
+      const drill = addModuleToSite(state, site, {
         partId: 'mining-drill-mk1',
         type: MiningModuleType.MINING_DRILL,
         powerDraw: 25,
       });
 
       // Mk2 storage silo (SOLID): 3W draw, 5000 kg capacity — NO Mk1 storage
-      const siloMk2 = addModuleToSite(site, {
+      const siloMk2 = addModuleToSite(state, site, {
         partId: 'storage-silo-mk2',
         type: MiningModuleType.STORAGE_SILO,
         powerDraw: 3,
       });
 
       // Surface launch pad: 50W draw, 200 kg/period capacity
-      const launchPad = addModuleToSite(site, {
+      const launchPad = addModuleToSite(state, site, {
         partId: 'surface-launch-pad-mk1',
         type: MiningModuleType.SURFACE_LAUNCH_PAD,
         powerDraw: 50,
@@ -1326,7 +1328,7 @@ describe('Mk2 storage modules', () => {
       });
 
       // Power generator: 200W output
-      addModuleToSite(site, {
+      addModuleToSite(state, site, {
         partId: 'power-generator-solar-mk1',
         type: MiningModuleType.POWER_GENERATOR,
         powerDraw: 0,
@@ -1334,21 +1336,21 @@ describe('Mk2 storage modules', () => {
       });
 
       // Mining drill: 25W draw
-      const drill = addModuleToSite(site, {
+      const drill = addModuleToSite(state, site, {
         partId: 'mining-drill-mk1',
         type: MiningModuleType.MINING_DRILL,
         powerDraw: 25,
       });
 
       // Mk1 silo: 2W draw, 2000 kg capacity
-      const siloMk1 = addModuleToSite(site, {
+      const siloMk1 = addModuleToSite(state, site, {
         partId: 'storage-silo-mk1',
         type: MiningModuleType.STORAGE_SILO,
         powerDraw: 2,
       });
 
       // Mk2 silo: 3W draw, 5000 kg capacity
-      const siloMk2 = addModuleToSite(site, {
+      const siloMk2 = addModuleToSite(state, site, {
         partId: 'storage-silo-mk2',
         type: MiningModuleType.STORAGE_SILO,
         powerDraw: 3,
@@ -1405,7 +1407,7 @@ describe('Mk2 storage modules', () => {
       });
 
       // Power generator: 200W output
-      addModuleToSite(site, {
+      addModuleToSite(state, site, {
         partId: 'power-generator-solar-mk1',
         type: MiningModuleType.POWER_GENERATOR,
         powerDraw: 0,
@@ -1413,21 +1415,21 @@ describe('Mk2 storage modules', () => {
       });
 
       // Mk2 storage silo (SOLID input): 3W draw, 5000 kg capacity
-      const siloMk2 = addModuleToSite(site, {
+      const siloMk2 = addModuleToSite(state, site, {
         partId: 'storage-silo-mk2',
         type: MiningModuleType.STORAGE_SILO,
         powerDraw: 3,
       });
 
       // Refinery: 40W draw
-      const refinery = addModuleToSite(site, {
+      const refinery = addModuleToSite(state, site, {
         partId: 'refinery-mk1',
         type: MiningModuleType.REFINERY,
         powerDraw: 40,
       });
 
       // Mk2 pressure vessel (GAS output): 8W draw, 2500 kg capacity
-      const pvMk2 = addModuleToSite(site, {
+      const pvMk2 = addModuleToSite(state, site, {
         partId: 'pressure-vessel-mk2',
         type: MiningModuleType.PRESSURE_VESSEL,
         powerDraw: 8,
@@ -1477,7 +1479,7 @@ describe('Mk2 storage modules', () => {
       });
 
       // Power generator: 200W output
-      addModuleToSite(site, {
+      addModuleToSite(state, site, {
         partId: 'power-generator-solar-mk1',
         type: MiningModuleType.POWER_GENERATOR,
         powerDraw: 0,
@@ -1485,28 +1487,28 @@ describe('Mk2 storage modules', () => {
       });
 
       // Mk2 silo (SOLID input): 5000 kg capacity
-      const siloMk2 = addModuleToSite(site, {
+      const siloMk2 = addModuleToSite(state, site, {
         partId: 'storage-silo-mk2',
         type: MiningModuleType.STORAGE_SILO,
         powerDraw: 3,
       });
 
       // Refinery
-      const refinery = addModuleToSite(site, {
+      const refinery = addModuleToSite(state, site, {
         partId: 'refinery-mk1',
         type: MiningModuleType.REFINERY,
         powerDraw: 40,
       });
 
       // Mk1 pressure vessel (GAS output): 1000 kg capacity
-      const pvMk1 = addModuleToSite(site, {
+      const pvMk1 = addModuleToSite(state, site, {
         partId: 'pressure-vessel-mk1',
         type: MiningModuleType.PRESSURE_VESSEL,
         powerDraw: 5,
       });
 
       // Mk2 pressure vessel (GAS output): 2500 kg capacity
-      const pvMk2 = addModuleToSite(site, {
+      const pvMk2 = addModuleToSite(state, site, {
         partId: 'pressure-vessel-mk2',
         type: MiningModuleType.PRESSURE_VESSEL,
         powerDraw: 8,
@@ -1559,42 +1561,42 @@ describe('Mk2 storage modules', () => {
       });
 
       // Mk1 silo (SOLID): 2000 kg capacity
-      const siloMk1 = addModuleToSite(site, {
+      const siloMk1 = addModuleToSite(state, site, {
         partId: 'storage-silo-mk1',
         type: MiningModuleType.STORAGE_SILO,
         powerDraw: 2,
       });
 
       // Mk2 silo (SOLID): 5000 kg capacity
-      const siloMk2 = addModuleToSite(site, {
+      const siloMk2 = addModuleToSite(state, site, {
         partId: 'storage-silo-mk2',
         type: MiningModuleType.STORAGE_SILO,
         powerDraw: 3,
       });
 
       // Mk1 pressure vessel (GAS): 1000 kg capacity
-      const pvMk1 = addModuleToSite(site, {
+      const pvMk1 = addModuleToSite(state, site, {
         partId: 'pressure-vessel-mk1',
         type: MiningModuleType.PRESSURE_VESSEL,
         powerDraw: 5,
       });
 
       // Mk2 pressure vessel (GAS): 2500 kg capacity
-      const pvMk2 = addModuleToSite(site, {
+      const pvMk2 = addModuleToSite(state, site, {
         partId: 'pressure-vessel-mk2',
         type: MiningModuleType.PRESSURE_VESSEL,
         powerDraw: 8,
       });
 
       // Mk1 fluid tank (LIQUID): default capacity
-      const ftMk1 = addModuleToSite(site, {
+      const ftMk1 = addModuleToSite(state, site, {
         partId: 'fluid-tank-mk1',
         type: MiningModuleType.FLUID_TANK,
         powerDraw: 5,
       });
 
       // Mk2 fluid tank (LIQUID): 3750 kg capacity
-      const ftMk2 = addModuleToSite(site, {
+      const ftMk2 = addModuleToSite(state, site, {
         partId: 'fluid-tank-mk2',
         type: MiningModuleType.FLUID_TANK,
         powerDraw: 8,
@@ -1633,13 +1635,13 @@ describe('Mk2 storage modules', () => {
       });
 
       // Mix of empty Mk1 and Mk2 modules
-      addModuleToSite(site, {
+      addModuleToSite(state, site, {
         partId: 'storage-silo-mk1',
         type: MiningModuleType.STORAGE_SILO,
         powerDraw: 2,
       });
 
-      const siloMk2 = addModuleToSite(site, {
+      const siloMk2 = addModuleToSite(state, site, {
         partId: 'storage-silo-mk2',
         type: MiningModuleType.STORAGE_SILO,
         powerDraw: 3,

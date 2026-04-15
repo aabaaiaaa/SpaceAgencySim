@@ -97,6 +97,21 @@ export interface SaveEnvelopeParams {
   hubs?: HubSave[];
   activeHubId?: string;
   nextHubId?: number;
+  nextContractId?: number;
+  nextChallengeId?: number;
+  nextDesignId?: number;
+  nextFlightResultId?: number;
+  nextAsteroidId?: number;
+  nextCrewId?: number;
+  nextFieldCraftId?: number;
+  nextMiningSiteId?: number;
+  nextMiningModuleId?: number;
+  nextInventoryId?: number;
+  nextRouteId?: number;
+  nextRouteLegId?: number;
+  nextProvenLegId?: number;
+  nextSatelliteId?: number;
+  nextSurfaceOpId?: number;
   autoSaveEnabled?: boolean;
   debugMode?: boolean;
   welcomeShown?: boolean;
@@ -146,6 +161,21 @@ export interface SaveEnvelopeState {
   hubs: HubSave[];
   activeHubId: string;
   nextHubId: number;
+  nextContractId: number;
+  nextChallengeId: number;
+  nextDesignId: number;
+  nextFlightResultId: number;
+  nextAsteroidId: number;
+  nextCrewId: number;
+  nextFieldCraftId: number;
+  nextMiningSiteId: number;
+  nextMiningModuleId: number;
+  nextInventoryId: number;
+  nextRouteId: number;
+  nextRouteLegId: number;
+  nextProvenLegId: number;
+  nextSatelliteId: number;
+  nextSurfaceOpId: number;
   autoSaveEnabled: boolean;
   debugMode: boolean;
   welcomeShown: boolean;
@@ -171,7 +201,7 @@ export interface SaveEnvelope {
  */
 export function buildSaveEnvelope(params: SaveEnvelopeParams = {}): SaveEnvelope {
   const {
-    version         = 5,
+    version         = 6,
     saveName        = 'E2E Test',
     money           = STARTING_MONEY,
     missions        = { available: [], accepted: [], completed: [] },
@@ -235,6 +265,21 @@ export function buildSaveEnvelope(params: SaveEnvelopeParams = {}): SaveEnvelope
   }];
   const activeHubId = params.activeHubId ?? 'earth';
   const nextHubId = params.nextHubId ?? 1;
+  const nextContractId = params.nextContractId ?? 1;
+  const nextChallengeId = params.nextChallengeId ?? 1;
+  const nextDesignId = params.nextDesignId ?? 1;
+  const nextFlightResultId = params.nextFlightResultId ?? 1;
+  const nextAsteroidId = params.nextAsteroidId ?? 1;
+  const nextCrewId = params.nextCrewId ?? 1;
+  const nextFieldCraftId = params.nextFieldCraftId ?? 1;
+  const nextMiningSiteId = params.nextMiningSiteId ?? 1;
+  const nextMiningModuleId = params.nextMiningModuleId ?? 1;
+  const nextInventoryId = params.nextInventoryId ?? 1;
+  const nextRouteId = params.nextRouteId ?? 1;
+  const nextRouteLegId = params.nextRouteLegId ?? 1;
+  const nextProvenLegId = params.nextProvenLegId ?? 1;
+  const nextSatelliteId = params.nextSatelliteId ?? 1;
+  const nextSurfaceOpId = params.nextSurfaceOpId ?? 1;
 
   return {
     saveName,
@@ -280,6 +325,21 @@ export function buildSaveEnvelope(params: SaveEnvelopeParams = {}): SaveEnvelope
       hubs,
       activeHubId,
       nextHubId,
+      nextContractId,
+      nextChallengeId,
+      nextDesignId,
+      nextFlightResultId,
+      nextAsteroidId,
+      nextCrewId,
+      nextFieldCraftId,
+      nextMiningSiteId,
+      nextMiningModuleId,
+      nextInventoryId,
+      nextRouteId,
+      nextRouteLegId,
+      nextProvenLegId,
+      nextSatelliteId,
+      nextSurfaceOpId,
       autoSaveEnabled,
       debugMode,
       welcomeShown,

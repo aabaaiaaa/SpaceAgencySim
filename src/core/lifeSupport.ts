@@ -175,17 +175,20 @@ interface CreateFieldCraftOptions {
  * Create a field craft entry when a crewed vessel is left in orbit or
  * landed on a non-Earth body upon flight return.
  */
-export function createFieldCraft({
-  name,
-  bodyId,
-  status,
-  crewIds,
-  hasExtendedLifeSupport: extendedSupport,
-  deployedPeriod,
-  orbitalElements = null,
-  orbitBandId = null,
-}: CreateFieldCraftOptions): FieldCraft {
-  const id = _generateId();
+export function createFieldCraft(
+  state: GameState,
+  {
+    name,
+    bodyId,
+    status,
+    crewIds,
+    hasExtendedLifeSupport: extendedSupport,
+    deployedPeriod,
+    orbitalElements = null,
+    orbitBandId = null,
+  }: CreateFieldCraftOptions,
+): FieldCraft {
+  const id = `fc-${state.nextFieldCraftId++}`;
   return {
     id,
     name,
@@ -213,13 +216,3 @@ export function getFieldCraftWarnings(state: GameState): FieldCraft[] {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Private helpers
-// ---------------------------------------------------------------------------
-
-function _generateId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return crypto.randomUUID();
-  }
-  return `fc-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}

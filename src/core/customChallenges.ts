@@ -187,13 +187,6 @@ export function ensureCustomChallengeState(state: GameState): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Generate a unique ID for a custom challenge.
- */
-function _generateId(): string {
-  return 'custom-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 7);
-}
-
-/**
  * Create a new custom challenge and add it to state.
  *
  * Accepts a partial definition — fills in defaults and generates an ID.
@@ -215,7 +208,7 @@ export function createCustomChallenge(state: GameState, def: CustomChallengeDef)
   const metricInfo = SCORE_METRIC_OPTIONS.find((m) => m.value === def.scoreMetric);
 
   const challenge: ChallengeDef = {
-    id: _generateId(),
+    id: `custom-${state.nextChallengeId++}`,
     custom: true,
     title: def.title.trim(),
     description: (def.description || '').trim() || 'A custom challenge.',

@@ -32,32 +32,32 @@ function buildRefinerySite(state: ReturnType<typeof createGameState>) {
     controlUnitPartId: 'base-control-unit-mk1',
   });
 
-  const generator = addModuleToSite(site, {
+  const generator = addModuleToSite(state, site, {
     partId: 'power-generator-solar-mk1',
     type: MiningModuleType.POWER_GENERATOR,
     powerDraw: 0,
     powerOutput: 100,
   });
 
-  const refinery = addModuleToSite(site, {
+  const refinery = addModuleToSite(state, site, {
     partId: 'refinery-mk1',
     type: MiningModuleType.REFINERY,
     powerDraw: 40,
   });
 
-  const silo = addModuleToSite(site, {
+  const silo = addModuleToSite(state, site, {
     partId: 'storage-silo-mk1',
     type: MiningModuleType.STORAGE_SILO,
     powerDraw: 2,
   });
 
-  const pressureVessel = addModuleToSite(site, {
+  const pressureVessel = addModuleToSite(state, site, {
     partId: 'pressure-vessel-mk1',
     type: MiningModuleType.PRESSURE_VESSEL,
     powerDraw: 5,
   });
 
-  const fluidTank = addModuleToSite(site, {
+  const fluidTank = addModuleToSite(state, site, {
     partId: 'fluid-tank-mk1',
     type: MiningModuleType.FLUID_TANK,
     powerDraw: 8,
@@ -275,26 +275,26 @@ describe('processRefineries', () => {
     });
 
     // Generator with low output — total draw will exceed output
-    addModuleToSite(site, {
+    addModuleToSite(state, site, {
       partId: 'power-generator-solar-mk1',
       type: MiningModuleType.POWER_GENERATOR,
       powerDraw: 0,
       powerOutput: 30,
     });
 
-    const refinery = addModuleToSite(site, {
+    const refinery = addModuleToSite(state, site, {
       partId: 'refinery-mk1',
       type: MiningModuleType.REFINERY,
       powerDraw: 40,
     });
 
-    const silo = addModuleToSite(site, {
+    const silo = addModuleToSite(state, site, {
       partId: 'storage-silo-mk1',
       type: MiningModuleType.STORAGE_SILO,
       powerDraw: 2,
     });
 
-    const pressureVessel = addModuleToSite(site, {
+    const pressureVessel = addModuleToSite(state, site, {
       partId: 'pressure-vessel-mk1',
       type: MiningModuleType.PRESSURE_VESSEL,
       powerDraw: 5,
@@ -335,21 +335,21 @@ describe('processRefineries', () => {
       controlUnitPartId: 'base-control-unit-mk1',
     });
 
-    addModuleToSite(site, {
+    addModuleToSite(state, site, {
       partId: 'power-generator-solar-mk1',
       type: MiningModuleType.POWER_GENERATOR,
       powerDraw: 0,
       powerOutput: 100,
     });
 
-    const refinery = addModuleToSite(site, {
+    const refinery = addModuleToSite(state, site, {
       partId: 'refinery-mk1',
       type: MiningModuleType.REFINERY,
       powerDraw: 40,
     });
 
     // Only connect a silo (SOLID) — water electrolysis needs GAS storage for outputs
-    const silo = addModuleToSite(site, {
+    const silo = addModuleToSite(state, site, {
       partId: 'storage-silo-mk1',
       type: MiningModuleType.STORAGE_SILO,
       powerDraw: 2,
@@ -380,19 +380,19 @@ describe('processRefineries', () => {
     });
 
     // No power generator
-    const refinery = addModuleToSite(site, {
+    const refinery = addModuleToSite(state, site, {
       partId: 'refinery-mk1',
       type: MiningModuleType.REFINERY,
       powerDraw: 40,
     });
 
-    const silo = addModuleToSite(site, {
+    const silo = addModuleToSite(state, site, {
       partId: 'storage-silo-mk1',
       type: MiningModuleType.STORAGE_SILO,
       powerDraw: 2,
     });
 
-    const pressureVessel = addModuleToSite(site, {
+    const pressureVessel = addModuleToSite(state, site, {
       partId: 'pressure-vessel-mk1',
       type: MiningModuleType.PRESSURE_VESSEL,
       powerDraw: 5,

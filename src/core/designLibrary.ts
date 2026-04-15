@@ -164,11 +164,11 @@ export function deleteDesignFromLibrary(state: GameState, designId: string): voi
   deleteDesignFromSharedLibrary(designId);
 }
 
-export function duplicateDesign(original: RocketDesign): RocketDesign {
+export function duplicateDesign(original: RocketDesign, state: GameState): RocketDesign {
   const now = new Date().toISOString();
   return {
     ...JSON.parse(JSON.stringify(original)),
-    id: 'design-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+    id: `design-${state.nextDesignId++}`,
     name: original.name + ' (Copy)',
     createdDate: now,
     updatedDate: now,

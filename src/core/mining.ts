@@ -31,17 +31,6 @@ export interface CreateSiteParams {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function generateSiteId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `mining-site-${crypto.randomUUID()}`;
-  }
-  return `mining-site-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 
@@ -53,7 +42,7 @@ function generateSiteId(): string {
  */
 export function createMiningSite(state: GameState, params: CreateSiteParams): MiningSite {
   const site: MiningSite = {
-    id: generateSiteId(),
+    id: `mining-site-${state.nextMiningSiteId++}`,
     name: params.name,
     bodyId: params.bodyId,
     coordinates: { x: params.coordinates.x, y: params.coordinates.y },
@@ -110,22 +99,15 @@ export interface AddModuleParams {
   powerOutput?: number; // only power generators have this
 }
 
-function generateModuleId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `module-${crypto.randomUUID()}`;
-  }
-  return `module-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
 /**
  * Add a module to an existing mining site.
  *
  * Creates the module, pushes it to the site's module list, and updates
  * the site's power bookkeeping.
  */
-export function addModuleToSite(site: MiningSite, params: AddModuleParams): MiningSiteModule {
+export function addModuleToSite(state: GameState, site: MiningSite, params: AddModuleParams): MiningSiteModule {
   const mod: MiningSiteModule = {
-    id: generateModuleId(),
+    id: `module-${state.nextMiningModuleId++}`,
     partId: params.partId,
     type: params.type,
     powerDraw: params.powerDraw,

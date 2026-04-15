@@ -41,7 +41,7 @@ export function proveRouteLeg(
   params: ProveRouteLegParams,
 ): ProvenLeg {
   const leg: ProvenLeg = {
-    id: `proven-leg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    id: `proven-leg-${state.nextProvenLegId++}`,
     origin: {
       ...params.origin,
       hubId: params.originHubId !== undefined ? params.originHubId : (params.origin.hubId ?? null),
@@ -146,14 +146,6 @@ export function calculateRouteThroughput(legs: RouteLeg[]): number {
 // Route creation
 // ---------------------------------------------------------------------------
 
-function generateRouteId(): string {
-  return `route-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function generateRouteLegId(): string {
-  return `route-leg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
 /**
  * Assemble a new Route from proven legs and add it to the game state.
  *
@@ -190,7 +182,7 @@ export function createRoute(state: GameState, params: CreateRouteParams): Route 
     }
 
     return {
-      id: generateRouteLegId(),
+      id: `route-leg-${state.nextRouteLegId++}`,
       origin,
       destination,
       craftDesignId: proven.craftDesignId,
@@ -206,7 +198,7 @@ export function createRoute(state: GameState, params: CreateRouteParams): Route 
   }
 
   const route: Route = {
-    id: generateRouteId(),
+    id: `route-${state.nextRouteId++}`,
     name: params.name,
     status: 'paused',
     resourceType: params.resourceType,

@@ -78,11 +78,6 @@ interface ContractGenerationData {
   conflictTags?: string[];
 }
 
-function _generateId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return `contract-${crypto.randomUUID()}`;
-  return `contract-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
 export function getMissionControlTier(state: GameState): number {
   const hub = getHub(state, EARTH_HUB_ID);
   const mc = hub?.facilities[FacilityId.MISSION_CONTROL];
@@ -99,7 +94,7 @@ function _clampRep(rep: number): number { return Math.max(0, Math.min(100, rep))
 
 function _buildContract(data: ContractGenerationData, state: GameState): ExtendedContract {
   return {
-    id: _generateId(), title: data.title, description: data.description, category: data.category as ContractCategory,
+    id: `contract-${state.nextContractId++}`, title: data.title, description: data.description, category: data.category as ContractCategory,
     objectives: data.objectives, bonusObjectives: data.bonusObjectives ?? [], bonusReward: data.bonusReward ?? 0,
     reward: data.reward, penaltyFee: Math.round(data.reward * CONTRACT_CANCEL_PENALTY_RATE),
     reputationReward: CONTRACT_REP_GAIN_MIN + Math.floor(Math.random() * (CONTRACT_REP_GAIN_MAX - CONTRACT_REP_GAIN_MIN + 1)),

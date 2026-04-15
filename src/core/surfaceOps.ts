@@ -51,13 +51,6 @@ interface SurfaceAction {
 // Helpers
 // ---------------------------------------------------------------------------
 
-let _nextId = 1;
-
-/** Generate a unique surface-item ID. */
-function _generateId(): string {
-  return `surface-${Date.now()}-${_nextId++}`;
-}
-
 /**
  * Get all surface items on a specific body.
  */
@@ -145,7 +138,7 @@ export function plantFlag(
   if (!state.surfaceItems) state.surfaceItems = [];
 
   const item: SurfaceItem = {
-    id: _generateId(),
+    id: `surface-${state.nextSurfaceOpId++}`,
     type: SurfaceItemType.FLAG,
     bodyId,
     posX: ps.posX,
@@ -195,7 +188,7 @@ export function collectSurfaceSample(
   const bodyId = flightState.bodyId;
 
   const item: SurfaceItem = {
-    id: _generateId(),
+    id: `surface-${state.nextSurfaceOpId++}`,
     type: SurfaceItemType.SURFACE_SAMPLE,
     bodyId,
     posX: ps.posX,
@@ -241,7 +234,7 @@ export function deploySurfaceInstrument(
   const bodyId = flightState.bodyId;
 
   const item: SurfaceItem = {
-    id: _generateId(),
+    id: `surface-${state.nextSurfaceOpId++}`,
     type: SurfaceItemType.SURFACE_INSTRUMENT,
     bodyId,
     posX: ps.posX,
@@ -282,7 +275,7 @@ export function deployBeacon(
   const bodyId = flightState.bodyId;
 
   const item: SurfaceItem = {
-    id: _generateId(),
+    id: `surface-${state.nextSurfaceOpId++}`,
     type: SurfaceItemType.BEACON,
     bodyId,
     posX: ps.posX,

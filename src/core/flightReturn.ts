@@ -231,7 +231,7 @@ export function processFlightReturn(state: GameState, flightState: FlightState, 
         const rocketDesign = state.rockets?.find((r) => r.id === flightState.rocketId);
         const craftName = rocketDesign?.name ?? `Craft-${(flightState.rocketId ?? '').slice(0, 6)}`;
         const fieldStatus = wasInOrbit ? FieldCraftStatus.IN_ORBIT : FieldCraftStatus.LANDED;
-        deployedFieldCraft = createFieldCraft({ name: craftName, bodyId: landingBodyId, status: fieldStatus, crewIds: survivingIds, hasExtendedLifeSupport: hasExtendedLifeSupport(assembly, ps), deployedPeriod: state.currentPeriod, orbitalElements: flightState?.orbitalElements ?? null, orbitBandId: flightState?.orbitBandId ?? null });
+        deployedFieldCraft = createFieldCraft(state, { name: craftName, bodyId: landingBodyId, status: fieldStatus, crewIds: survivingIds, hasExtendedLifeSupport: hasExtendedLifeSupport(assembly, ps), deployedPeriod: state.currentPeriod, orbitalElements: flightState?.orbitalElements ?? null, orbitBandId: flightState?.orbitBandId ?? null });
         state.fieldCraft.push(deployedFieldCraft);
       }
     }
@@ -253,7 +253,7 @@ export function processFlightReturn(state: GameState, flightState: FlightState, 
   const rocketDesign = state.savedDesigns?.find((d) => d.id === flightState?.rocketId) ?? state.rockets?.find((r) => r.id === flightState?.rocketId);
 
   const flightResult: FlightResult = {
-    id: _generateId(), missionId: flightState?.missionId ?? '', rocketId: flightState?.rocketId ?? '',
+    id: `flight-${state.nextFlightResultId++}`, missionId: flightState?.missionId ?? '', rocketId: flightState?.rocketId ?? '',
     crewIds: flightState?.crewIds ?? [], launchDate: new Date().toISOString(), outcome,
     deltaVUsed: 0, revenue: missionRevenueTotal + recoveryValue, notes: '',
     maxAltitude: flightState?.maxAltitude ?? flightState?.altitude ?? 0,
@@ -311,7 +311,3 @@ function _determineOutcome(ps: PhysicsState | null, missionsCompleted: boolean):
   return FlightOutcome.FAILURE;
 }
 
-function _generateId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') return crypto.randomUUID();
-  return `flight-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}

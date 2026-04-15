@@ -37,25 +37,25 @@ Implementation plan: `docs/superpowers/plans/2026-04-15-iteration-14.md`
 - **Verification**: `npx tsc --noEmit src/core/gameState.ts src/core/saveload.ts` — may show errors in factory files (expected, fixed in TASK-006).
 
 ### TASK-006: Update test factories for new counter fields
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-005
 - **Description**: In `src/tests/_factories.ts`, add all 15 `next*Id` fields (each set to `1`) to the `makeGameState()` return object, before the `...overrides` spread. In `e2e/helpers/_saveFactory.ts`, add 15 param destructurings with `?? 1` defaults (after `nextHubId`), include them in the return state object, and update the version default from 5 to 6. See implementation plan Task 6 for exact code.
 - **Verification**: `npx tsc --noEmit src/tests/_factories.ts e2e/helpers/_saveFactory.ts` — 0 errors.
 
 ### TASK-007: Migrate ID generators batch 1 (contracts, challenges, designs, flights, asteroids)
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-005
 - **Description**: Migrate 5 files to sequential counters. In each file, delete the old `_generateId()` function (or inline Date.now expression) and replace call sites with the counter pattern `\`prefix-${state.nextPrefixId++}\``. Files: (1) `src/core/contracts.ts:81-84` — delete `_generateId()`, use `\`contract-${state.nextContractId++}\``. (2) `src/core/customChallenges.ts:192-194` — delete `_generateId()`, use `\`custom-${state.nextChallengeId++}\``. (3) `src/core/designLibrary.ts:171` — replace inline ID in `duplicateDesign()` with `\`design-${state.nextDesignId++}\``; add `state: GameState` parameter to `duplicateDesign()` signature and update all callers. (4) `src/core/flightReturn.ts:314-317` — delete `_generateId()`, use `\`flight-${state.nextFlightResultId++}\``. (5) `src/core/grabbing.ts:462` — replace `AST-P-${asteroid.id}-${Date.now()}` with `\`AST-P-${state.nextAsteroidId++}\``. See implementation plan Task 7 steps 1-5 for details.
 - **Verification**: `npx tsc --noEmit src/core/contracts.ts src/core/customChallenges.ts src/core/designLibrary.ts src/core/flightReturn.ts src/core/grabbing.ts` — 0 errors.
 
 ### TASK-007a: Migrate ID generators batch 2 (crew, life support, mining, inventory)
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-005
 - **Description**: Migrate 4 files to sequential counters. (1) `src/core/hubCrew.ts:116` — replace `'crew-' + Date.now() + ...` with `\`crew-${state.nextCrewId++}\``. (2) `src/core/lifeSupport.ts:220-225` — delete `_generateId()`, use `\`fc-${state.nextFieldCraftId++}\``. (3) `src/core/mining.ts:37-42` — delete `generateSiteId()`, use `\`mining-site-${state.nextMiningSiteId++}\``. Also delete `generateModuleId()` (lines 113-118), use `\`module-${state.nextMiningModuleId++}\``. (4) `src/core/partInventory.ts:73-78` — delete `_generateId()`, use `\`inv-${state.nextInventoryId++}\``. See implementation plan Task 7 steps 6-9 for details.
 - **Verification**: `npx tsc --noEmit src/core/hubCrew.ts src/core/lifeSupport.ts src/core/mining.ts src/core/partInventory.ts` — 0 errors.
 
 ### TASK-007b: Migrate ID generators batch 3 (routes, satellites, surfaceOps)
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-005
 - **Description**: Migrate 3 files to sequential counters. (1) `src/core/routes.ts` — replace proven leg ID at line 44 with `\`proven-leg-${state.nextProvenLegId++}\``. Delete `generateRouteId()` (lines 145-147), use `\`route-${state.nextRouteId++}\``. Delete `generateRouteLegId()` (lines 149-151), use `\`route-leg-${state.nextRouteLegId++}\``. (2) `src/core/satellites.ts:123` — replace with `\`sat-${state.nextSatelliteId++}\``. Note: the next line `const orbObjId = 'orb-' + satId;` is unchanged. (3) `src/core/surfaceOps.ts` — delete module-level `let _nextId = 1;` (line 54) and `_generateId()` (lines 57-59), use `\`surface-${state.nextSurfaceOpId++}\``. After all migrations, verify no `Date.now()` ID patterns remain: `grep -rn "Date.now()" src/core/ --include="*.ts"` should show no ID generation patterns. See implementation plan Task 7 steps 10-13.
 - **Verification**: `npx tsc --noEmit src/core/routes.ts src/core/satellites.ts src/core/surfaceOps.ts && npx eslint src/core/` — 0 errors.
@@ -67,7 +67,7 @@ Implementation plan: `docs/superpowers/plans/2026-04-15-iteration-14.md`
 - **Verification**: `npm run test:unit` — all unit tests pass.
 
 ### TASK-009: Create shared mapGeometry module with tests
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create `src/core/mapGeometry.ts` — a pure math module with no DOM dependencies. Exports: `BEZIER_OFFSET_FACTOR` (0.18), `bezierControlPoint(x1,y1,x2,y2,legIndex)` returning `{cx,cy}`, `evalQuadBezier(x1,y1,cx,cy,x2,y2,t)` returning `{x,y}`, `BODY_COLORS` record, `DEFAULT_BODY_COLOR`, `getBodyColorHex(bodyId)`, `getBodyColorNum(bodyId)`, `ROUTE_STATUS_COLORS` with active/paused/broken each having `{hex,num}`. Create `src/tests/mapGeometry.test.ts` with tests covering: Bézier control point math (horizontal, diagonal, zero-distance, alternating direction), evalQuadBezier (t=0, t=0.5, t=1), body color lookup (known body, unknown body, case-insensitive, hex/num consistency), route status colors (all 3 present, hex/num consistent). Tag key tests with `@smoke`. See implementation plan Task 9 for exact code.
 - **Verification**: `npx vitest run src/tests/mapGeometry.test.ts` — all tests pass.

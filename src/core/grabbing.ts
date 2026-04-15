@@ -459,7 +459,7 @@ export function persistReleasedAsteroid(
   }
 
   const orbitalObject: OrbitalObject = {
-    id: `AST-P-${asteroid.id}-${Date.now()}`,
+    id: `AST-P-${state.nextAsteroidId++}`,
     bodyId,
     type: 'asteroid',
     name: asteroid.name,

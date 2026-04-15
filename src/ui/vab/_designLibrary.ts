@@ -386,7 +386,7 @@ function buildLibraryCard(
   dupBtn.textContent = 'Duplicate';
   dupBtn.addEventListener('click', (e: MouseEvent) => {
     e.stopPropagation();
-    const copy = duplicateDesign(design);
+    const copy = duplicateDesign(design, S.gameState!);
     saveDesignToLibrary(S.gameState!, copy);
     rerender();
     showToast('Design duplicated.');

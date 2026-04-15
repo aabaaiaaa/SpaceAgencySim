@@ -120,7 +120,7 @@ export function deploySatellite(
   }
 
   // Generate IDs.
-  const satId = `sat-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  const satId = `sat-${state.nextSatelliteId++}`;
   const orbObjId = `orb-${satId}`;
 
   // Create orbital object for map tracking.

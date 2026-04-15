@@ -10,7 +10,7 @@
  *    neither happy-dom nor jsdom is installed)
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { getBodyColor } from '../ui/logistics/_routeMap.ts';
 
 // ---------------------------------------------------------------------------

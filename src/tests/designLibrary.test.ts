@@ -406,38 +406,43 @@ describe('Design Library', () => {
 
   describe('duplicateDesign', () => {
     it('creates a deep copy with new ID', () => {
+      const state = freshState();
       const original = makeDesign();
-      const copy = duplicateDesign(original);
+      const copy = duplicateDesign(original, state);
       expect(copy.id).not.toBe(original.id);
       expect(copy.id).toMatch(/^design-/);
     });
 
     it('appends " (Copy)" to the name', () => {
-      const copy = duplicateDesign(makeDesign({ name: 'My Rocket' }));
+      const state = freshState();
+      const copy = duplicateDesign(makeDesign({ name: 'My Rocket' }), state);
       expect(copy.name).toBe('My Rocket (Copy)');
     });
 
     it('sets new creation and update timestamps', () => {
+      const state = freshState();
       const original = makeDesign({
         createdDate: '2020-01-01T00:00:00.000Z',
         updatedDate: '2020-06-01T00:00:00.000Z',
       });
-      const copy = duplicateDesign(original);
+      const copy = duplicateDesign(original, state);
       expect(copy.createdDate).not.toBe(original.createdDate);
       expect(copy.updatedDate).not.toBe(original.updatedDate);
     });
 
     it('does not share object references with original', () => {
+      const state = freshState();
       const original = makeDesign();
-      const copy = duplicateDesign(original);
+      const copy = duplicateDesign(original, state);
       copy.parts.push({ partId: 'parachute-mk1', position: { x: 0, y: -1 } });
       expect(original.parts).toHaveLength(3);
       expect(copy.parts).toHaveLength(4);
     });
 
     it('preserves part data faithfully', () => {
+      const state = freshState();
       const original = makeDesign();
-      const copy = duplicateDesign(original);
+      const copy = duplicateDesign(original, state);
       expect(copy.parts[0].partId).toBe(original.parts[0].partId);
       expect(copy.totalMass).toBe(original.totalMass);
       expect(copy.totalThrust).toBe(original.totalThrust);

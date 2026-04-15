@@ -231,8 +231,14 @@ describe('processLifeSupport()', () => {
 // ---------------------------------------------------------------------------
 
 describe('createFieldCraft()', () => {
+  let state: GameState;
+
+  beforeEach(() => {
+    state = freshState();
+  });
+
   it('creates a field craft with default supply count', () => {
-    const craft = createFieldCraft({
+    const craft = createFieldCraft(state, {
       name: 'Orbiter-1',
       bodyId: 'MOON',
       status: FieldCraftStatus.IN_ORBIT,
@@ -252,7 +258,7 @@ describe('createFieldCraft()', () => {
   });
 
   it('creates a field craft with extended life support', () => {
-    const craft = createFieldCraft({
+    const craft = createFieldCraft(state, {
       name: 'Station Alpha',
       bodyId: 'EARTH',
       status: FieldCraftStatus.IN_ORBIT,
@@ -270,7 +276,7 @@ describe('createFieldCraft()', () => {
 
   it('clones crewIds array to prevent external mutation', () => {
     const crewIds = ['crew-1', 'crew-2'];
-    const craft = createFieldCraft({
+    const craft = createFieldCraft(state, {
       name: 'Test',
       bodyId: 'MARS',
       status: FieldCraftStatus.LANDED,

@@ -113,7 +113,7 @@ export function hireCrewAtHub(
   const cost = HIRE_COST * getImportTaxMultiplier(hub.bodyId);
   if (!spend(state, cost)) return null;
 
-  const id = 'crew-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8);
+  const id = `crew-${state.nextCrewId++}`;
   const member = createCrewMember({
     id,
     name: crewData.name,

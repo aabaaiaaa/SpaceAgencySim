@@ -68,16 +68,6 @@ export function getEffectiveReliability(baseReliability: number, wear: number): 
 // ---------------------------------------------------------------------------
 
 /**
- * Generate a unique inventory entry ID.
- */
-function _generateId(): string {
-  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-    return `inv-${crypto.randomUUID()}`;
-  }
-  return `inv-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
-
-/**
  * Add a recovered part to the player's inventory.
  *
  * @param state - Game state.
@@ -96,7 +86,7 @@ export function addToInventory(
     state.partInventory = [];
   }
   const entry: InventoryPart = {
-    id: _generateId(),
+    id: `inv-${state.nextInventoryId++}`,
     partId,
     wear: Math.min(100, Math.max(0, wear)),
     flights,
