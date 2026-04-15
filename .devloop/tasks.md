@@ -109,7 +109,7 @@
 - **Verification**: Grep CLAUDE.md for `\.js`, `remain JS`, `jsToTsResolve`, `remains JavaScript` — no matches (except in code examples where `.js` in import specifiers is still accurate if applicable).
 
 ### TASK-019: Audit and update coverage exclusion list
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-002
 - **Description**: Review the coverage exclusion list at `vite.config.ts:34-94` against the actual file tree. Remove entries for files that no longer exist (stale entries). Add entries for any new DOM-heavy or PixiJS-heavy files that should be excluded but aren't. Verify no testable pure-logic modules are incorrectly excluded. Consider consolidating patterns where possible (e.g., barrel re-exports). See requirements.md section 8.
 - **Verification**: `npm run test:unit` — all tests pass, coverage thresholds still met. Every file in the exclusion list exists on disk.
