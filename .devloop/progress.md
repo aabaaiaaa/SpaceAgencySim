@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 20
-- **Completed**: 8
-- **Remaining**: 12
-- **Last Updated**: 2026-04-15T22:19:21.760Z
+- **Completed**: 9
+- **Remaining**: 11
+- **Last Updated**: 2026-04-15T22:23:30.252Z
 
 ## Iteration Log
 
@@ -79,4 +79,13 @@
 - **Exit Status**: success
 - **Tokens**: 6,238,610 total (75 in, 27,037 out, 99,320 cache-create, 6,112,178 cache-read)
 - **Cost**: $4.3922
+
+### Iteration 9 - 2026-04-15T22:23:30.250Z
+- **Task Attempted**: TASK-009
+- **Task Completed**: TASK-009
+- **Summary**: Completed Update mainmenu.ts for IDB-based save discovery
+- **Duration**: 4m 6s
+- **Exit Status**: success
+- **Tokens**: 1,610,353 total (33 in, 8,372 out, 51,781 cache-create, 1,550,167 cache-read)
+- **Cost**: $1.3082
 

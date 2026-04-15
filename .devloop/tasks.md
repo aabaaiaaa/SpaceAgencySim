@@ -49,7 +49,7 @@
 - **Verification**: `npx vitest run src/tests/designLibrary.test.ts` — all tests pass.
 
 ### TASK-009: Update mainmenu.ts for IDB-based save discovery
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-005
 - **Description**: `mainmenu.ts` calls `listSaves()` and `discoverOverflowKeys()` to populate the load screen. These are now async IDB-backed (changed in TASK-005). Ensure `mainmenu.ts` awaits these calls correctly. The load screen rendering should handle the async data fetch. See requirements.md section 2f.
 - **Verification**: `npm run typecheck` passes with no errors in `mainmenu.ts`.

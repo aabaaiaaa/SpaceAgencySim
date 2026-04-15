@@ -122,7 +122,7 @@ export function showMainMenu(
   // Reset VAB state so a new game gets a fresh VAB session.
   _vabInitialized = false;
   _cachedVab?.resetVabUI();
-  initMainMenu(container, onGameReady);
+  void initMainMenu(container, onGameReady);
 }
 
 /**

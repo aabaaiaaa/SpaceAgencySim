@@ -32,6 +32,7 @@ import {
   applyPersistedSettings,
   decompressSaveData,
 } from '../core/saveload.ts';
+import { idbGet } from '../core/idbStorage.ts';
 import { showNotification } from './notification.ts';
 import { createGameState } from '../core/gameState.ts';
 import { initializeMissions, reconcileParts } from '../core/missions.ts';
@@ -224,7 +225,7 @@ let _onGameReady: ((state: GameState) => void) | null = null;
 /**
  * Mounts the main menu into the given container and begins the entry flow.
  */
-export function initMainMenu(container: HTMLElement, onGameReady: (state: GameState) => void): void {
+export async function initMainMenu(container: HTMLElement, onGameReady: (state: GameState) => void): Promise<void> {
   _onGameReady = onGameReady;
 
   // Create overlay element.
@@ -233,7 +234,7 @@ export function initMainMenu(container: HTMLElement, onGameReady: (state: GameSt
   container.appendChild(_overlay);
 
   // Decide which screen to show first.
-  const saves = listSaves();
+  const saves = await listSaves();
   const hasAnySave: boolean = saves.some((s) => s !== null);
 
   _renderTitle(_overlay);
@@ -316,7 +317,7 @@ function _renderLoadScreen(overlay: HTMLElement, saves: (SaveSlotSummary | null)
 
   // Wire up global actions.
   screen.querySelector('#mm-new-game-btn')!.addEventListener('click', () => {
-    _switchScreen('newgame', true);
+    void _switchScreen('newgame', true);
   });
 
   _wireImportButton(screen);
@@ -401,7 +402,7 @@ function _buildSaveCard(summary: SaveSlotSummary): HTMLDivElement {
     const slot: number   = Number(btn.dataset.slot);
     const key: string    = btn.dataset.key ?? '';
     if (action === 'load')   { void _handleLoad(slot, key); }
-    if (action === 'export') { _handleExport(slot, key); }
+    if (action === 'export') { void _handleExport(slot, key); }
     if (action === 'delete') { _handleDeleteConfirm(slot, summary.saveName, key); }
   });
 
@@ -563,7 +564,7 @@ function _renderNewGameScreen(overlay: HTMLElement, canGoBack: boolean): void {
   });
 
   if (backBtn) {
-    backBtn.addEventListener('click', () => _switchScreen('load', false));
+    backBtn.addEventListener('click', () => void _switchScreen('load', false));
   }
 }
 
@@ -575,7 +576,7 @@ function _renderNewGameScreen(overlay: HTMLElement, canGoBack: boolean): void {
  * Replaces the current screen content (everything after the title block)
  * with a fresh render of the target screen.
  */
-function _switchScreen(target: 'load' | 'newgame', canGoBack: boolean): void {
+async function _switchScreen(target: 'load' | 'newgame', canGoBack: boolean): Promise<void> {
   if (!_overlay) return;
 
   // Remove all but the title block.
@@ -587,7 +588,7 @@ function _switchScreen(target: 'load' | 'newgame', canGoBack: boolean): void {
   }
 
   if (target === 'load') {
-    const saves = listSaves();
+    const saves = await listSaves();
     _renderLoadScreen(_overlay, saves);
   } else if (target === 'newgame') {
     _renderNewGameScreen(_overlay, canGoBack);
@@ -605,7 +606,7 @@ async function _handleLoad(slotIndex: number, storageKey?: string): Promise<void
   const key = storageKey || `spaceAgencySave_${slotIndex}`;
 
   // Version compatibility check.
-  const raw = localStorage.getItem(key);
+  const raw = await idbGet(key);
   if (raw) {
     try {
       const json = decompressSaveData(raw);
@@ -636,9 +637,9 @@ async function _handleLoad(slotIndex: number, storageKey?: string): Promise<void
 /**
  * Exports the save in the given slot as a JSON file download.
  */
-function _handleExport(slotIndex: number, storageKey?: string): void {
+async function _handleExport(slotIndex: number, storageKey?: string): Promise<void> {
   try {
-    exportSave(slotIndex, storageKey);
+    await exportSave(slotIndex, storageKey);
   } catch (err: unknown) {
     logger.error('mainMenu', 'Export failed', { error: String(err) });
     _showGlobalError(`Export failed: ${(err as Error).message}`);
@@ -653,16 +654,16 @@ function _handleDeleteConfirm(slotIndex: number, saveName: string, storageKey?: 
     'Delete Save',
     `Are you sure you want to delete "${escapeHtml(saveName)}"? This cannot be undone.`,
     'Delete',
-    () => {
+    async () => {
       try {
-        deleteSave(slotIndex, storageKey);
+        await deleteSave(slotIndex, storageKey);
         // Refresh the load screen.
-        _switchScreen('load', false);
-        const saves = listSaves();
+        await _switchScreen('load', false);
+        const saves = await listSaves();
         const hasAnySave: boolean = saves.some((s) => s !== null);
         if (!hasAnySave) {
           // All saves deleted — go straight to new game.
-          _switchScreen('newgame', false);
+          await _switchScreen('newgame', false);
         }
       } catch (err: unknown) {
         logger.error('mainMenu', 'Delete failed', { error: String(err) });
@@ -743,18 +744,18 @@ function _wireImportButton(screen: HTMLElement): void {
     fileInput.value = ''; // Reset so the same file can be re-imported.
 
     const reader = new FileReader();
-    reader.onload = (event: ProgressEvent<FileReader>) => {
+    reader.onload = async (event: ProgressEvent<FileReader>) => {
       const jsonString = event.target?.result as string;
 
       // Find the first empty slot; if all are full, use slot 0 (overwrites oldest).
-      const saves = listSaves();
+      const saves = await listSaves();
       let targetSlot: number = saves.findIndex((s) => s === null);
       if (targetSlot === -1) targetSlot = 0;
 
       try {
-        importSave(jsonString, targetSlot);
+        await importSave(jsonString, targetSlot);
         // Refresh the load screen to show the imported save.
-        _switchScreen('load', false);
+        await _switchScreen('load', false);
       } catch (err: unknown) {
         logger.error('mainMenu', 'Import failed', { error: String(err) });
         _showGlobalError(`Import failed: ${(err as Error).message}`);
