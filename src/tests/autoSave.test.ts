@@ -1,26 +1,40 @@
 /**
- * autoSave.test.js — Unit tests for the auto-save system.
+ * autoSave.test.ts — Unit tests for the auto-save system.
  *
  * Tests cover:
  *   - isAutoSaveEnabled()   — reads autoSaveEnabled from state
  *   - performAutoSave()     — writes to the dedicated auto-save slot
- *   - hasAutoSave()         — checks for existing auto-save
- *   - deleteAutoSave()      — removes auto-save from storage
- *   - QuotaExceededError handling
- *   - IndexedDB fallback
+ *   - hasAutoSave()         — checks for existing auto-save in IDB
+ *   - deleteAutoSave()      — removes auto-save from IDB
+ *   - IDB write failure handling
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi, type Mock } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
 
 import type { GameState } from '../core/gameState.ts';
 
-// Mock idbStorage before importing autoSave.
+// ---------------------------------------------------------------------------
+// In-memory IDB mock — shared between mock factory and test code
+// ---------------------------------------------------------------------------
+
+const _idbStore = new Map<string, string>();
+
 vi.mock('../core/idbStorage.js', () => ({
-  idbSet: vi.fn(() => Promise.resolve()),
-  idbGet: vi.fn(() => Promise.resolve(null)),
-  idbDelete: vi.fn(() => Promise.resolve()),
-  isIdbAvailable: vi.fn(() => true),
+  idbSet: vi.fn((key: string, value: string) => {
+    _idbStore.set(key, value);
+    return Promise.resolve();
+  }),
+  idbGet: vi.fn((key: string) => {
+    return Promise.resolve(_idbStore.has(key) ? _idbStore.get(key)! : null);
+  }),
+  idbDelete: vi.fn((key: string) => {
+    _idbStore.delete(key);
+    return Promise.resolve();
+  }),
+  idbGetAllKeys: vi.fn(() => {
+    return Promise.resolve([..._idbStore.keys()]);
+  }),
 }));
 
 import {
@@ -34,36 +48,10 @@ import {
 } from '../core/autoSave.ts';
 
 import { compressSaveData, decompressSaveData } from '../core/saveload.ts';
-import { idbSet, idbDelete, isIdbAvailable } from '../core/idbStorage.ts';
-
-// ---------------------------------------------------------------------------
-// localStorage mock
-// ---------------------------------------------------------------------------
-
-interface MockStorage {
-  getItem(key: string): string | null;
-  setItem: ((key: string, value: string) => void) | Mock;
-  removeItem(key: string): void;
-  clear(): void;
-  readonly length: number;
-}
-
-function createLocalStorageMock(): MockStorage {
-  const store = new Map<string, string>();
-  return {
-    getItem(key: string): string | null { return store.has(key) ? store.get(key)! : null; },
-    setItem(key: string, value: string) { store.set(key, String(value)); },
-    removeItem(key: string) { store.delete(key); },
-    clear() { store.clear(); },
-    get length() { return store.size; },
-  };
-}
-
-let mockStorage: MockStorage;
+import { idbSet, idbDelete } from '../core/idbStorage.ts';
 
 beforeEach(() => {
-  mockStorage = createLocalStorageMock();
-  vi.stubGlobal('localStorage', mockStorage);
+  _idbStore.clear();
   vi.useFakeTimers();
   _setSessionStartTimeForTesting(Date.now());
   _resetAutoSaveSlotForTesting();
@@ -121,8 +109,8 @@ describe('performAutoSave', () => {
 
     expect(result.success).toBe(true);
     // With no manual saves, auto-save goes to slot 0.
-    const raw = mockStorage.getItem('spaceAgencySave_0');
-    expect(raw).not.toBeNull();
+    const raw = _idbStore.get('spaceAgencySave_0');
+    expect(raw).toBeDefined();
 
     const json = decompressSaveData(raw!);
     const envelope = JSON.parse(json);
@@ -145,7 +133,7 @@ describe('performAutoSave', () => {
     expect(state.playTimeSeconds).toBe(130);
   });
 
-  it('mirrors to IndexedDB when available', async () => {
+  it('writes to IndexedDB', async () => {
     const state = freshState();
     await performAutoSave(state);
 
@@ -159,27 +147,14 @@ describe('performAutoSave', () => {
     expect(result.error).toBe('No state provided');
   });
 
-  it('falls back to IndexedDB on QuotaExceededError @smoke', async () => {
+  it('returns failure when IDB write fails @smoke', async () => {
     const state = freshState();
-    const quotaError = new DOMException('quota exceeded', 'QuotaExceededError');
-    mockStorage.setItem = vi.fn(() => { throw quotaError; });
-
-    const result = await performAutoSave(state);
-
-    expect(result.success).toBe(true);
-    expect(idbSet).toHaveBeenCalled();
-  });
-
-  it('returns failure when localStorage full and IDB unavailable', async () => {
-    const state = freshState();
-    const quotaError = new DOMException('quota exceeded', 'QuotaExceededError');
-    mockStorage.setItem = vi.fn(() => { throw quotaError; });
-    vi.mocked(isIdbAvailable).mockReturnValue(false);
+    vi.mocked(idbSet).mockRejectedValueOnce(new Error('IDB write failed'));
 
     const result = await performAutoSave(state);
 
     expect(result.success).toBe(false);
-    expect(result.error).toBe('Storage full');
+    expect(result.error).toBe('IDB write failed');
   });
 
   it('creates a deep clone of state in the envelope', async () => {
@@ -192,15 +167,16 @@ describe('performAutoSave', () => {
     state.agencyName = 'After';
 
     // With no manual saves, auto-save goes to slot 0.
-    const json = decompressSaveData(mockStorage.getItem('spaceAgencySave_0')!);
+    const raw = _idbStore.get('spaceAgencySave_0')!;
+    const json = decompressSaveData(raw);
     const envelope = JSON.parse(json);
     expect(envelope.state.agencyName).toBe('Before');
   });
 
   it('uses next available slot when initial slots are occupied', async () => {
-    // Fill slots 0-4.
+    // Fill slots 0-4 in IDB.
     for (let i = 0; i < 5; i++) {
-      mockStorage.setItem(`spaceAgencySave_${i}`, 'occupied');
+      _idbStore.set(`spaceAgencySave_${i}`, 'occupied');
     }
     _resetAutoSaveSlotForTesting();
 
@@ -208,13 +184,13 @@ describe('performAutoSave', () => {
     const result = await performAutoSave(state);
     expect(result.success).toBe(true);
     // Should use slot 5 (first empty beyond the occupied ones).
-    expect(mockStorage.getItem('spaceAgencySave_5')).not.toBeNull();
+    expect(_idbStore.has('spaceAgencySave_5')).toBe(true);
   });
 
   it('falls back to AUTO_SAVE_KEY when all 100 slots are occupied @smoke', async () => {
-    // Fill all 100 manual save slots (0-99).
+    // Fill all 100 manual save slots (0-99) in IDB.
     for (let i = 0; i < 100; i++) {
-      mockStorage.setItem(`spaceAgencySave_${i}`, 'occupied');
+      _idbStore.set(`spaceAgencySave_${i}`, 'occupied');
     }
     _resetAutoSaveSlotForTesting();
 
@@ -225,8 +201,8 @@ describe('performAutoSave', () => {
 
     expect(result.success).toBe(true);
     // Should have fallen back to the dedicated auto-save key.
-    const raw = mockStorage.getItem(AUTO_SAVE_KEY);
-    expect(raw).not.toBeNull();
+    const raw = _idbStore.get(AUTO_SAVE_KEY);
+    expect(raw).toBeDefined();
 
     const json = decompressSaveData(raw!);
     const envelope = JSON.parse(json);
@@ -241,14 +217,14 @@ describe('performAutoSave', () => {
 // ---------------------------------------------------------------------------
 
 describe('hasAutoSave', () => {
-  it('returns false when no auto-save exists', () => {
-    expect(hasAutoSave()).toBe(false);
+  it('returns false when no auto-save exists', async () => {
+    expect(await hasAutoSave()).toBe(false);
   });
 
-  it('returns true when the dedicated auto-save key has data', () => {
-    // Directly place data at the dedicated key (legacy or manual).
-    mockStorage.setItem(AUTO_SAVE_KEY, 'data');
-    expect(hasAutoSave()).toBe(true);
+  it('returns true when the dedicated auto-save key has data', async () => {
+    // Directly place data at the dedicated key in IDB.
+    _idbStore.set(AUTO_SAVE_KEY, 'data');
+    expect(await hasAutoSave()).toBe(true);
   });
 });
 
@@ -257,24 +233,24 @@ describe('hasAutoSave', () => {
 // ---------------------------------------------------------------------------
 
 describe('deleteAutoSave', () => {
-  it('removes the auto-save from localStorage', () => {
+  it('removes the auto-save from IDB', async () => {
     // Place data at the dedicated key.
-    mockStorage.setItem(AUTO_SAVE_KEY, 'data');
-    expect(hasAutoSave()).toBe(true);
+    _idbStore.set(AUTO_SAVE_KEY, 'data');
+    expect(await hasAutoSave()).toBe(true);
 
-    deleteAutoSave();
-    expect(hasAutoSave()).toBe(false);
+    await deleteAutoSave();
+    expect(await hasAutoSave()).toBe(false);
   });
 
-  it('also deletes from IndexedDB', async () => {
+  it('calls idbDelete with the auto-save key', async () => {
     await performAutoSave(freshState());
-    deleteAutoSave();
+    await deleteAutoSave();
 
     expect(idbDelete).toHaveBeenCalledWith(AUTO_SAVE_KEY);
   });
 
-  it('does not crash when no auto-save exists', () => {
-    expect(() => deleteAutoSave()).not.toThrow();
+  it('does not crash when no auto-save exists', async () => {
+    await expect(deleteAutoSave()).resolves.not.toThrow();
   });
 });
 
@@ -295,7 +271,7 @@ describe('auto-save slot isolation', () => {
 
 describe('auto-save slot reuse', () => {
   it('@smoke reuses existing auto-save slot for same agency', async () => {
-    // Pre-populate slot 3 with a compressed auto-save for "NASA"
+    // Pre-populate slot 3 with a compressed auto-save for "NASA" in IDB
     const envelope = JSON.stringify({
       saveName: 'Auto-Save',
       timestamp: new Date().toISOString(),
@@ -303,7 +279,7 @@ describe('auto-save slot reuse', () => {
       state: { agencyName: 'NASA' },
     });
     const compressed = compressSaveData(envelope);
-    mockStorage.setItem('spaceAgencySave_3', compressed);
+    _idbStore.set('spaceAgencySave_3', compressed);
 
     // Fill slots 0-2 with manual saves (not auto-saves)
     for (let i = 0; i < 3; i++) {
@@ -313,7 +289,7 @@ describe('auto-save slot reuse', () => {
         version: 6,
         state: { agencyName: 'NASA' },
       });
-      mockStorage.setItem(`spaceAgencySave_${i}`, compressSaveData(manualEnvelope));
+      _idbStore.set(`spaceAgencySave_${i}`, compressSaveData(manualEnvelope));
     }
 
     const state = freshState();
@@ -322,8 +298,8 @@ describe('auto-save slot reuse', () => {
 
     expect(result.success).toBe(true);
     // Should have reused slot 3 (the existing auto-save for NASA)
-    const raw = mockStorage.getItem('spaceAgencySave_3');
-    expect(raw).not.toBeNull();
+    const raw = _idbStore.get('spaceAgencySave_3');
+    expect(raw).toBeDefined();
     const json = decompressSaveData(raw!);
     const saved = JSON.parse(json);
     expect(saved.saveName).toBe('NASA');
@@ -332,7 +308,7 @@ describe('auto-save slot reuse', () => {
   });
 
   it('finds first empty slot when no prior auto-save exists', async () => {
-    // Fill slots 0-2 with manual saves
+    // Fill slots 0-2 with manual saves in IDB
     for (let i = 0; i < 3; i++) {
       const manualEnvelope = JSON.stringify({
         saveName: `Save ${i}`,
@@ -340,7 +316,7 @@ describe('auto-save slot reuse', () => {
         version: 6,
         state: { agencyName: 'SpaceX' },
       });
-      mockStorage.setItem(`spaceAgencySave_${i}`, compressSaveData(manualEnvelope));
+      _idbStore.set(`spaceAgencySave_${i}`, compressSaveData(manualEnvelope));
     }
 
     const state = freshState();
@@ -349,7 +325,6 @@ describe('auto-save slot reuse', () => {
 
     expect(result.success).toBe(true);
     // Should use slot 3 (first empty after 0-2)
-    const raw = mockStorage.getItem('spaceAgencySave_3');
-    expect(raw).not.toBeNull();
+    expect(_idbStore.has('spaceAgencySave_3')).toBe(true);
   });
 });

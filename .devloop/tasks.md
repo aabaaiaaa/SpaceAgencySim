@@ -31,7 +31,7 @@
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` — all non-removed tests pass (some tests will be updated in TASK-010).
 
 ### TASK-006: Migrate autoSave.ts from localStorage to IndexedDB
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-004
 - **Description**: Replace all localStorage calls in `autoSave.ts` with IDB equivalents. `_findAutoSaveKey()` scans IDB; `triggerAutoSave()` writes to IDB only; `hasAutoSave()` checks IDB (becomes async — update callers); `deleteAutoSave()` removes from IDB. See requirements.md section 2c.
 - **Verification**: `npx vitest run src/tests/autoSave.test.ts` — all tests pass.

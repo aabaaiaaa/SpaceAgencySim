@@ -8,20 +8,19 @@
  * @module autoSave
  */
 
-import { idbSet, idbDelete, isIdbAvailable } from './idbStorage.ts';
+import { idbSet, idbGet, idbDelete, idbGetAllKeys } from './idbStorage.ts';
 import { compressSaveData, decompressSaveData, SAVE_VERSION } from './saveload.ts';
-import { logger } from './logger.ts';
 
 import type { GameState } from './gameState.ts';
 
-/** Prefix for manual save localStorage keys. */
+/** Prefix for save keys. */
 const MANUAL_SAVE_PREFIX = 'spaceAgencySave_';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-/** localStorage key for the dedicated auto-save slot (fallback). */
+/** Key for the dedicated auto-save slot (fallback). */
 export const AUTO_SAVE_KEY = 'spaceAgencySave_auto';
 
 /** Remembered slot for this session (picked once, reused). */
@@ -68,24 +67,31 @@ export function isAutoSaveEnabled(state: GameState | null | undefined): boolean 
 }
 
 /**
- * Determine which localStorage key to use for auto-saves.
+ * Determine which key to use for auto-saves by scanning IndexedDB.
  * Picks the first empty slot starting from 0, capped at 100.
  * Falls back to the dedicated auto-save key if all slots are occupied.
  * The choice is remembered for the session so we don't switch slots.
  */
-function _getAutoSaveKey(agencyName: string): string {
+async function _getAutoSaveKey(agencyName: string): Promise<string> {
   if (_autoSaveSlotKey !== null) return _autoSaveSlotKey;
+
+  // Build a set of occupied keys from IDB for fast lookup.
+  const allKeys = new Set(await idbGetAllKeys());
 
   // First pass: find an existing auto-save slot for the same agency.
   let firstEmptySlot: string | null = null;
   for (let i = 0; i < 100; i++) {
     const key = `${MANUAL_SAVE_PREFIX}${i}`;
-    const raw = localStorage.getItem(key);
-    if (raw === null) {
+    if (!allKeys.has(key)) {
       if (firstEmptySlot === null) firstEmptySlot = key;
       continue;
     }
     try {
+      const raw = await idbGet(key);
+      if (raw === null) {
+        if (firstEmptySlot === null) firstEmptySlot = key;
+        continue;
+      }
       const json = decompressSaveData(raw);
       const envelope = JSON.parse(json);
       if ((envelope.autoSave === true || envelope.saveName === 'Auto-Save') && envelope.state?.agencyName === agencyName) {
@@ -116,8 +122,7 @@ function _getAutoSaveKey(agencyName: string): string {
  * are occupied.
  *
  * Accumulates session play time, serialises the state, and writes to
- * localStorage (with IndexedDB mirror). If localStorage throws
- * QuotaExceededError, falls back to IndexedDB only.
+ * IndexedDB.
  */
 export async function performAutoSave(
   state: GameState | null | undefined,
@@ -128,7 +133,7 @@ export async function performAutoSave(
   state.playTimeSeconds = (state.playTimeSeconds ?? 0) + getSessionSeconds();
   resetSessionTimer();
 
-  const saveKey = _getAutoSaveKey(state.agencyName);
+  const saveKey = await _getAutoSaveKey(state.agencyName);
 
   const envelope = {
     saveName: state.agencyName || 'Auto-Save',
@@ -142,41 +147,26 @@ export async function performAutoSave(
   const compressed = compressSaveData(json);
 
   try {
-    localStorage.setItem(saveKey, compressed);
+    await idbSet(saveKey, compressed);
   } catch (err: unknown) {
     const error = err as { name?: string; message?: string };
-    if (error?.name === 'QuotaExceededError') {
-      // Attempt IndexedDB as fallback — await to ensure the save completes.
-      if (isIdbAvailable()) {
-        await idbSet(saveKey, compressed);
-        return { success: true };
-      }
-      return { success: false, error: 'Storage full' };
-    }
     return { success: false, error: error?.message ?? 'Unknown error' };
-  }
-
-  // Mirror to IndexedDB (fire-and-forget — LS already has the data).
-  if (isIdbAvailable()) {
-    idbSet(saveKey, compressed).catch(err => logger.debug('autoSave', 'IDB mirror write failed', err));
   }
 
   return { success: true };
 }
 
 /**
- * Checks whether an auto-save exists in localStorage.
+ * Checks whether an auto-save exists in IndexedDB.
  */
-export function hasAutoSave(): boolean {
-  return localStorage.getItem(AUTO_SAVE_KEY) !== null;
+export async function hasAutoSave(): Promise<boolean> {
+  const raw = await idbGet(AUTO_SAVE_KEY);
+  return raw !== null;
 }
 
 /**
- * Deletes the auto-save from localStorage and IndexedDB.
+ * Deletes the auto-save from IndexedDB.
  */
-export function deleteAutoSave(): void {
-  localStorage.removeItem(AUTO_SAVE_KEY);
-  if (isIdbAvailable()) {
-    idbDelete(AUTO_SAVE_KEY).catch(err => logger.debug('autoSave', 'IDB mirror delete failed', err));
-  }
+export async function deleteAutoSave(): Promise<void> {
+  await idbDelete(AUTO_SAVE_KEY);
 }
