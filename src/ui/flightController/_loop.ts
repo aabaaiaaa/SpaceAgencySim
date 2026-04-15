@@ -165,6 +165,7 @@ function _syncSnapshotToMutableState(
   fs.timeElapsed = snap.flight.timeElapsed;
   fs.altitude = snap.flight.altitude;
   fs.velocity = snap.flight.velocity;
+  fs.horizontalVelocity = snap.flight.horizontalVelocity;
   fs.fuelRemaining = snap.flight.fuelRemaining;
   fs.deltaVRemaining = snap.flight.deltaVRemaining;
   fs.aborted = snap.flight.aborted;

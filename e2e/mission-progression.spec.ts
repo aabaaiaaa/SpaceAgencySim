@@ -6,6 +6,7 @@ import {
   teleportCraft, startTestFlight,
   pressStage, pressThrottleUp, pressThrottleCut,
   stageAndLaunch,
+  buildSaveEnvelope,
 } from './helpers.js';
 
 /**
@@ -30,6 +31,8 @@ interface ObjectiveTemplate {
   id: string;
   type: string;
   target: Record<string, unknown>;
+  optional?: boolean;
+  bonusReward?: number;
 }
 
 interface MissionTemplate {
@@ -74,18 +77,26 @@ const STARTER_PARTS: string[] = [
 const OBJ: Record<string, MissionTemplate> = {
   'mission-001': {
     title: 'First Flight',
-    objectives: [{ id: 'obj-001-1', type: 'REACH_ALTITUDE', target: { altitude: 100 } }],
+    objectives: [
+      { id: 'obj-001-1', type: 'REACH_SPEED', target: { speed: 150 } },
+      { id: 'obj-001-2', type: 'REACH_ALTITUDE', target: { altitude: 500 } },
+      { id: 'obj-001-3', type: 'REACH_ALTITUDE', target: { altitude: 1_000 }, optional: true, bonusReward: 10_000 },
+      { id: 'obj-001-4', type: 'SAFE_LANDING', target: { maxLandingSpeed: 10 }, optional: true, bonusReward: 25_000 },
+    ],
     reward: 25_000, unlocksAfter: [], unlockedParts: [],
   },
   'mission-004': {
     title: 'Speed Demon',
-    objectives: [{ id: 'obj-004-1', type: 'REACH_SPEED', target: { speed: 150 } }],
+    objectives: [
+      { id: 'obj-004-1', type: 'REACH_HORIZONTAL_SPEED', target: { speed: 300 } },
+      { id: 'obj-004-2', type: 'SAFE_LANDING', target: { maxLandingSpeed: 30, allowCrash: true } },
+    ],
     reward: 30_000, unlocksAfter: ['mission-001'], unlockedParts: [],
   },
   'mission-005': {
     title: 'Safe Return I',
     objectives: [{ id: 'obj-005-1', type: 'SAFE_LANDING', target: { maxLandingSpeed: 10 } }],
-    reward: 35_000, unlocksAfter: ['mission-004'], unlockedParts: ['parachute-mk2'],
+    reward: 35_000, unlocksAfter: ['mission-004'], unlockedParts: ['parachute-mk2', 'science-module-mk1', 'thermometer-mk1'],
   },
   'mission-006': {
     title: 'Controlled Descent',
@@ -179,31 +190,20 @@ const OBJ: Record<string, MissionTemplate> = {
 };
 
 // ---------------------------------------------------------------------------
-// Save-state builder
+// Save-state builder (wraps the shared factory)
 // ---------------------------------------------------------------------------
 
-interface AcceptedMission {
-  id: string;
-  title: string;
-  description: string;
-  location: string;
-  objectives: { id: string; type: string; completed: boolean; description: string; target: Record<string, unknown> }[];
-  reward: number;
-  unlocksAfter: string[];
-  unlockedParts: string[];
-  status: string;
-}
-
-/**
- * Build an accepted mission object suitable for `state.missions.accepted`.
- */
-function acceptedMission(id: string): AcceptedMission {
+function acceptedMission(id: string): Record<string, unknown> {
   const t = OBJ[id];
   return {
     id, title: t.title,
     description: `E2E test mission ${id}`,
     location: 'desert',
-    objectives: t.objectives.map(o => ({ ...o, completed: false, description: o.type })),
+    objectives: t.objectives.map(o => ({
+      id: o.id, type: o.type, target: o.target,
+      completed: false, description: o.type,
+      ...(o.optional ? { optional: true, bonusReward: o.bonusReward } : {}),
+    })),
     reward: t.reward,
     unlocksAfter: t.unlocksAfter,
     unlockedParts: t.unlockedParts,
@@ -218,70 +218,25 @@ interface BuildEnvelopeParams {
   crew?: CrewMember[];
 }
 
-interface LocalSaveEnvelope {
-  saveName: string;
-  timestamp: string;
-  state: {
-    agencyName: string;
-    money: number;
-    loan: { balance: number; interestRate: number; totalInterestAccrued: number };
-    missions: {
-      available: unknown[];
-      accepted: AcceptedMission[];
-      completed: {
-        id: string;
-        title: string;
-        description: string;
-        location: string;
-        objectives: { id: string; type: string; completed: boolean; description: string; target: Record<string, unknown> }[];
-        reward: number;
-        unlocksAfter: string[];
-        unlockedParts: string[];
-        status: string;
-      }[];
-    };
-    crew: CrewMember[];
-    rockets: unknown[];
-    parts: string[];
-    flightHistory: unknown[];
-    playTimeSeconds: number;
-    currentFlight: null;
-    [key: string]: unknown;
-  };
-  [key: string]: unknown;
-}
-
-/**
- * Build a save-slot envelope to inject into localStorage.
- */
-function buildEnvelope({ completedIds = [], acceptedId, parts, crew = [] }: BuildEnvelopeParams): LocalSaveEnvelope {
-  return {
+function buildEnvelope({ completedIds = [], acceptedId, parts, crew = [] }: BuildEnvelopeParams) {
+  return buildSaveEnvelope({
     saveName: 'Mission Progression E2E',
-    timestamp: new Date().toISOString(),
-    state: {
-      agencyName:    'Test Agency',
-      money:         STARTING_MONEY,
-      loan:          { balance: 2_000_000, interestRate: 0.03, totalInterestAccrued: 0 },
-      missions: {
-        available: [],
-        accepted:  [acceptedMission(acceptedId)],
-        completed: completedIds.map(id => ({
-          id, title: OBJ[id]?.title ?? id, description: '', location: 'desert',
-          objectives: (OBJ[id]?.objectives ?? []).map(o => ({ ...o, completed: true, description: o.type })),
-          reward: OBJ[id]?.reward ?? 0,
-          unlocksAfter: OBJ[id]?.unlocksAfter ?? [],
-          unlockedParts: OBJ[id]?.unlockedParts ?? [],
-          status: 'completed',
-        })),
-      },
-      crew,
-      rockets:         [],
-      parts,
-      flightHistory:   [],
-      playTimeSeconds: 0,
-      currentFlight:   null,
+    money: STARTING_MONEY,
+    parts,
+    crew,
+    missions: {
+      available: [],
+      accepted: [acceptedMission(acceptedId)],
+      completed: completedIds.map(id => ({
+        id, title: OBJ[id]?.title ?? id, description: '', location: 'desert',
+        objectives: (OBJ[id]?.objectives ?? []).map(o => ({ ...o, completed: true, description: o.type })),
+        reward: OBJ[id]?.reward ?? 0,
+        unlocksAfter: OBJ[id]?.unlocksAfter ?? [],
+        unlockedParts: OBJ[id]?.unlockedParts ?? [],
+        status: 'completed',
+      })),
     },
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -340,7 +295,8 @@ async function waitObjectivesComplete(page: Page, missionId: string, timeout: nu
     (id: string): boolean => {
       const state = window.__gameState;
       const m = state?.missions?.accepted?.find(x => x.id === id);
-      return m?.objectives?.every(o => o.completed) ?? false;
+      // Only check required (non-optional) objectives — matches flightReturn.ts logic.
+      return m?.objectives?.filter(o => !o.optional).every(o => o.completed) ?? false;
     },
     missionId, { timeout },
   );
@@ -455,7 +411,7 @@ test.describe('Mission Progression', () => {
   // GROUP 1: Tutorial Chain (M001, M004)
   // =========================================================================
 
-  test('M001 — First Flight (reach 100m)', async ({ page }) => {
+  test('M001 — First Flight (reach 150 m/s + 500m)', async ({ page }) => {
     test.setTimeout(60_000);
     const env = buildEnvelope({
       acceptedId: 'mission-001',
@@ -467,16 +423,22 @@ test.describe('Mission Progression', () => {
     await startTestFlight(page, ['cmd-mk1', 'tank-small', 'engine-spark']);
     await stage(page);
     await pressThrottleUp(page);
-    await waitAlt(page, 100);
+    // Need to reach 150 m/s speed AND 500m altitude (required objectives).
+    await waitSpeed(page, 150);
+    await waitAlt(page, 500);
     await pressThrottleCut(page);
 
+    // 100× warp to speed up the long descent from high altitude.
+    await waitWarpUnlocked(page);
+    await setWarp(page, 100);
+
     // Wait for landing/crash and return.
-    await waitLanded(page);
+    await waitLanded(page, 60_000);
     await returnToHub(page);
     await expectCompleted(page, 'mission-001');
   });
 
-  test('M004 — Speed Demon (reach 150 m/s)', async ({ page }) => {
+  test('M004 — Speed Demon (reach 300 m/s horizontal + recover ≤30 m/s)', async ({ page }) => {
     test.setTimeout(60_000);
     const env = buildEnvelope({
       completedIds: ['mission-001'],
@@ -486,12 +448,29 @@ test.describe('Mission Progression', () => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, env);
 
-    await startTestFlight(page, ['cmd-mk1', 'tank-medium', 'engine-spark']);
+    // No parachute — we'll use teleportCraft to control speed.
+    await startTestFlight(page, ['probe-core-mk1', 'tank-medium', 'engine-spark']);
+
     await stage(page);
     await pressThrottleUp(page);
-    await waitSpeed(page, 150);
-    // Objective met — return via menu instead of waiting for long descent.
-    await triggerReturnViaMenu(page);
+
+    // Climb a bit, then teleport with high horizontal velocity to satisfy
+    // REACH_HORIZONTAL_SPEED 300 m/s (starter parts can't reach this naturally).
+    await waitAlt(page, 100);
+    await teleportCraft(page, { posX: 0, posY: 5_000, velX: 350, velY: 50 });
+
+    // Wait for horizontal speed objective.
+    await page.waitForFunction((): boolean => {
+      const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-004');
+      return m?.objectives?.find(o => o.type === 'REACH_HORIZONTAL_SPEED')?.completed ?? false;
+    }, { timeout: 10_000 });
+
+    // Now teleport to near-ground with very low velocity for a gentle crash.
+    // allowCrash: true means a crash at ≤30 m/s satisfies SAFE_LANDING.
+    await teleportCraft(page, { posX: 0, posY: 20, velX: 0, velY: -10 });
+
+    // Wait for landing/crash.
+    await waitLanded(page, 30_000);
     await returnToHub(page);
     await expectCompleted(page, 'mission-004');
   });
@@ -501,7 +480,7 @@ test.describe('Mission Progression', () => {
   // =========================================================================
 
   test('M005 — Safe Return I (land ≤10 m/s) → unlocks parachute-mk2', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(120_000);
     const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: m1to4,
@@ -523,8 +502,7 @@ test.describe('Mission Progression', () => {
 
     // Stage 0: fire engine at full throttle — burn ALL fuel so mass is at
     // dry weight (250kg) when the chute deploys.
-    await stage(page);
-    await pressThrottleUp(page);
+    await stageAndLaunch(page);
 
     // Wait for fuel depletion (engine stops firing when tank empties).
     // Dry mass 250kg → terminal velocity with mk1 chute ≈ 4.12 m/s ≤ 5 m/s.
@@ -542,7 +520,7 @@ test.describe('Mission Progression', () => {
     await waitWarpUnlocked(page);
     await setWarp(page, 100);
 
-    await waitLanded(page, 120_000);
+    await waitLanded(page, 90_000);
 
     // Probe-core rockets don't auto-trigger the post-flight summary
     // (no COMMAND_MODULE parts). Use the in-flight menu instead.
@@ -550,11 +528,13 @@ test.describe('Mission Progression', () => {
     await returnToHub(page);
     await expectCompleted(page, 'mission-005');
     await expectPartUnlocked(page, 'parachute-mk2');
+    await expectPartUnlocked(page, 'science-module-mk1');
+    await expectPartUnlocked(page, 'thermometer-mk1');
     await expectPartInVab(page, 'parachute-mk2');
   });
 
   test('M006 — Controlled Descent (engine brake, land ≤5 m/s) → unlocks landing-legs-small', async ({ page }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(90_000);
     const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: m1to4,
@@ -564,49 +544,41 @@ test.describe('Mission Progression', () => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, env);
 
-    // Use probe-core for lighter rocket: wet 720kg, dry 320kg — both under
-    // parachute-mk1 maxSafeMass 1200kg. Terminal velocity ≈ 4.7 m/s < 5 m/s.
-    await startTestFlight(page, ['parachute-mk1', 'probe-core-mk1', 'tank-small', 'engine-spark'], {
+    // Lightweight probe + parachute (no fuel tank or engine in final mass).
+    // After engine fires (ACTIVATE_PART), decouple the heavy parts so only
+    // the parachute + probe remain: 100 + 50 = 150 kg → terminal velocity ≈ 3.2 m/s.
+    await startTestFlight(page, [
+      'parachute-mk1', 'probe-core-mk1', 'decoupler-stack-tr18', 'tank-small', 'engine-spark',
+    ], {
       staging: [
         { partIds: ['engine-spark'] },
+        { partIds: ['decoupler-stack-tr18'] },
         { partIds: ['parachute-mk1'] },
       ],
     });
 
-    await stageAndLaunch(page); // fire engine (satisfies ACTIVATE_PART ENGINE)
+    // Explicitly force malfunctions off.
+    await page.evaluate(() => window.__setMalfunctionMode?.('off'));
 
-    // Burn ALL fuel — dry mass 250kg → terminal velocity 4.12 m/s ≤ 5 m/s.
-    // Without legs, the physics engine crashes rockets landing > 5 m/s.
-    await waitAlt(page, 50); // confirm engine is firing
-    await page.waitForFunction(
-      (): boolean => window.__flightPs?.firingEngines?.size === 0,
-      { timeout: 15_000 },
-    );
+    // Stage 0: fire engine (satisfies ACTIVATE_PART ENGINE).
+    await stage(page);
+    await pressThrottleUp(page);
+    await waitAlt(page, 200);
+    await pressThrottleCut(page);
 
-    // Deploy parachute for safe descent — retry if first attempt is swallowed.
+    // Stage 1: decouple tank+engine (reduces mass drastically).
     await waitWarpUnlocked(page);
-    for (let attempt = 0; attempt < 3; attempt++) {
-      await stage(page);
-      const deployed = await page.waitForFunction(
-        (): boolean => {
-          const ps = window.__flightPs;
-          if (!ps?.parachuteStates) return false;
-          for (const [, entry] of ps.parachuteStates) {
-            if (entry.state === 'deploying' || entry.state === 'deployed') return true;
-          }
-          return false;
-        },
-        { timeout: 3_000 },
-      ).then(() => true).catch(() => false);
-      if (deployed) break;
-    }
+    await stage(page);
 
-    // 10× warp for descent — low warp ensures the physics has enough steps
-    // to decelerate under the parachute to terminal velocity before impact.
+    // Stage 2: deploy parachute.
+    await waitWarpUnlocked(page);
+    await stage(page);
+
+    // 10× warp for descent — only ~200m to fall with very light mass.
     await waitWarpUnlocked(page);
     await setWarp(page, 10);
 
-    await waitLanded(page, 300_000);
+    await waitLanded(page, 60_000);
     await triggerReturnViaMenu(page);
     await returnToHub(page);
     await expectCompleted(page, 'mission-006');
@@ -663,7 +635,7 @@ test.describe('Mission Progression', () => {
   // =========================================================================
 
   test('M008 — Black Box Test (activate science + crash ≥50 m/s)', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: [...m1to4, 'mission-005'],
@@ -680,8 +652,7 @@ test.describe('Mission Progression', () => {
       ],
     });
 
-    await stage(page); // fires engine + activates science module
-    await pressThrottleUp(page);
+    await stageAndLaunch(page); // fires engine + activates science module
 
     // Climb to ~500m so free-fall gives ≥50 m/s impact.
     await waitAlt(page, 500);
@@ -712,8 +683,7 @@ test.describe('Mission Progression', () => {
       ],
     });
 
-    await stage(page); // fire engine
-    await pressThrottleUp(page);
+    await stageAndLaunch(page); // fire engine
 
     await waitAlt(page, 250);
     // Cut throttle BEFORE ejecting — otherwise the remaining rocket body
@@ -762,11 +732,10 @@ test.describe('Mission Progression', () => {
       ],
     });
 
-    await stage(page); // Stage 0: fire engine
+    await stageAndLaunch(page); // Stage 0: fire engine
 
     // Full throttle climb well above the 1200m band ceiling so the
     // parachute can slow us to terminal velocity before re-entering.
-    await pressThrottleUp(page);
     await waitAlt(page, 1400);
     await pressThrottleCut(page); // cut engine
 
@@ -837,7 +806,7 @@ test.describe('Mission Progression', () => {
   });
 
   test('M011 — Emergency Systems Verified (eject crew ≥100m + crash ≥50 m/s)', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     const m1to4 = ['mission-001', 'mission-004'];
     const env = buildEnvelope({
       completedIds: [...m1to4, 'mission-005', 'mission-006', 'mission-007', 'mission-008', 'mission-009'],
@@ -855,8 +824,7 @@ test.describe('Mission Progression', () => {
       ],
     });
 
-    await stage(page); // engine
-    await pressThrottleUp(page);
+    await stageAndLaunch(page); // engine
 
     // Climb to ~300m.
     await waitAlt(page, 300);
@@ -902,8 +870,7 @@ test.describe('Mission Progression', () => {
       ],
     });
 
-    await stage(page); // Stage 0: fire engine
-    await pressThrottleUp(page);
+    await stageAndLaunch(page); // Stage 0: fire engine
 
     // Verify liftoff, then teleport to 2km.
     await waitAlt(page, 100);
@@ -949,8 +916,7 @@ test.describe('Mission Progression', () => {
         { partIds: ['decoupler-stack-tr18', 'engine-spark'] },
       ],
     });
-    await stage(page);
-    await pressThrottleUp(page);
+    await stageAndLaunch(page);
 
     // Verify liftoff, then teleport above target altitude.
     await waitAlt(page, 100);
@@ -977,8 +943,7 @@ test.describe('Mission Progression', () => {
       'probe-core-mk1', 'tank-medium', 'engine-reliant',
     ]);
 
-    await stage(page);
-    await pressThrottleUp(page);
+    await stageAndLaunch(page);
 
     // Verify liftoff, then teleport above target altitude.
     await waitAlt(page, 100);
@@ -1025,8 +990,7 @@ test.describe('Mission Progression', () => {
     });
 
     // Stage engine and throttle up, verify liftoff.
-    await stage(page);
-    await pressThrottleUp(page);
+    await stageAndLaunch(page);
     await waitAlt(page, 100);
 
     // Teleport directly to orbit.
@@ -1078,8 +1042,7 @@ test.describe('Mission Progression', () => {
         { partIds: ['decoupler-stack-tr18', 'engine-nerv'] },
       ],
     });
-    await stage(page);
-    await pressThrottleUp(page);
+    await stageAndLaunch(page);
 
     // Verify liftoff, then teleport directly to orbit.
     await waitAlt(page, 100);
@@ -1132,8 +1095,7 @@ test.describe('Mission Progression', () => {
     });
 
     // Stage engine and throttle up, verify liftoff.
-    await stage(page);
-    await pressThrottleUp(page);
+    await stageAndLaunch(page);
     await waitAlt(page, 100);
 
     // Teleport directly to orbit.
