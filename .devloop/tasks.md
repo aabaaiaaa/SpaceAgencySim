@@ -1,7 +1,7 @@
 # Iteration 16 — Tasks
 
 ### TASK-001: Upgrade Vite from v6 to v8
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Upgrade Vite to the latest v8 release. Review Vite 7 and 8 migration guides for breaking changes. Update `vite.config.ts` if any config options changed. Verify `resolve.extensions` still works for .ts resolution from .js specifiers. See requirements.md section 1a.
 - **Verification**: `npm run build` succeeds with 0 errors/warnings and `npm run dev` starts without errors. Run `npx vite --version` to confirm v8.
