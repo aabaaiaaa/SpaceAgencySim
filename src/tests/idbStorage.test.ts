@@ -13,6 +13,7 @@ import {
   idbSet,
   idbGet,
   idbDelete,
+  idbGetAllKeys,
   isIdbAvailable,
   _resetDbForTesting,
 } from '../core/idbStorage.ts';
@@ -83,6 +84,13 @@ function createIdbMock(): MockIdbFactory {
       queueMicrotask(() => {
         this._data!.delete(key);
         req._succeed(undefined);
+      });
+      return req;
+    }
+    getAllKeys(): MockIDBRequest {
+      const req = new MockIDBRequest();
+      queueMicrotask(() => {
+        req._succeed(Array.from(this._data!.keys()));
       });
       return req;
     }
@@ -238,6 +246,29 @@ describe('idbStorage module', () => {
 
     it('does not throw when deleting a nonexistent key', async () => {
       await expect(idbDelete('nonexistent')).resolves.toBeUndefined();
+    });
+  });
+
+  describe('idbGetAllKeys()', () => {
+    it('returns an empty array when the store is empty', async () => {
+      const keys = await idbGetAllKeys();
+      expect(keys).toEqual([]);
+    });
+
+    it('returns all stored keys', async () => {
+      await idbSet('alpha', '1');
+      await idbSet('beta', '2');
+      await idbSet('gamma', '3');
+      const keys = await idbGetAllKeys();
+      expect(keys.sort()).toEqual(['alpha', 'beta', 'gamma']);
+    });
+
+    it('reflects deletions', async () => {
+      await idbSet('a', '1');
+      await idbSet('b', '2');
+      await idbDelete('a');
+      const keys = await idbGetAllKeys();
+      expect(keys).toEqual(['b']);
     });
   });
 

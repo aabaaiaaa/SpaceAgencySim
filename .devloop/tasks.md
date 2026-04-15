@@ -19,7 +19,7 @@
 - **Verification**: `npm run build && npm run typecheck && npm run lint && npm run test:unit` — all pass.
 
 ### TASK-004: Add getAllKeys to idbStorage.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-002
 - **Description**: The existing `idbStorage.ts` provides `idbSet`, `idbGet`, `idbDelete`, and `isIdbAvailable`. Add an `idbGetAllKeys()` function that returns all keys from the IDB object store. This is needed for `listSaves()` and `discoverOverflowKeys()` which currently scan localStorage keys. Also update module comments to reflect IDB is now the primary (and only) storage backend — remove "mirror" language and fallback references. See requirements.md section 2a.
 - **Verification**: `npx vitest run src/tests/idbStorage.test.ts` — existing tests pass plus new test for `idbGetAllKeys()`.

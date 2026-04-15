@@ -1,11 +1,9 @@
 /**
- * idbStorage.ts — IndexedDB key-value store that mirrors localStorage saves.
+ * idbStorage.ts — IndexedDB key-value store for all persistent game data.
  *
  * Provides a simple async key-value interface over a single IndexedDB database
- * and object store. Keys match localStorage keys for consistency.
- *
- * All operations handle IndexedDB unavailability gracefully by resolving/
- * rejecting without crashing — callers can fall back to localStorage-only.
+ * and object store. This is the primary (and only) storage backend — saves,
+ * settings, and design library data all live here.
  *
  * @module idbStorage
  */
@@ -128,6 +126,22 @@ export async function idbDelete(key: string): Promise<void> {
     const store: IDBObjectStore = tx.objectStore(STORE_NAME);
     const request = store.delete(key);
     request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+/**
+ * Returns all keys currently stored in the IndexedDB object store.
+ *
+ * @returns Array of all stored key strings.
+ */
+export async function idbGetAllKeys(): Promise<string[]> {
+  const db = await openDB();
+  return new Promise<string[]>((resolve, reject) => {
+    const tx = db.transaction(STORE_NAME, 'readonly');
+    const store: IDBObjectStore = tx.objectStore(STORE_NAME);
+    const request = store.getAllKeys();
+    request.onsuccess = () => resolve(request.result as string[]);
     request.onerror = () => reject(request.error);
   });
 }
