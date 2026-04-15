@@ -103,7 +103,7 @@ Implementation plan: `docs/superpowers/plans/2026-04-15-iteration-14.md`
 - **Verification**: `npx tsc --noEmit src/ui/mainmenu.ts` — 0 errors.
 
 ### TASK-014: E2E tests for auto-save visibility and save compatibility
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-013, TASK-012
 - **Description**: (1) In `e2e/auto-save.spec.ts`, add a test tagged `@smoke`: fill all 5 manual slots with saves via localStorage injection, load one save, trigger a flight + post-flight to auto-save, return to main menu, verify the load screen shows more than 5 save cards. (2) In `e2e/saveload.spec.ts`, add a test tagged `@smoke`: inject a save with `version: 1` into slot 0, open the load screen, verify the version warning badge `[data-testid="version-warning"]` is visible, click Load, verify the game does NOT start (error notification appears or the load screen remains visible). See implementation plan Task 14.
 - **Verification**: `npx playwright test e2e/auto-save.spec.ts e2e/saveload.spec.ts` — all tests pass.

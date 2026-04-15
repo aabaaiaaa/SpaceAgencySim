@@ -278,4 +278,31 @@ test.describe('Save & Load Flow', () => {
     await expect(slot0).not.toHaveClass(/save-slot-incompatible/, { timeout: 5_000 });
     await expect(slot0.locator('.save-slot-action-tag')).toHaveText('Load', { timeout: 5_000 });
   });
+
+  test('(10) incompatible save version shows warning badge and blocks loading @smoke', async ({ page }) => {
+    // Inject a save with version: 1 (incompatible) into slot 0.
+    const oldEnvelope = makeEnvelope({ saveName: 'Old Save', version: 1 });
+
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+    await page.addInitScript(({ key, env }) => {
+      localStorage.setItem(key, JSON.stringify(env));
+    }, { key: 'spaceAgencySave_0', env: oldEnvelope });
+
+    await page.goto('/');
+    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
+
+    // Verify the version warning badge is visible on slot 0.
+    const slot0Card = page.locator('.mm-save-card[data-slot="0"]');
+    await expect(slot0Card).toBeVisible({ timeout: 5_000 });
+    const warning = slot0Card.locator('[data-testid="version-warning"]');
+    await expect(warning).toBeVisible({ timeout: 5_000 });
+
+    // Click Load and verify the game does NOT start.
+    await page.click('[data-action="load"][data-slot="0"]');
+
+    // The load screen should remain visible (game did not start).
+    await expect(page.locator('#mm-load-screen')).toBeVisible({ timeout: 5_000 });
+    // The hub overlay should NOT appear (game did not load).
+    await expect(page.locator('#hub-overlay')).toHaveCount(0, { timeout: 3_000 });
+  });
 });

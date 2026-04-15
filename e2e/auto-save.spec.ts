@@ -81,6 +81,55 @@ test.describe('Auto-Save System', () => {
     expect(hasAutoSave).toBe(false);
   });
 
+  test('auto-save appears on load screen when all manual slots are full @smoke', async ({ page }) => {
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+
+    // Build 5 manual save envelopes and fill all slots 0-4.
+    const envelopes = Array.from({ length: 5 }, (_, i) =>
+      buildSaveEnvelope({
+        saveName: `Manual Save ${i}`,
+        parts: UNLOCKED_PARTS,
+        autoSaveEnabled: true,
+      }),
+    );
+
+    await page.addInitScript((envs: ReturnType<typeof buildSaveEnvelope>[]) => {
+      for (let i = 0; i < envs.length; i++) {
+        localStorage.setItem(`spaceAgencySave_${i}`, JSON.stringify(envs[i]));
+      }
+    }, envelopes);
+
+    // Load slot 0 into the game.
+    await page.goto('/');
+    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
+    await page.click('[data-action="load"][data-slot="0"]');
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
+    await dismissWelcomeModal(page);
+
+    // Trigger a flight and crash to invoke auto-save.
+    await startTestFlight(page, UNLOCKED_PARTS);
+    await teleportCraft(page, { posX: 0, posY: 5, velX: 0, velY: 0, grounded: true, landed: true, crashed: true });
+
+    // Wait for auto-save to complete.
+    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#auto-save-toast')).toBeVisible({ timeout: 5_000 });
+    await page.waitForFunction(
+      (): boolean => {
+        const toast = document.getElementById('auto-save-toast');
+        return toast?.textContent?.includes('Saved') ?? false;
+      },
+      { timeout: 5_000 },
+    );
+
+    // Navigate back to main menu and check the load screen.
+    await page.goto('/');
+    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
+
+    // There should be more than 5 save cards (5 manual + at least 1 auto-save).
+    const saveCards = await page.locator('.mm-save-card:not(.mm-empty-slot)').count();
+    expect(saveCards).toBeGreaterThan(5);
+  });
+
   test('disabling auto-save in settings prevents toast', async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
