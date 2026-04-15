@@ -1493,18 +1493,18 @@ describe('Save compression', () => {
   });
 
   describe('save version bump', () => {
-    it('SAVE_VERSION is 5 (incompatible saves rejected)', () => {
-      expect(SAVE_VERSION).toBe(5);
+    it('SAVE_VERSION is 6 (incompatible saves rejected)', () => {
+      expect(SAVE_VERSION).toBe(6);
     });
 
-    it('saved envelopes contain version 5', async () => {
+    it('saved envelopes contain version 6', async () => {
       const state = freshState();
       await saveGame(state, 0, 'Version Test');
 
       const raw = localStorage.getItem('spaceAgencySave_0');
       const json = decompressSaveData(raw!);
       const envelope = JSON.parse(json) as SaveEnvelope;
-      expect(envelope.version).toBe(5);
+      expect(envelope.version).toBe(6);
     });
   });
 });

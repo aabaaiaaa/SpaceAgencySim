@@ -1,14 +1,9 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 5,
+  "lastIteration": 6,
   "startedAt": "2026-04-15T12:35:06.733Z",
   "iteration": 14,
   "devloopVersion": "4.0.2",
-  "activeTask": {
-    "taskId": "TASK-015",
-    "taskTitle": "Final typecheck, lint, and smoke test verification",
-    "iterationNumber": 6,
-    "startedAt": "2026-04-15T13:40:55.201Z"
-  }
+  "activeTask": null
 }

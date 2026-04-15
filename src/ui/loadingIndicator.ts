@@ -10,7 +10,7 @@ let overlay: HTMLDivElement | null = null;
  * Idempotent — calling multiple times reuses the same element.
  */
 export function showLoadingIndicator(): void {
-  if (overlay) {
+  if (overlay && overlay.isConnected) {
     overlay.style.display = 'flex';
     return;
   }
@@ -48,7 +48,7 @@ export function showLoadingIndicator(): void {
  * Hide the loading overlay.
  */
 export function hideLoadingIndicator(): void {
-  if (overlay) {
+  if (overlay && overlay.isConnected) {
     overlay.style.display = 'none';
   }
 }
