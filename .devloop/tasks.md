@@ -55,7 +55,7 @@
 - **Verification**: `npm run build 2>&1 | grep -i "vab" && npx tsc --noEmit`
 
 ### TASK-010: Remove redundant render/vab.ts dynamic import
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-009
 - **Description**: In `src/ui/index.ts`, remove `render/vab.ts` from the dynamic `Promise.all` import (line ~341) since it is already statically loaded by `src/main.ts`. (1) Add a static import at the top: `import { showVabScene, hideVabScene } from '../render/vab.ts';` — these are the only two render/vab exports used in index.ts. (2) Remove the `_cachedVabRender` variable and its type annotation (line ~28). (3) Change the dynamic import from `Promise.all([import('./vab.ts'), import('../render/vab.ts')])` to just `import('./vab.ts')`. (4) Update the VAB navigation block (~lines 339-368): replace `_cachedVabRender?.showVabScene()` / `_cachedVabRender?.hideVabScene()` with direct calls to `showVabScene()` / `hideVabScene()`. The `vabRender` destructured variable and `_cachedVabRender = vabRender` assignment are deleted. (5) Update the other `_cachedVabRender?.hideVabScene()` calls at lines ~144, ~200, ~260 to use the static import directly. See requirements.md Section 5.
 - **Verification**: `npm run build 2>&1 | grep -i "vab" && npx tsc --noEmit`

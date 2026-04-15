@@ -10,6 +10,7 @@ import { initMainMenu } from './mainmenu.ts';
 import { initHubUI, destroyHubUI, showWelcomeModal, showReturnResultsOverlay } from './hub.ts';
 import { initTopBar, destroyTopBar, refreshTopBar, setCurrentScreen } from './topbar.ts';
 import { showHubScene } from '../render/hub.ts';
+import { showVabScene, hideVabScene } from '../render/vab.ts';
 import { hasFacility } from '../core/construction.ts';
 import { GameMode } from '../core/constants.ts';
 import './design-tokens.css';
@@ -25,7 +26,6 @@ import { showNotification } from './notification.ts';
 // _handleLoadGame without awaiting another import.
 
 let _cachedVab: typeof import('./vab.ts') | null = null;
-let _cachedVabRender: typeof import('../render/vab.ts') | null = null;
 let _cachedCrewAdmin: typeof import('./crewAdmin.ts') | null = null;
 let _cachedMissionControl: typeof import('./missionControl.ts') | null = null;
 let _cachedLaunchPad: typeof import('./launchPad.ts') | null = null;
@@ -141,7 +141,7 @@ export function initUI(container: HTMLElement, state: GameState): void {
   _logisticsOpen      = false;
   // Ensure a fresh VAB assembly for each new game session.
   _cachedVab?.resetVabUI();
-  _cachedVabRender?.hideVabScene(); // ensure VAB PixiJS is hidden when starting a new session
+  hideVabScene(); // ensure VAB PixiJS is hidden when starting a new session
 
   // Mount the persistent top bar — visible on all in-game screens.
   initTopBar(container, state, {
@@ -197,7 +197,7 @@ export function returnToHubFromFlight(
  */
 function _handleExitToMenu(): void {
   _cachedFlightController?.stopFlightScene(); // safe to call even if no flight is active
-  _cachedVabRender?.hideVabScene();           // hide VAB PixiJS container (no-op if already hidden)
+  hideVabScene();           // hide VAB PixiJS container (no-op if already hidden)
   destroyTopBar();
   destroyHubUI(); // no-op if hub is not the current screen
   if (_crewAdminOpen) {
@@ -257,7 +257,7 @@ function _handleExitToMenu(): void {
  */
 function _handleLoadGame(loadedState: GameState): void {
   _cachedFlightController?.stopFlightScene();
-  _cachedVabRender?.hideVabScene();
+  hideVabScene();
   destroyTopBar();
   destroyHubUI();
   if (_crewAdminOpen)      { _cachedCrewAdmin?.destroyCrewAdminUI();      _crewAdminOpen = false; }
@@ -336,23 +336,18 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
 
     if (!_vabInitialized) {
       showLoadingIndicator();
-      const vabResult = await loadScreen(() => Promise.all([
-        import('./vab.ts'),
-        import('../render/vab.ts'),
-      ]), 'VAB');
-      if (vabResult) {
-        const [vabMod, vabRender] = vabResult;
+      const vabMod = await loadScreen(() => import('./vab.ts'), 'VAB');
+      if (vabMod) {
         _cachedVab = vabMod;
-        _cachedVabRender = vabRender;
         hideLoadingIndicator();
 
-        vabRender.showVabScene();
+        showVabScene();
         vabMod.initVabUI(container, state, {
           onBack: () => {
             const vabRoot = document.getElementById('vab-root');
             if (vabRoot) vabRoot.remove();
             _vabInitialized = false;
-            _cachedVabRender?.hideVabScene();
+            hideVabScene();
             showHubScene();
             setCurrentScreen('hub');
             refreshTopBar();
@@ -364,7 +359,7 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
         _vabInitialized = true;
       }
     } else {
-      _cachedVabRender?.showVabScene();
+      showVabScene();
     }
 
     return;
