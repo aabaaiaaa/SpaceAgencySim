@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
-import { showNotification } from '../ui/notification.ts';
+import { showNotification, _resetForTesting } from '../ui/notification.ts';
 
 function getToasts(): HTMLElement[] {
   return Array.from(document.querySelectorAll('[data-notification-toast]'));
@@ -13,13 +13,12 @@ function getToasts(): HTMLElement[] {
 describe('showNotification()', () => {
   beforeEach(() => {
     vi.useFakeTimers();
-    // Clear any leftover toasts
-    getToasts().forEach((t) => t.remove());
+    _resetForTesting();
   });
 
   afterEach(() => {
     vi.useRealTimers();
-    getToasts().forEach((t) => t.remove());
+    _resetForTesting();
   });
 
   it('single notification creates one toast element', () => {

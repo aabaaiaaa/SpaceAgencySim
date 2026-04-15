@@ -69,3 +69,10 @@ export function showNotification(message: string, type: 'error' | 'info' = 'info
     setTimeout(() => _removeToast(toast), FADE_MS);
   }, DISMISS_MS);
 }
+
+/** Reset internal state — test-only. */
+export function _resetForTesting(): void {
+  while (_activeToasts.length > 0) {
+    _activeToasts.pop()!.remove();
+  }
+}

@@ -97,7 +97,7 @@
 - **Verification**: `npx vitest run src/tests/notification.test.ts` — all tests pass.
 
 ### TASK-017: Create notification unit tests
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-016
 - **Description**: Create `src/tests/notification.test.ts` with unit tests for the notification stacking queue: (1) Single notification creates one toast element. (2) Two notifications create two toast elements. (3) Toasts are stacked with different bottom positions. (4) After 4+ seconds, toasts are removed from DOM (use `vi.useFakeTimers`). (5) Maximum cap (5) is enforced — adding beyond the cap removes the oldest. See requirements.md section 6.
 - **Verification**: `npx vitest run src/tests/notification.test.ts` — all tests pass.
