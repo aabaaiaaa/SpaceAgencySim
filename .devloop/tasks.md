@@ -115,7 +115,7 @@
 - **Verification**: `npm run test:unit` — all tests pass, coverage thresholds still met. Every file in the exclusion list exists on disk.
 
 ### TASK-020: Final typecheck, lint, build, and smoke test verification
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-003, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019
 - **Description**: Run the full verification suite to confirm all iteration 16 changes work together. This is the final gate before the iteration is complete.
 - **Verification**: `npm run build && npm run typecheck && npm run lint && npm run test:unit && npm run test:smoke:e2e` — all pass with 0 errors.

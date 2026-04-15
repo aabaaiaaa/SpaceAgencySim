@@ -55,7 +55,7 @@ interface HubMenuItem {
 
 interface DropdownItem {
   label: string;
-  action: () => void;
+  action: () => void | Promise<void>;
   danger?: boolean;
 }
 
@@ -436,7 +436,7 @@ function _openDropdown(): void {
     btn.addEventListener('click', (e: MouseEvent) => {
       e.stopPropagation();
       _closeDropdown();
-      item.action();
+      void item.action();
     });
     menu.appendChild(btn);
   }
@@ -908,7 +908,7 @@ function _buildBorrowSection(): HTMLDivElement {
 // Save Slot Picker Modal
 // ---------------------------------------------------------------------------
 
-function _openSaveSlotPicker(): void {
+async function _openSaveSlotPicker(): Promise<void> {
   if (!_state) return;
   _closeAllModals();
 
@@ -923,7 +923,7 @@ function _openSaveSlotPicker(): void {
 
   modal.appendChild(_makeTitleRow('Save Game', () => backdrop.remove()));
 
-  const saves = listSaves();
+  const saves = await listSaves();
 
   for (let i = 0; i < SAVE_SLOT_COUNT; i++) {
     const slot = saves[i];
@@ -995,7 +995,7 @@ function _openSaveSlotPicker(): void {
 // Load Game — modal overlay with save slots
 // ---------------------------------------------------------------------------
 
-function _doLoadGame(): void {
+async function _doLoadGame(): Promise<void> {
   _closeAllModals();
 
   const backdrop: HTMLDivElement = _makeBackdrop('load-modal-backdrop');
@@ -1009,7 +1009,7 @@ function _doLoadGame(): void {
 
   modal.appendChild(_makeTitleRow('Load Game', () => backdrop.remove()));
 
-  const saves = listSaves();
+  const saves = await listSaves();
   let hasAnySave: boolean = false;
 
   for (let i = 0; i < SAVE_SLOT_COUNT; i++) {

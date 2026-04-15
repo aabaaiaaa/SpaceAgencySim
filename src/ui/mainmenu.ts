@@ -795,7 +795,7 @@ function _beginGame(state: GameState): void {
 /**
  * Shows a confirm/cancel modal dialog.
  */
-function _showConfirmModal(title: string, body: string, confirmText: string, onConfirm: () => void): void {
+function _showConfirmModal(title: string, body: string, confirmText: string, onConfirm: () => void | Promise<void>): void {
   const backdrop: HTMLDivElement = document.createElement('div');
   backdrop.className = 'mm-modal-backdrop';
   backdrop.innerHTML = `
@@ -822,7 +822,7 @@ function _showConfirmModal(title: string, body: string, confirmText: string, onC
 
   backdrop.querySelector('#mm-modal-confirm')!.addEventListener('click', () => {
     remove();
-    onConfirm();
+    void onConfirm();
   });
   backdrop.querySelector('#mm-modal-cancel')!.addEventListener('click', remove);
   backdrop.addEventListener('click', (e: MouseEvent) => {

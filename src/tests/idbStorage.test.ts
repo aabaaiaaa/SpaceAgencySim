@@ -340,7 +340,7 @@ describe('deleteSave() IndexedDB mirroring', () => {
     expect(localStorage.getItem('spaceAgencySave_1')).not.toBeNull();
     expect(await idbGet('spaceAgencySave_1')).not.toBeNull();
 
-    deleteSave(1);
+    await deleteSave(1);
     await vi.runAllTimersAsync();
 
     expect(localStorage.getItem('spaceAgencySave_1')).toBeNull();

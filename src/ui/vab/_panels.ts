@@ -54,7 +54,7 @@ let _renderStagingPanelFn: () => void = () => {};
 let _runAndRenderValidationFn: () => void = () => {};
 let _syncAndRenderStagingFn: () => void = () => {};
 let _renderEngineerPanelFn: () => void = () => {};
-let _handleSaveDesignFn: () => void = () => {};
+let _handleSaveDesignFn: () => void | Promise<void> = () => {};
 let _handleLoadDesignFn: () => void = () => {};
 let _handleLaunchClickedFn: () => void = () => {};
 let _vabRefreshPartsFn: (state: GameState) => void = (_state: GameState) => {};
@@ -73,7 +73,7 @@ export function setPanelCallbacks({
   runAndRenderValidation: () => void;
   syncAndRenderStaging: () => void;
   renderEngineerPanel: () => void;
-  handleSaveDesign: () => void;
+  handleSaveDesign: () => void | Promise<void>;
   handleLoadDesign: () => void;
   handleLaunchClicked: () => void;
   vabRefreshParts: (state: GameState) => void;
@@ -308,7 +308,7 @@ export function bindButtons(root: HTMLElement): void {
 
   // ── Save design ──
   root.querySelector('#vab-btn-save')?.addEventListener('click', () => {
-    _handleSaveDesignFn();
+    void _handleSaveDesignFn();
   });
 
   // ── Load design ──

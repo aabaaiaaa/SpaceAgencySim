@@ -28,7 +28,7 @@ export async function handleSaveGame(): Promise<void> {
   const s = getFCState();
   if (!s.state) return;
 
-  const saves      = listSaves();
+  const saves      = await listSaves();
   let   targetSlot = saves.findIndex((sv) => sv === null);
   if (targetSlot < 0) targetSlot = 0;
 
