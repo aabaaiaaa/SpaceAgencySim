@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 4,
+  "lastIteration": 5,
   "startedAt": "2026-04-15T17:28:16.944Z",
   "iteration": 15,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-003",
-    "taskTitle": "Unit tests for overflow save load and export",
-    "iterationNumber": 5,
-    "startedAt": "2026-04-15T17:32:26.890Z"
+    "taskId": "TASK-004",
+    "taskTitle": "E2E test — load an overflow auto-save card",
+    "iterationNumber": 6,
+    "startedAt": "2026-04-15T17:36:34.154Z"
   }
 }

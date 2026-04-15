@@ -19,7 +19,7 @@
 - **Verification**: `npx vitest run src/tests/saveload.test.ts`
 
 ### TASK-004: E2E test — load an overflow auto-save card
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-002
 - **Description**: In `e2e/auto-save.spec.ts`, add a test (or extend the existing auto-save visibility test) that: (1) Seeds 5 full manual slots plus an auto-save in an overflow slot. (2) Navigates to the load screen and verifies the auto-save card is visible. (3) Clicks the Load button on the auto-save card. (4) Verifies the game starts — hub overlay is visible and agency name matches the seeded save. Tag with `@smoke`. See requirements.md Section 1.
 - **Verification**: `npx playwright test e2e/auto-save.spec.ts`

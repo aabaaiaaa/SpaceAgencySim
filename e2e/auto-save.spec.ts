@@ -130,6 +130,61 @@ test.describe('Auto-Save System', () => {
     expect(saveCards).toBeGreaterThan(5);
   });
 
+  test('loading an overflow auto-save card starts the game @smoke', async ({ page }) => {
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+
+    const AUTO_SAVE_AGENCY = 'AutoSaved Agency';
+
+    // Build 5 manual save envelopes for slots 0-4.
+    const manualEnvelopes = Array.from({ length: 5 }, (_, i) =>
+      buildSaveEnvelope({
+        saveName: `Manual Save ${i}`,
+        agencyName: `Manual Agency ${i}`,
+        parts: UNLOCKED_PARTS,
+        autoSaveEnabled: true,
+      }),
+    );
+
+    // Build an auto-save envelope with a distinct agency name.
+    const autoSaveEnvelope = {
+      ...buildSaveEnvelope({
+        saveName: 'Auto-Save',
+        agencyName: AUTO_SAVE_AGENCY,
+        parts: UNLOCKED_PARTS,
+        autoSaveEnabled: true,
+      }),
+      autoSave: true,
+    };
+
+    // Seed all saves into localStorage before navigating.
+    await page.addInitScript(
+      ({ manuals, autoSave }: { manuals: ReturnType<typeof buildSaveEnvelope>[]; autoSave: Record<string, unknown> }) => {
+        for (let i = 0; i < manuals.length; i++) {
+          localStorage.setItem(`spaceAgencySave_${i}`, JSON.stringify(manuals[i]));
+        }
+        localStorage.setItem('spaceAgencySave_auto', JSON.stringify(autoSave));
+      },
+      { manuals: manualEnvelopes, autoSave: autoSaveEnvelope },
+    );
+
+    // Navigate to the load screen.
+    await page.goto('/');
+    await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
+
+    // Verify the auto-save card is visible (has the AUTO-SAVE badge).
+    await expect(page.locator('.mm-mode-autosave')).toBeVisible({ timeout: 5_000 });
+
+    // Click the Load button on the auto-save card.
+    await page.click('button[data-action="load"][data-key="spaceAgencySave_auto"]');
+
+    // Verify the game starts — hub overlay is visible.
+    await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
+
+    // Verify the agency name matches the seeded auto-save.
+    const agencyName = await page.evaluate(() => window.__gameState?.agencyName);
+    expect(agencyName).toBe(AUTO_SAVE_AGENCY);
+  });
+
   test('disabling auto-save in settings prevents toast', async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
