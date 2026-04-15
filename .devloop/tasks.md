@@ -61,7 +61,7 @@
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` — all remaining tests pass, no localStorage references remain.
 
 ### TASK-011: Update remaining unit tests for IDB
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006, TASK-007, TASK-008
 - **Description**: Update storage mocking in `autoSave.test.ts`, `settingsStore.test.ts`, `designLibrary.test.ts`, `storageErrors.test.ts`, and `debugMode.test.ts` to use IDB instead of localStorage. See requirements.md section 2h.
 - **Verification**: `npx vitest run src/tests/autoSave.test.ts src/tests/settingsStore.test.ts src/tests/designLibrary.test.ts src/tests/storageErrors.test.ts src/tests/debugMode.test.ts` — all pass.

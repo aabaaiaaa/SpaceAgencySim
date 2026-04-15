@@ -1,41 +1,40 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
 import type { GameState } from '../core/gameState.ts';
+
+// ---------------------------------------------------------------------------
+// In-memory IDB mock — shared between mock factory and test code
+// ---------------------------------------------------------------------------
+
+const _idbStore = new Map<string, string>();
+
+vi.mock('../core/idbStorage.js', () => ({
+  idbSet: vi.fn((key: string, value: string) => {
+    _idbStore.set(key, value);
+    return Promise.resolve();
+  }),
+  idbGet: vi.fn((key: string) => {
+    return Promise.resolve(_idbStore.has(key) ? _idbStore.get(key)! : null);
+  }),
+  idbDelete: vi.fn((key: string) => {
+    _idbStore.delete(key);
+    return Promise.resolve();
+  }),
+  idbGetAllKeys: vi.fn(() => {
+    return Promise.resolve([..._idbStore.keys()]);
+  }),
+}));
+
 import {
   saveGame,
   loadGame,
+  compressSaveData,
   SAVE_VERSION,
   _setSessionStartTimeForTesting,
 } from '../core/saveload.ts';
 
-// ---------------------------------------------------------------------------
-// localStorage mock (same pattern as saveload.test.js)
-// ---------------------------------------------------------------------------
-
-interface LocalStorageMock {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem(key: string): void;
-  clear(): void;
-  readonly length: number;
-}
-
-function createLocalStorageMock(): LocalStorageMock {
-  const store = new Map<string, string>();
-  return {
-    getItem(key: string): string | null { return store.has(key) ? store.get(key)! : null; },
-    setItem(key: string, value: string): void { store.set(key, String(value)); },
-    removeItem(key: string): void { store.delete(key); },
-    clear(): void { store.clear(); },
-    get length(): number { return store.size; },
-  };
-}
-
-let mockStorage: LocalStorageMock;
-
 beforeEach(() => {
-  mockStorage = createLocalStorageMock();
-  vi.stubGlobal('localStorage', mockStorage);
+  _idbStore.clear();
   vi.useFakeTimers();
   vi.setSystemTime(0);
   _setSessionStartTimeForTesting(0);
@@ -43,7 +42,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.useRealTimers();
-  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 // ---------------------------------------------------------------------------
@@ -130,7 +129,7 @@ describe('debugMode save migration', () => {
       version: SAVE_VERSION,
       state: JSON.parse(JSON.stringify(state)),
     };
-    localStorage.setItem('spaceAgencySave_0', JSON.stringify(legacyEnvelope));
+    _idbStore.set('spaceAgencySave_0', compressSaveData(JSON.stringify(legacyEnvelope)));
 
     const restored = await loadGame(0);
     expect(restored.debugMode).toBe(false);
@@ -147,7 +146,7 @@ describe('debugMode save migration', () => {
       version: SAVE_VERSION,
       state: JSON.parse(JSON.stringify(state)),
     };
-    localStorage.setItem('spaceAgencySave_0', JSON.stringify(envelope));
+    _idbStore.set('spaceAgencySave_0', compressSaveData(JSON.stringify(envelope)));
 
     const restored = await loadGame(0);
     expect(restored.debugMode).toBe(true);
