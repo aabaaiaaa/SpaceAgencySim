@@ -479,7 +479,9 @@ describe('Custom Challenges', () => {
       const { challenge } = createCustomChallenge(state, validDef()) as { challenge: ChallengeDef };
       const json = exportChallengeJSON(challenge);
 
+      // Advance the counter so the imported challenge gets a different sequential ID
       const state2 = freshState();
+      state2.nextChallengeId = 100;
       const result = importChallengeJSON(state2, json);
       expect(result.challenge!.id).toMatch(/^custom-/);
       expect(result.challenge!.id).not.toBe(challenge.id);

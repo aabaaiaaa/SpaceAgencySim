@@ -3,8 +3,8 @@
  *
  * Renders a schematic SVG solar-system map showing celestial bodies,
  * proven leg dashed lines, and active route solid lines.  Also exports
- * small helpers (`getBodyColor`, `formatLocation`) consumed by sibling
- * modules.
+ * small helpers (`getBodyColor` re-export, `formatLocation`) consumed
+ * by sibling modules.  Geometry and colors delegate to core/mapGeometry.
  *
  * @module ui/logistics/_routeMap
  */
@@ -13,6 +13,7 @@ import type { RouteLocation } from '../../core/gameState.ts';
 import type { Hub } from '../../core/hubTypes.ts';
 import { getHubsOnBody } from '../../core/hubs.ts';
 import { EARTH_HUB_ID } from '../../core/constants.ts';
+import { bezierControlPoint, getBodyColorHex, ROUTE_STATUS_COLORS } from '../../core/mapGeometry.ts';
 import {
   getLogisticsState,
   triggerRender,
@@ -24,18 +25,11 @@ import { computeSchematicLayout, getSchematicWidth } from './_schematicLayout.ts
 // ---------------------------------------------------------------------------
 
 /**
- * Return a fill colour for a celestial-body circle on the route map.
- * Reads from CSS custom properties (--body-color-{bodyId}) so that
- * logistics.css is the single source of truth.  Falls back to #888
- * when the DOM is not attached (e.g. unit-test environment).
+ * Re-export getBodyColorHex as getBodyColor for backward compatibility.
+ * Previously read CSS custom properties; now delegates to the shared
+ * mapGeometry module which has the canonical color map.
  */
-export function getBodyColor(bodyId: string): string {
-  if (typeof document === 'undefined') return '#888';
-  const val = getComputedStyle(document.documentElement)
-    .getPropertyValue(`--body-color-${bodyId.toLowerCase()}`)
-    .trim();
-  return val || '#888';
-}
+export { getBodyColorHex as getBodyColor } from '../../core/mapGeometry.ts';
 
 /**
  * Format a RouteLocation for display.
@@ -63,31 +57,22 @@ export function formatLocation(
 }
 
 // ---------------------------------------------------------------------------
-// Bezier curve helper
+// Bezier path helper (delegates to shared mapGeometry)
 // ---------------------------------------------------------------------------
 
 /**
- * Compute a quadratic Bezier path string between two points.
- * The control point is offset perpendicular to the line joining the
- * endpoints, alternating direction based on legIndex for visual clarity.
+ * Build an SVG quadratic Bézier path string using the shared control-point
+ * computation.  Falls back to a straight line when the endpoints coincide.
  */
 function bezierPath(
   x1: number, y1: number,
   x2: number, y2: number,
   legIndex: number,
 ): string {
-  const mx = (x1 + x2) / 2;
-  const my = (y1 + y2) / 2;
   const dx = x2 - x1;
   const dy = y2 - y1;
-  const dist = Math.sqrt(dx * dx + dy * dy);
-  if (dist === 0) return `M ${x1},${y1} L ${x2},${y2}`;
-  const px = -dy / dist;
-  const py = dx / dist;
-  const offset = 0.18 * dist;
-  const sign = legIndex % 2 === 0 ? 1 : -1;
-  const cx = mx + px * offset * sign;
-  const cy = my + py * offset * sign;
+  if (dx === 0 && dy === 0) return `M ${x1},${y1} L ${x2},${y2}`;
+  const { cx, cy } = bezierControlPoint(x1, y1, x2, y2, legIndex);
   return `M ${x1},${y1} Q ${cx},${cy} ${x2},${y2}`;
 }
 
@@ -140,7 +125,7 @@ export function renderRouteMap(): SVGSVGElement {
     circle.setAttribute('cy', String(node.y));
     circle.setAttribute('r', String(node.radius));
     circle.setAttribute('class', `body-node body-${bodyId.toLowerCase()}`);
-    circle.setAttribute('fill', getBodyColor(bodyId));
+    circle.setAttribute('fill', getBodyColorHex(bodyId));
     circle.setAttribute('stroke', '#666');
     circle.setAttribute('stroke-width', '1.5');
 
@@ -208,7 +193,7 @@ export function renderRouteMap(): SVGSVGElement {
     if (node.type !== 'surfaceHub' && node.type !== 'orbitalHub') continue;
 
     const parentNode = node.parentId ? layout.get(node.parentId) : null;
-    const bodyColor = getBodyColor(node.parentId ?? '');
+    const bodyColor = getBodyColorHex(node.parentId ?? '');
 
     // Hub status: online / under-construction / offline
     const hub = ls.state?.hubs.find(h => h.id === node.hubId);
@@ -397,13 +382,12 @@ export function renderRouteMap(): SVGSVGElement {
         path.setAttribute('class', `route-line route-${route.status}`);
         path.style.cursor = 'pointer';
 
-        // Color by status
-        if (route.status === 'broken') {
-          path.setAttribute('stroke', '#CC3333');
-        } else if (route.status === 'paused') {
-          path.setAttribute('stroke', 'rgba(100, 180, 255, 0.4)');
-        } else {
-          path.setAttribute('stroke', '#64B4FF');
+        // Color by status — use shared ROUTE_STATUS_COLORS
+        const statusKey = route.status as keyof typeof ROUTE_STATUS_COLORS;
+        const statusColor = ROUTE_STATUS_COLORS[statusKey] ?? ROUTE_STATUS_COLORS.active;
+        path.setAttribute('stroke', statusColor.hex);
+        if (route.status === 'paused') {
+          path.setAttribute('opacity', '0.4');
         }
 
         // Click to highlight route in table

@@ -82,8 +82,10 @@ export function _setSessionStartTimeForTesting(timestampMs: number): void {
  * A lightweight summary of one save slot shown in the UI.
  */
 export interface SaveSlotSummary {
-  /** Slot index (0–4). */
+  /** Slot index (0–4 for manual slots, -1 for overflow/auto). */
   slotIndex: number;
+  /** The localStorage key for this save (e.g. 'spaceAgencySave_0', 'spaceAgencySave_auto'). */
+  storageKey: string;
   /** Player-assigned label. */
   saveName: string;
   /** Player's agency name. */
@@ -265,10 +267,11 @@ function countLivingCrew(state: { crew?: Array<{ status: AstronautStatus }> }): 
 /**
  * Builds a SaveSlotSummary from an envelope object read from localStorage.
  */
-function summaryFromEnvelope(slotIndex: number, envelope: SaveEnvelope): SaveSlotSummary {
+function summaryFromEnvelope(slotIndex: number, envelope: SaveEnvelope, storageKey: string): SaveSlotSummary {
   const s = envelope.state;
   return {
     slotIndex,
+    storageKey,
     saveName: envelope.saveName,
     agencyName: s.agencyName ?? '',
     timestamp: envelope.timestamp,
@@ -349,7 +352,7 @@ export async function saveGame(state: GameState, slotIndex: number, saveName: st
       // localStorage full — attempt IndexedDB as fallback.
       if (isIdbAvailable()) {
         await idbSet(key, compressed);
-        return summaryFromEnvelope(slotIndex, envelope);
+        return summaryFromEnvelope(slotIndex, envelope, key);
       }
       throw new Error('Storage full — unable to save. Delete old saves to free space.', { cause: err });
     }
@@ -361,7 +364,7 @@ export async function saveGame(state: GameState, slotIndex: number, saveName: st
     idbSet(key, compressed).catch(err => logger.debug('saveload', 'IDB mirror write failed', err));
   }
 
-  return summaryFromEnvelope(slotIndex, envelope);
+  return summaryFromEnvelope(slotIndex, envelope, key);
 }
 
 // ---------------------------------------------------------------------------
@@ -551,13 +554,16 @@ export const loadGameAsync = loadGame;
 /**
  * Deletes the save stored in the specified slot.
  *
+ * If `storageKey` is provided it is used directly (for overflow / auto-save
+ * slots that don't map to a 0–4 index). Otherwise the key is derived from
+ * `slotIndex`, which must be a valid manual slot index.
+ *
  * No-ops silently if the slot is already empty.
  *
- * @throws {RangeError} If slotIndex is out of bounds.
+ * @throws {RangeError} If slotIndex is out of bounds and no storageKey is provided.
  */
-export function deleteSave(slotIndex: number): void {
-  assertValidSlot(slotIndex);
-  const key = slotKey(slotIndex);
+export function deleteSave(slotIndex: number, storageKey?: string): void {
+  const key = storageKey ?? (assertValidSlot(slotIndex), slotKey(slotIndex));
   localStorage.removeItem(key);
 
   // Mirror deletion to IndexedDB (fire-and-forget).
@@ -571,16 +577,21 @@ export function deleteSave(slotIndex: number): void {
 // ---------------------------------------------------------------------------
 
 /**
- * Returns a summary array for all save slots.
+ * Returns a summary array for all discovered save slots.
  *
- * The array always has exactly `SAVE_SLOT_COUNT` (5) entries, one per slot.
- * Empty or corrupt slots are represented as `null`.
+ * The first `SAVE_SLOT_COUNT` (5) entries correspond to manual slots 0–4
+ * and are always present (null for empty or corrupt). Additional entries
+ * may follow for overflow slots (5–99) and the dedicated auto-save key
+ * (`spaceAgencySave_auto`); only populated slots are included in the
+ * overflow section.
  */
 export function listSaves(): (SaveSlotSummary | null)[] {
   const result: (SaveSlotSummary | null)[] = [];
 
+  // Always include the 5 manual slots (null for empty).
   for (let i = 0; i < SAVE_SLOT_COUNT; i++) {
-    const raw = localStorage.getItem(slotKey(i));
+    const key = slotKey(i);
+    const raw = localStorage.getItem(key);
 
     if (raw === null) {
       result.push(null);
@@ -591,12 +602,34 @@ export function listSaves(): (SaveSlotSummary | null)[] {
       const json = decompressSaveData(raw);
       const envelope = JSON.parse(json);
       if (envelope && typeof envelope === 'object' && envelope.state) {
-        result.push(summaryFromEnvelope(i, envelope));
+        result.push(summaryFromEnvelope(i, envelope, key));
       } else {
-        result.push(null); // Malformed envelope — treat as empty.
+        result.push(null);
       }
     } catch {
-      result.push(null); // Corrupt JSON — treat as empty.
+      result.push(null);
+    }
+  }
+
+  // Scan overflow slots (5–99) and the dedicated auto-save key.
+  const overflowKeys: string[] = [];
+  for (let i = SAVE_SLOT_COUNT; i < 100; i++) {
+    overflowKeys.push(slotKey(i));
+  }
+  overflowKeys.push('spaceAgencySave_auto');
+
+  for (const key of overflowKeys) {
+    const raw = localStorage.getItem(key);
+    if (raw === null) continue;
+
+    try {
+      const json = decompressSaveData(raw);
+      const envelope = JSON.parse(json);
+      if (envelope && typeof envelope === 'object' && envelope.state) {
+        result.push(summaryFromEnvelope(-1, envelope, key));
+      }
+    } catch {
+      // Corrupt overflow save — skip silently.
     }
   }
 
@@ -763,7 +796,7 @@ function _importBinaryEnvelope(bytes: Uint8Array, slotIndex: number): SaveSlotSu
   // Persist — store the LZC string directly (already compressed).
   _persistImport(lzcString, slotIndex);
 
-  return summaryFromEnvelope(slotIndex, envelope);
+  return summaryFromEnvelope(slotIndex, envelope, slotKey(slotIndex));
 }
 
 /**
@@ -791,7 +824,7 @@ function _importLegacyJson(jsonString: string, slotIndex: number): SaveSlotSumma
   const compressed = compressSaveData(json);
   _persistImport(compressed, slotIndex);
 
-  return summaryFromEnvelope(slotIndex, envelope);
+  return summaryFromEnvelope(slotIndex, envelope, slotKey(slotIndex));
 }
 
 /**

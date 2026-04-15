@@ -5,13 +5,14 @@
  * Tests cover:
  * 1. _formatMoney logic (reimplemented from hubManagement.ts — private, not exported)
  * 2. _getStatusInfo logic (reimplemented from hubManagement.ts — private, not exported)
- * 3. getBodyColor (imported from logistics/_routeMap.ts — fallback in Node env)
+ * 3. getBodyColor (re-exported from logistics/_routeMap.ts, delegates to core/mapGeometry)
  * 4. showLoadingIndicator / hideLoadingIndicator (skipped — requires DOM env;
  *    neither happy-dom nor jsdom is installed)
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { getBodyColor } from '../ui/logistics/_routeMap.ts';
+import { BODY_COLORS, DEFAULT_BODY_COLOR } from '../core/mapGeometry.ts';
 
 // ---------------------------------------------------------------------------
 // 1. _formatMoney — local reimplementation of the private helper from
@@ -169,25 +170,25 @@ describe('_getStatusInfo (hubManagement helper)', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. getBodyColor — imported from src/ui/logistics/_routeMap.ts.
-//    In the Node.js test environment `document` is undefined, so the
-//    function should always return the fallback value '#888'.
+// 3. getBodyColor — re-exported from src/ui/logistics/_routeMap.ts,
+//    delegates to getBodyColorHex in core/mapGeometry.ts.
+//    Returns actual hex colors from the BODY_COLORS map.
 // ---------------------------------------------------------------------------
 
 describe('getBodyColor (logistics route map helper)', () => {
-  it('returns fallback #888 when document is undefined (Node test env)', () => {
-    expect(getBodyColor('EARTH')).toBe('#888');
+  it('returns correct hex color for known bodies', () => {
+    expect(getBodyColor('EARTH')).toBe(BODY_COLORS.earth);
   });
 
-  it('returns fallback #888 for any body ID in Node test env', () => {
-    expect(getBodyColor('MOON')).toBe('#888');
-    expect(getBodyColor('MARS')).toBe('#888');
-    expect(getBodyColor('SUN')).toBe('#888');
+  it('returns correct colors for known bodies (case-insensitive)', () => {
+    expect(getBodyColor('MOON')).toBe(BODY_COLORS.moon);
+    expect(getBodyColor('MARS')).toBe(BODY_COLORS.mars);
+    expect(getBodyColor('SUN')).toBe(BODY_COLORS.sun);
   });
 
-  it('returns fallback #888 for unknown body IDs', () => {
-    expect(getBodyColor('PLUTO')).toBe('#888');
-    expect(getBodyColor('')).toBe('#888');
+  it('returns default color for unknown body IDs', () => {
+    expect(getBodyColor('PLUTO')).toBe(DEFAULT_BODY_COLOR);
+    expect(getBodyColor('')).toBe(DEFAULT_BODY_COLOR);
   });
 
   it('is a function that accepts a string argument', () => {

@@ -112,9 +112,10 @@ function freshState(): GameState {
   return state;
 }
 
+let _contractTestSeq = 0;
 function makeContract(overrides: TestContractOverrides = {}): TestContract {
   return {
-    id: overrides.id ?? `contract-test-${Math.random().toString(36).slice(2)}`,
+    id: overrides.id ?? `contract-test-${++_contractTestSeq}`,
     title: overrides.title ?? 'Test Contract',
     description: overrides.description ?? 'A test contract.',
     category: overrides.category ?? ContractCategory.ALTITUDE_RECORD,

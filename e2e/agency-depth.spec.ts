@@ -1420,7 +1420,7 @@ test.describe('Design library save/load/duplicate', () => {
       const now = new Date().toISOString();
       const clone = JSON.parse(JSON.stringify(original));
       Object.assign(clone, {
-        id: 'design-' + Date.now() + '-' + Math.random().toString(36).slice(2, 8),
+        id: `design-${gs.nextDesignId++}`,
         name: original.name + ' (Copy)',
         createdDate: now,
         updatedDate: now,

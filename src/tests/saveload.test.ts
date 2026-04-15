@@ -565,6 +565,75 @@ describe('listSaves()', () => {
 });
 
 // ---------------------------------------------------------------------------
+// listSaves — dynamic slot discovery
+// ---------------------------------------------------------------------------
+
+describe('listSaves — dynamic slot discovery', () => {
+  /** Helper to create a minimal save envelope JSON string. */
+  function makeEnvelopeJSON(overrides: Partial<SaveEnvelope> = {}): string {
+    const state = freshState();
+    return JSON.stringify({
+      saveName: 'Test',
+      timestamp: new Date(0).toISOString(),
+      version: SAVE_VERSION,
+      state: JSON.parse(JSON.stringify(state)),
+      ...overrides,
+    });
+  }
+
+  it('empty storage returns 5 nulls', () => {
+    const saves = listSaves();
+    expect(saves).toHaveLength(SAVE_SLOT_COUNT);
+    expect(saves.every(s => s === null)).toBe(true);
+  });
+
+  it('discovers overflow slot 7', () => {
+    localStorage.setItem('spaceAgencySave_7', makeEnvelopeJSON({ saveName: 'Overflow 7' }));
+
+    const saves = listSaves();
+    expect(saves.length).toBeGreaterThan(SAVE_SLOT_COUNT);
+    const overflow = saves.find(s => s !== null && s.storageKey === 'spaceAgencySave_7');
+    expect(overflow).toBeDefined();
+    expect(overflow!.saveName).toBe('Overflow 7');
+    expect(overflow!.slotIndex).toBe(-1);
+  });
+
+  it('discovers auto-save key', () => {
+    localStorage.setItem('spaceAgencySave_auto', makeEnvelopeJSON({ saveName: 'Auto Save' }));
+
+    const saves = listSaves();
+    const autoSave = saves.find(s => s !== null && s.storageKey === 'spaceAgencySave_auto');
+    expect(autoSave).toBeDefined();
+    expect(autoSave!.saveName).toBe('Auto Save');
+    expect(autoSave!.slotIndex).toBe(-1);
+  });
+
+  it('storageKey present on all summaries', async () => {
+    await saveGame(freshState(), 0, 'Slot Zero');
+
+    const saves = listSaves();
+    expect(saves[0]).not.toBeNull();
+    expect(saves[0]!.storageKey).toBe('spaceAgencySave_0');
+  });
+
+  it('incompatible version saves still appear', () => {
+    const state = freshState();
+    const envelope = {
+      saveName: 'Old Version',
+      timestamp: new Date(0).toISOString(),
+      version: 1,
+      state: JSON.parse(JSON.stringify(state)),
+    };
+    localStorage.setItem('spaceAgencySave_0', JSON.stringify(envelope));
+
+    const saves = listSaves();
+    expect(saves[0]).not.toBeNull();
+    expect(saves[0]!.saveName).toBe('Old Version');
+    expect(saves[0]!.version).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // importSave
 // ---------------------------------------------------------------------------
 

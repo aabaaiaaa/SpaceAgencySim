@@ -31,9 +31,10 @@ function createMarsHub(state: GameState): ReturnType<typeof createHub> {
 }
 
 /** Adds a test crew member to state and returns it. */
+let _crewTestSeq = 0;
 function addCrew(state: GameState, overrides: Partial<CrewMember> = {}): CrewMember {
   const c = createCrewMember({
-    id: overrides.id ?? 'crew-test-' + Math.random().toString(36).slice(2, 8),
+    id: overrides.id ?? `crew-test-${++_crewTestSeq}`,
     name: overrides.name ?? 'Test Astronaut',
     salary: overrides.salary ?? 2_000,
     hireDate: '2026-01-01T00:00:00.000Z',

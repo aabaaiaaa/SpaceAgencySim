@@ -509,7 +509,7 @@ test.describe('Custom mission creator', () => {
 
       // Create a custom challenge programmatically
       const challenge = {
-        id: 'custom-test-' + Date.now(),
+        id: `custom-${state.nextChallengeId++}`,
         custom: true,
         title: 'Test Custom Challenge',
         description: 'A test custom challenge created by E2E tests.',
@@ -531,7 +531,7 @@ test.describe('Custom mission creator', () => {
     });
 
     expect(result.count).toBe(1);
-    expect(result.id).toContain('custom-test-');
+    expect(result.id).toMatch(/^custom-\d+$/);
 
     await page.close();
   });
@@ -876,7 +876,7 @@ test.describe('Custom mission creator', () => {
         description?: string;
       }[];
       const challenge = {
-        id: 'custom-import-' + Date.now(),
+        id: `custom-${state.nextChallengeId++}`,
         custom: true,
         title: data.title as string,
         description: (data.description as string) || '',

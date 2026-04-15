@@ -61,7 +61,7 @@ Implementation plan: `docs/superpowers/plans/2026-04-15-iteration-14.md`
 - **Verification**: `npx tsc --noEmit src/core/routes.ts src/core/satellites.ts src/core/surfaceOps.ts && npx eslint src/core/` — 0 errors.
 
 ### TASK-008: Fix tests broken by ID format changes
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006, TASK-007, TASK-007a, TASK-007b
 - **Description**: Search all test files for assertions that match old ID formats (regex patterns like `route-\d+-\w+`, hardcoded IDs with timestamps, references to `Date.now` or `randomUUID` in test assertions). Update them to match the new `prefix-N` format. Common changes: `expect(id).toMatch(/^route-\d+-\w+$/)` → `expect(id).toMatch(/^route-\d+$/)`. Prefix-only checks like `expect(id).toMatch(/^contract-/)` still work. Run `grep -rn "Date.now\|randomUUID\|Math.random.*toString.36" src/tests/ e2e/ --include="*.ts" --include="*.js"` to find all instances. See implementation plan Task 8.
 - **Verification**: `npm run test:unit` — all unit tests pass.
@@ -73,19 +73,19 @@ Implementation plan: `docs/superpowers/plans/2026-04-15-iteration-14.md`
 - **Verification**: `npx vitest run src/tests/mapGeometry.test.ts` — all tests pass.
 
 ### TASK-010: Wire SVG logistics map to shared mapGeometry
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-009
 - **Description**: In `src/ui/logistics/_routeMap.ts`: (1) Import `bezierControlPoint`, `getBodyColorHex`, `ROUTE_STATUS_COLORS` from `../../core/mapGeometry.ts`. (2) Delete the local `getBodyColor()` function (lines 32-38). Replace all calls to `getBodyColor(bodyId)` with `getBodyColorHex(bodyId)`. If `getBodyColor` is exported and imported by other files, add a re-export alias or update callers. (3) Delete the local `bezierPath()` function (lines 74-92). At each call site, use `bezierControlPoint()` to get the control point and build the SVG path string inline: `M ${x1},${y1} Q ${cx},${cy} ${x2},${y2}`. (4) Replace hardcoded route status color strings (around lines 401-407) with `ROUTE_STATUS_COLORS[status].hex`. For paused routes, set SVG `opacity` attribute to `0.4` instead of using `rgba()`. (5) In `src/ui/logistics/logistics.css`, delete the `:root` block with `--body-color-*` custom properties (lines 6-16). Verify no other CSS rules reference these variables. See implementation plan Task 10 steps 1-5.
 - **Verification**: `npx tsc --noEmit src/ui/logistics/_routeMap.ts && npx vitest run src/tests/logistics.test.ts src/tests/logistics-layout.test.ts` — 0 errors, all tests pass.
 
 ### TASK-010a: Wire PixiJS flight map to shared mapGeometry
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-009
 - **Description**: In `src/render/map.ts`: (1) Import `bezierControlPoint`, `evalQuadBezier`, `getBodyColorNum`, `ROUTE_STATUS_COLORS` from `../core/mapGeometry.ts`. (2) Delete local constants: `ROUTE_ACTIVE_COLOR` (line 1715), `ROUTE_PAUSED_COLOR` (line 1716), `ROUTE_BROKEN_COLOR` (line 1717), `BEZIER_OFFSET_FACTOR` (line 1721). Keep `PROVEN_LEG_COLOR` — it's render-specific. (3) Delete local functions `_bezierControlPoint()` (lines 1755-1777) and `_evalQuadBezier()` (lines 1782-1793). (4) Update all call sites: replace `_bezierControlPoint(ox,oy,dx,dy,i)` with `bezierControlPoint(ox,oy,dx,dy,i)` — note return property rename from `{cpx,cpy}` to `{cx,cy}`, use destructuring rename `{cx:cpx, cy:cpy}` or update all downstream references. Replace `_evalQuadBezier()` calls with `evalQuadBezier()`. (5) Replace route color references: `ROUTE_ACTIVE_COLOR` → `ROUTE_STATUS_COLORS.active.num`, `ROUTE_PAUSED_COLOR` → `ROUTE_STATUS_COLORS.paused.num`, `ROUTE_BROKEN_COLOR` → `ROUTE_STATUS_COLORS.broken.num`. See implementation plan Task 10 steps 6-8.
 - **Verification**: `npx tsc --noEmit src/render/map.ts && npx eslint src/render/map.ts` — 0 errors.
 
 ### TASK-011: Update listSaves() for dynamic slot discovery
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-005
 - **Description**: In `src/core/saveload.ts`: (1) Add `storageKey: string` field to `SaveSlotSummary` interface. (2) Update `summaryFromEnvelope()` to accept and pass through a `storageKey` parameter. (3) Rewrite `listSaves()` to: first scan slots 0-4 (always included, null for empty), then scan slots 5-99 and the `spaceAgencySave_auto` key (only include if populated, with slotIndex=-1). All summaries include `storageKey`. (4) Update `deleteSave` to accept a storage key for overflow slots. (5) Add unit tests in `src/tests/saveload.test.ts`: empty storage returns 5 nulls; overflow slot 7 is discovered; auto-save key is discovered; storageKey is present on all summaries; incompatible version saves still appear (for warning badge display). See implementation plan Task 11 for exact test code and listSaves rewrite.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` — all tests pass.

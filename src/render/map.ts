@@ -58,6 +58,7 @@ import type { OrbitalElements, OrbitalObject } from '../core/gameState.ts';
 import type { Hub } from '../core/hubTypes.ts';
 import { RESOURCES_BY_ID } from '../data/resources.ts';
 import type { ResourceType } from '../core/constants.ts';
+import { bezierControlPoint, evalQuadBezier, ROUTE_STATUS_COLORS } from '../core/mapGeometry.ts';
 
 // ---------------------------------------------------------------------------
 // Colour palette
@@ -1712,13 +1713,7 @@ function _drawCommsOverlay(state: ReadonlyGameState, bodyId: string, cx: number,
 // Private — route overlay
 // ---------------------------------------------------------------------------
 
-const ROUTE_ACTIVE_COLOR = 0x44ff88;
-const ROUTE_PAUSED_COLOR = 0x666666;
-const ROUTE_BROKEN_COLOR = 0xff4444;
 const PROVEN_LEG_COLOR   = 0x6688aa;
-
-/** Perpendicular offset factor for Bezier control points (fraction of inter-body distance). */
-const BEZIER_OFFSET_FACTOR = 0.18;
 
 /** Number of flow dots rendered per active route leg. */
 const DOTS_PER_LEG = 3;
@@ -1744,53 +1739,6 @@ function _bodyScreenPos(
   return { x: cx + orbitDist * scale, y: cy };
 }
 
-/**
- * Compute the control point for a quadratic Bezier curve between two points.
- * The control point is offset perpendicular to the line joining origin and
- * destination by a fraction of the inter-body distance, creating an arc.
- *
- * @param legIndex  Leg index within a route (used to alternate arc direction for
- *                  multi-leg routes so arcs don't overlap).
- */
-function _bezierControlPoint(
-  ox: number, oy: number,
-  dx: number, dy: number,
-  legIndex: number,
-): { cpx: number; cpy: number } {
-  const mx = (ox + dx) / 2;
-  const my = (oy + dy) / 2;
-
-  const lineLen = Math.hypot(dx - ox, dy - oy);
-  const offset = lineLen * BEZIER_OFFSET_FACTOR;
-
-  // Perpendicular direction (normalised).
-  const perpX = -(dy - oy) / (lineLen || 1);
-  const perpY =  (dx - ox) / (lineLen || 1);
-
-  // Alternate direction for even/odd legs so multi-leg arcs fan out.
-  const sign = legIndex % 2 === 0 ? 1 : -1;
-
-  return {
-    cpx: mx + perpX * offset * sign,
-    cpy: my + perpY * offset * sign,
-  };
-}
-
-/**
- * Evaluate a point on a quadratic Bezier curve at parameter t in [0, 1].
- */
-function _evalQuadBezier(
-  ox: number, oy: number,
-  cpx: number, cpy: number,
-  dx: number, dy: number,
-  t: number,
-): { x: number; y: number } {
-  const u = 1 - t;
-  return {
-    x: u * u * ox + 2 * u * t * cpx + t * t * dx,
-    y: u * u * oy + 2 * u * t * cpy + t * t * dy,
-  };
-}
 
 /**
  * Draw a dashed quadratic Bezier curve by approximating it with short line
@@ -1811,7 +1759,7 @@ function _drawDashedBezier(
   const pts: { x: number; y: number }[] = [{ x: ox, y: oy }];
   for (let i = 1; i <= SAMPLES; i++) {
     const t = i / SAMPLES;
-    pts.push(_evalQuadBezier(ox, oy, cpx, cpy, dx, dy, t));
+    pts.push(evalQuadBezier(ox, oy, cpx, cpy, dx, dy, t));
   }
 
   // Walk along the polyline, emitting dash / gap segments.
@@ -1907,17 +1855,16 @@ function _drawRouteOverlay(
         const pairKey = [leg.origin.bodyId, leg.destination.bodyId].sort().join(':');
         activeRoutePairs.add(pairKey);
 
-        const color = route.status === 'active' ? ROUTE_ACTIVE_COLOR
-                    : route.status === 'broken' ? ROUTE_BROKEN_COLOR
-                    : ROUTE_PAUSED_COLOR;
+        const statusKey = route.status as keyof typeof ROUTE_STATUS_COLORS;
+        const color = (ROUTE_STATUS_COLORS[statusKey] ?? ROUTE_STATUS_COLORS.active).num;
 
         const alpha = route.status === 'paused' ? 0.4 : 0.7;
 
-        const cp = _bezierControlPoint(oPos.x, oPos.y, dPos.x, dPos.y, legIdx);
+        const { cx: cpx, cy: cpy } = bezierControlPoint(oPos.x, oPos.y, dPos.x, dPos.y, legIdx);
 
         // Draw solid Bezier curve.
         _routeGraphics.moveTo(oPos.x, oPos.y);
-        _routeGraphics.quadraticCurveTo(cp.cpx, cp.cpy, dPos.x, dPos.y);
+        _routeGraphics.quadraticCurveTo(cpx, cpy, dPos.x, dPos.y);
         _routeGraphics.stroke({ color, width: 2, alpha });
 
         // Cache arc info for tooltip hit-testing.
@@ -1929,7 +1876,7 @@ function _drawRouteOverlay(
           throughput: route.throughputPerPeriod,
           isEarthBound,
           ox: oPos.x, oy: oPos.y,
-          cpx: cp.cpx, cpy: cp.cpy,
+          cpx, cpy,
           dx: dPos.x, dy: dPos.y,
         });
 
@@ -1941,7 +1888,7 @@ function _drawRouteOverlay(
 
             // Distribute dots evenly along the curve with a time-based offset.
             const t = ((_flowDotTime * FLOW_DOT_SPEED + d / DOTS_PER_LEG) % 1 + 1) % 1;
-            const pos = _evalQuadBezier(oPos.x, oPos.y, cp.cpx, cp.cpy, dPos.x, dPos.y, t);
+            const pos = evalQuadBezier(oPos.x, oPos.y, cpx, cpy, dPos.x, dPos.y, t);
 
             dot.x = pos.x;
             dot.y = pos.y;
@@ -1970,12 +1917,12 @@ function _drawRouteOverlay(
       if (!oPos || !dPos) continue;
       if (Math.abs(oPos.x - dPos.x) < 1 && Math.abs(oPos.y - dPos.y) < 1) continue;
 
-      const cp = _bezierControlPoint(oPos.x, oPos.y, dPos.x, dPos.y, i);
+      const { cx: cpx, cy: cpy } = bezierControlPoint(oPos.x, oPos.y, dPos.x, dPos.y, i);
 
       _drawDashedBezier(
         _routeGraphics,
         oPos.x, oPos.y,
-        cp.cpx, cp.cpy,
+        cpx, cpy,
         dPos.x, dPos.y,
         PROVEN_LEG_COLOR,
         0.5,
@@ -2018,7 +1965,7 @@ function _distToBezier(
   let minDist = Infinity;
   for (let i = 0; i <= BEZIER_HIT_SAMPLES; i++) {
     const t = i / BEZIER_HIT_SAMPLES;
-    const pt = _evalQuadBezier(ox, oy, cpx, cpy, dx, dy, t);
+    const pt = evalQuadBezier(ox, oy, cpx, cpy, dx, dy, t);
     const d = Math.hypot(pt.x - px, pt.y - py);
     if (d < minDist) minDist = d;
   }

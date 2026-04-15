@@ -2,19 +2,6 @@
    Logistics Center — CSS
    =========================================================================== */
 
-/* Body Colors — single source of truth, read at runtime by getBodyColor() in _routeMap.ts */
-:root {
-  --body-color-sun: #FFD700;
-  --body-color-earth: #4488CC;
-  --body-color-moon: #999999;
-  --body-color-mars: #CC5533;
-  --body-color-ceres: #887766;
-  --body-color-jupiter: #CC9955;
-  --body-color-saturn: #CCBB77;
-  --body-color-titan: #AA8844;
-  --body-color-default: #666666;
-}
-
 /* Logistics panel layout */
 #logistics-overlay {
   /* uses facility-overlay class, no extra styles needed */

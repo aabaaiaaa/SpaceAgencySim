@@ -1,36 +1,37 @@
 import { describe, it, expect } from 'vitest';
 import { getBodyColor, formatLocation } from '../ui/logistics/_routeMap.ts';
+import { BODY_COLORS, DEFAULT_BODY_COLOR } from '../core/mapGeometry.ts';
 import type { RouteLocation } from '../core/gameState.ts';
 
 // ---------------------------------------------------------------------------
 // getBodyColor()
 // ---------------------------------------------------------------------------
-// Unit tests run in Node.js (environment: 'node' in vite.config.ts) so
-// `typeof document === 'undefined'` is true.  The function's fallback path
-// returns '#888' for every bodyId.  A full DOM test would require jsdom or
-// a browser environment; the CSS custom property read path is covered by
-// the E2E suite instead.
+// getBodyColor is now a re-export of getBodyColorHex from core/mapGeometry.
+// It returns actual hex colors from the BODY_COLORS map instead of relying
+// on CSS custom properties.  No DOM dependency — works identically in Node
+// and browser environments.
 // ---------------------------------------------------------------------------
 
 describe('getBodyColor()', () => {
-  it('@smoke returns fallback #888 when DOM is unavailable (Node env)', () => {
-    expect(getBodyColor('earth')).toBe('#888');
+  it('@smoke returns correct hex color for known bodies', () => {
+    expect(getBodyColor('earth')).toBe(BODY_COLORS.earth);
+    expect(getBodyColor('EARTH')).toBe(BODY_COLORS.earth);
   });
 
-  it('returns fallback for any arbitrary bodyId string', () => {
-    expect(getBodyColor('MARS')).toBe('#888');
-    expect(getBodyColor('moon')).toBe('#888');
-    expect(getBodyColor('jupiter')).toBe('#888');
-    expect(getBodyColor('saturn')).toBe('#888');
-    expect(getBodyColor('titan')).toBe('#888');
-    expect(getBodyColor('ceres')).toBe('#888');
-    expect(getBodyColor('sun')).toBe('#888');
+  it('returns correct colors for all known bodies (case-insensitive)', () => {
+    expect(getBodyColor('MARS')).toBe(BODY_COLORS.mars);
+    expect(getBodyColor('moon')).toBe(BODY_COLORS.moon);
+    expect(getBodyColor('jupiter')).toBe(BODY_COLORS.jupiter);
+    expect(getBodyColor('saturn')).toBe(BODY_COLORS.saturn);
+    expect(getBodyColor('titan')).toBe(BODY_COLORS.titan);
+    expect(getBodyColor('ceres')).toBe(BODY_COLORS.ceres);
+    expect(getBodyColor('sun')).toBe(BODY_COLORS.sun);
   });
 
-  it('returns fallback for unknown body names', () => {
-    expect(getBodyColor('pluto')).toBe('#888');
-    expect(getBodyColor('unknown')).toBe('#888');
-    expect(getBodyColor('')).toBe('#888');
+  it('returns default color for unknown body names', () => {
+    expect(getBodyColor('pluto')).toBe(DEFAULT_BODY_COLOR);
+    expect(getBodyColor('unknown')).toBe(DEFAULT_BODY_COLOR);
+    expect(getBodyColor('')).toBe(DEFAULT_BODY_COLOR);
   });
 
   it('accepts any string as bodyId (type signature check)', () => {
