@@ -427,11 +427,9 @@ function parseEnvelope(raw: string | null): SaveEnvelope | null {
  * @throws {RangeError} If slotIndex is out of bounds.
  * @throws {Error}      If the slot is empty or the stored data is corrupt.
  */
-export async function loadGame(slotIndex: number): Promise<GameState> {
-  logger.debug('save', 'Loading game', { slotIndex });
-  assertValidSlot(slotIndex);
-
-  const key = slotKey(slotIndex);
+export async function loadGame(slotIndex: number, storageKey?: string): Promise<GameState> {
+  logger.debug('save', 'Loading game', { slotIndex, storageKey });
+  const key = storageKey ?? (assertValidSlot(slotIndex), slotKey(slotIndex));
 
   // Check localStorage.
   const lsRaw = localStorage.getItem(key);
@@ -652,10 +650,10 @@ export function listSaves(): (SaveSlotSummary | null)[] {
  * @throws {RangeError} If slotIndex is out of bounds.
  * @throws {Error}      If the slot is empty, corrupt, or no DOM is available.
  */
-export function exportSave(slotIndex: number): void {
-  assertValidSlot(slotIndex);
+export function exportSave(slotIndex: number, storageKey?: string): void {
+  const key = storageKey ?? (assertValidSlot(slotIndex), slotKey(slotIndex));
 
-  const raw = localStorage.getItem(slotKey(slotIndex));
+  const raw = localStorage.getItem(key);
   if (raw === null) {
     throw new Error(`Save slot ${slotIndex} is empty; nothing to export.`);
   }

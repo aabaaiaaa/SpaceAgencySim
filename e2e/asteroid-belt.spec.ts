@@ -384,6 +384,11 @@ test.describe('Asteroid Belt — zone definitions', () => {
   test.afterEach(async () => { await page.close(); });
 
   test('@smoke belt zones are defined on the Sun body with correct boundaries', async () => {
+    await page.waitForFunction(
+      () => window.__celestialBodies?.SUN?.altitudeBands?.length > 0,
+      { timeout: 10_000 },
+    );
+
     const beltInfo = await page.evaluate<BeltBandInfo[] | null>(() => {
       const sun = window.__celestialBodies?.SUN;
       if (!sun) return null;

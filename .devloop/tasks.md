@@ -1,7 +1,7 @@
 # Iteration 15 — Tasks
 
 ### TASK-001: Add storageKey parameter to loadGame and exportSave
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/core/saveload.ts`, add an optional `storageKey?: string` parameter to `loadGame()` (line ~430) and `exportSave()` (line ~655). When provided, use it directly and skip `assertValidSlot()` + `slotKey()` derivation. Follow the exact pattern already used by `deleteSave()`: `const key = storageKey ?? (assertValidSlot(slotIndex), slotKey(slotIndex));`. Replace all subsequent uses of `slotKey(slotIndex)` in both functions with the resolved `key` variable. See requirements.md Section 1 for full context.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts`
@@ -25,7 +25,7 @@
 - **Verification**: `npx playwright test e2e/auto-save.spec.ts`
 
 ### TASK-005: Stabilize flaky asteroid belt E2E test
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `e2e/asteroid-belt.spec.ts`, in the test at line ~386 ("belt zones are defined on the Sun body with correct boundaries"), add `await page.waitForFunction(() => window.__celestialBodies?.SUN?.altitudeBands?.length > 0, { timeout: 10_000 })` before the `page.evaluate()` call that reads belt zone data. This fixes the race condition where the hub overlay appears before `__celestialBodies` is fully populated. See requirements.md Section 2.
 - **Verification**: `npx playwright test e2e/asteroid-belt.spec.ts --grep "belt zones"`
