@@ -37,7 +37,7 @@
 - **Verification**: `npx vitest run src/tests/autoSave.test.ts` — all tests pass.
 
 ### TASK-007: Migrate settingsStore.ts from localStorage to IndexedDB
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-004
 - **Description**: Replace localStorage with IDB for settings persistence. `loadSettings()` reads from IDB (async). `persistSettings()` writes to IDB. `_hasExistingSettings()` checks IDB. Implement an in-memory cache: settings are loaded from IDB once at init (awaited), then served synchronously from cache. Only writes go to IDB. This preserves the current synchronous read pattern for consumers. See requirements.md section 2d.
 - **Verification**: `npx vitest run src/tests/settingsStore.test.ts` — all tests pass.

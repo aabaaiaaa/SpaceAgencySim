@@ -317,18 +317,15 @@ export async function saveGame(state: GameState, slotIndex: number, saveName: st
   // Sync current settings to the dedicated settings key on every save,
   // ensuring the dedicated store stays up-to-date even if a settings
   // mutation path didn't call saveSettings() directly.
-  // Best-effort: don't let a settings write failure block the actual save.
-  try {
-    saveSettings({
-      difficultySettings: { ...state.difficultySettings },
-      autoSaveEnabled:    state.autoSaveEnabled,
-      debugMode:          state.debugMode,
-      showPerfDashboard:  state.showPerfDashboard,
-      malfunctionMode:    state.malfunctionMode as MalfunctionModeType,
-    });
-  } catch {
-    // Settings sync is non-critical — the save itself is what matters.
-  }
+  // Best-effort fire-and-forget — cache is updated synchronously,
+  // IDB write failure won't block the actual save.
+  void saveSettings({
+    difficultySettings: { ...state.difficultySettings },
+    autoSaveEnabled:    state.autoSaveEnabled,
+    debugMode:          state.debugMode,
+    showPerfDashboard:  state.showPerfDashboard,
+    malfunctionMode:    state.malfunctionMode as MalfunctionModeType,
+  });
 
   const envelope: SaveEnvelope = {
     saveName: String(saveName),

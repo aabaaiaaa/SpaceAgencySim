@@ -54,7 +54,7 @@ export function onKeyDown(e: KeyboardEvent): void {
       s.state.showPerfDashboard = !s.state.showPerfDashboard;
       // Persist the change to the dedicated settings key so it survives
       // across saves and save deletions.
-      saveSettings({
+      void saveSettings({
         difficultySettings: { ...s.state.difficultySettings },
         autoSaveEnabled:    s.state.autoSaveEnabled,
         debugMode:          s.state.debugMode,

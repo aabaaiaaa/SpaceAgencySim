@@ -22,6 +22,7 @@ import { CELESTIAL_BODIES, isLandable } from './data/bodies.ts';
 import { getPartById } from './data/parts.ts';
 import { autoSaveImmediate } from './ui/autoSaveToast.ts';
 import { isAutoSaveEnabled, AUTO_SAVE_KEY } from './core/autoSave.ts';
+import { initSettings } from './core/settingsStore.ts';
 import { logger } from './core/logger.ts';
 
 // E2E test API options for programmatic flight launches.
@@ -60,6 +61,12 @@ declare global {
 
 async function main() {
   logger.debug('app', 'Game starting');
+
+  // ── Settings ───────────────────────────────────────────────────────────
+  // Load persisted settings from IndexedDB into the in-memory cache before
+  // anything else runs, so loadSettings() can serve reads synchronously.
+  await initSettings();
+
   const canvas    = document.getElementById('game-canvas') as HTMLCanvasElement;
   const uiOverlay = document.getElementById('ui-overlay')!;
 

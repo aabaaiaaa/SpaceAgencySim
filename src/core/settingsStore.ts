@@ -3,17 +3,23 @@
  *
  * Settings (difficulty, auto-save, debug mode, etc.) currently live inside
  * GameState and are saved/loaded per save slot.  Deleting a save loses them.
- * This module stores settings under a dedicated localStorage key so they
+ * This module stores settings under a dedicated IndexedDB key so they
  * survive save deletion and apply across all slots.
  *
- * NO SIDE EFFECTS ON IMPORT — callers must explicitly call loadSettings(),
- * saveSettings(), or migrateSettings().
+ * Uses an in-memory cache: `initSettings()` loads from IDB once at startup
+ * (must be awaited), then `loadSettings()` serves reads synchronously from
+ * cache.  Only writes go to IDB.
+ *
+ * NO SIDE EFFECTS ON IMPORT — callers must explicitly call initSettings(),
+ * loadSettings(), saveSettings(), or migrateSettings().
  */
 
 import {
   DEFAULT_DIFFICULTY_SETTINGS,
   MalfunctionMode,
 } from './constants.ts';
+
+import { idbGet, idbSet } from './idbStorage.ts';
 
 import type { DifficultySettings, MalfunctionMode as MalfunctionModeType } from './constants.ts';
 import type { GameState } from './gameState.ts';
@@ -22,7 +28,7 @@ import type { GameState } from './gameState.ts';
 // Constants
 // ---------------------------------------------------------------------------
 
-/** localStorage key for persisted settings. */
+/** IDB key for persisted settings. */
 const STORAGE_KEY = 'spaceAgency_settings';
 
 /** Current schema version — bump when the shape changes. */
@@ -56,7 +62,7 @@ const MIGRATIONS: Array<[number, MigrationFn]> = [];
  * fromVersion >= envelope.version, in order.  Returns a new envelope with
  * version set to SCHEMA_VERSION.
  *
- * The caller (loadSettings) runs mergeWithDefaults() after this, which fills
+ * The caller (initSettings) runs mergeWithDefaults() after this, which fills
  * any fields the migrations didn't set.
  */
 function _migrateSettings(envelope: SettingsEnvelope): SettingsEnvelope {
@@ -97,11 +103,28 @@ export interface PersistedSettings {
   malfunctionMode: MalfunctionModeType;
 }
 
-/** Internal envelope stored in localStorage (wraps settings + metadata). */
+/** Internal envelope stored in IDB (wraps settings + metadata). */
 interface SettingsEnvelope {
   version: number;
   settings: PersistedSettings;
 }
+
+// ---------------------------------------------------------------------------
+// In-memory cache
+// ---------------------------------------------------------------------------
+
+/**
+ * Cached settings loaded from IDB.  Populated by initSettings(), read by
+ * loadSettings(), updated by saveSettings().
+ */
+let _cache: PersistedSettings | null = null;
+
+/**
+ * True once settings have been persisted to IDB at least once (either loaded
+ * during init or written via saveSettings).  Used by migrateSettings() to
+ * skip writing when a dedicated settings key already exists.
+ */
+let _hasPersistedSettings = false;
 
 // ---------------------------------------------------------------------------
 // Defaults
@@ -126,41 +149,57 @@ function defaultSettings(): PersistedSettings {
 // ---------------------------------------------------------------------------
 
 /**
- * Load settings from the dedicated localStorage key.
+ * Initialise the settings cache from IndexedDB.  Must be awaited once at
+ * application startup before any other settings function is called.
  *
- * If the key is missing, corrupt, or has an unrecognised schema version the
- * function returns default settings without throwing.
+ * After this returns, `loadSettings()` serves reads synchronously from cache.
  */
-export function loadSettings(): PersistedSettings {
+export async function initSettings(): Promise<void> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw === null) return defaultSettings();
-
-    const envelope: unknown = JSON.parse(raw);
-    if (!isValidEnvelope(envelope)) return defaultSettings();
-
-    // Apply any pending schema migrations, then merge with defaults so any
-    // newly-added fields get a value.
-    const migrated = _migrateSettings(envelope);
-    return mergeWithDefaults(migrated.settings);
+    const raw = await idbGet(STORAGE_KEY);
+    if (raw !== null) {
+      const envelope: unknown = JSON.parse(raw);
+      if (isValidEnvelope(envelope)) {
+        const migrated = _migrateSettings(envelope);
+        _cache = mergeWithDefaults(migrated.settings);
+        _hasPersistedSettings = true;
+        return;
+      }
+    }
   } catch {
-    // JSON parse error or any other runtime issue — fall back to defaults.
-    return defaultSettings();
+    // JSON parse error or IDB failure — fall through to defaults.
   }
+  _cache = defaultSettings();
 }
 
 /**
- * Persist settings to the dedicated localStorage key.
+ * Load settings from the in-memory cache (synchronous).
  *
- * Wraps the settings in an envelope with a schema version so future
- * migrations can detect and upgrade the format.
+ * If initSettings() has not been called yet, returns default settings.
+ * If the cached data was corrupt or missing, returns default settings.
  */
-export function saveSettings(settings: PersistedSettings): void {
+export function loadSettings(): PersistedSettings {
+  return _cache ?? defaultSettings();
+}
+
+/**
+ * Persist settings to IndexedDB.
+ *
+ * Updates the in-memory cache synchronously so subsequent `loadSettings()`
+ * calls immediately reflect the change.  The IDB write happens asynchronously;
+ * callers that do not need confirmation of the write can ignore the returned
+ * Promise.
+ */
+export function saveSettings(settings: PersistedSettings): Promise<void> {
+  // Update cache immediately so synchronous reads see the new values.
+  _cache = { ...settings };
+  _hasPersistedSettings = true;
+
   const envelope: SettingsEnvelope = {
     version: SCHEMA_VERSION,
     settings,
   };
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(envelope));
+  return idbSet(STORAGE_KEY, JSON.stringify(envelope));
 }
 
 /**
@@ -170,13 +209,16 @@ export function saveSettings(settings: PersistedSettings): void {
  * Only writes if the dedicated key does not already exist, so a previously
  * persisted independent store is never overwritten by stale save data.
  *
+ * The IDB write is fire-and-forget — the in-memory cache is updated
+ * synchronously so a subsequent loadSettings() returns the migrated values.
+ *
  * @param gameState  Any object with the legacy settings fields (typically the
  *                   result of loading a save slot).  Missing fields are filled
  *                   from defaults.
  */
 export function migrateSettings(gameState: GameState | Record<string, unknown>): void {
   // Do not overwrite an existing dedicated store.
-  if (localStorage.getItem(STORAGE_KEY) !== null) return;
+  if (_hasPersistedSettings) return;
 
   const settings = defaultSettings();
 
@@ -203,7 +245,16 @@ export function migrateSettings(gameState: GameState | Record<string, unknown>):
     settings.malfunctionMode = gameState.malfunctionMode as MalfunctionModeType;
   }
 
-  saveSettings(settings);
+  void saveSettings(settings);
+}
+
+/**
+ * Resets the in-memory cache and persistence flag.
+ * Exported ONLY for testing — do not call from game logic.
+ */
+export function _resetCacheForTesting(): void {
+  _cache = null;
+  _hasPersistedSettings = false;
 }
 
 // ---------------------------------------------------------------------------

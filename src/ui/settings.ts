@@ -35,7 +35,7 @@ import type { DifficultySettings, MalfunctionMode as MalfunctionModeType } from 
 
 /**
  * Gathers the settings fields from GameState and writes them to the
- * dedicated localStorage key via settingsStore.  Called after every
+ * dedicated IDB key via settingsStore.  Called after every
  * user-initiated change so settings survive save deletion.
  */
 function persistCurrentSettings(state: GameState): void {
@@ -46,7 +46,7 @@ function persistCurrentSettings(state: GameState): void {
     showPerfDashboard:  state.showPerfDashboard,
     malfunctionMode:    state.malfunctionMode as MalfunctionModeType,
   };
-  saveSettings(persisted);
+  void saveSettings(persisted);
 }
 
 // ---------------------------------------------------------------------------

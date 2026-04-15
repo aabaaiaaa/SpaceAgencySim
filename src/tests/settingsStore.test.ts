@@ -10,53 +10,62 @@
  *   - Migration from old save format
  *   - Migration doesn't overwrite existing settings
  *   - Partial settings merge with defaults
- *   - Independent persistence (survives unrelated localStorage changes)
+ *   - Independent persistence (survives unrelated IDB key changes)
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+
+// ---------------------------------------------------------------------------
+// In-memory IDB mock — shared between mock factory and test code
+// ---------------------------------------------------------------------------
+
+const _idbStore = new Map<string, string>();
+
+vi.mock('../core/idbStorage.js', () => ({
+  idbSet: vi.fn((key: string, value: string) => {
+    _idbStore.set(key, value);
+    return Promise.resolve();
+  }),
+  idbGet: vi.fn((key: string) => {
+    return Promise.resolve(_idbStore.has(key) ? _idbStore.get(key)! : null);
+  }),
+  idbDelete: vi.fn((key: string) => {
+    _idbStore.delete(key);
+    return Promise.resolve();
+  }),
+  idbGetAllKeys: vi.fn(() => {
+    return Promise.resolve([..._idbStore.keys()]);
+  }),
+}));
+
 import {
+  initSettings,
   loadSettings,
   saveSettings,
   migrateSettings,
+  _resetCacheForTesting,
 } from '../core/settingsStore.ts';
 import type { PersistedSettings } from '../core/settingsStore.ts';
 import { DEFAULT_DIFFICULTY_SETTINGS, MalfunctionMode } from '../core/constants.ts';
 
 // ---------------------------------------------------------------------------
-// localStorage mock
+// Setup / teardown
 // ---------------------------------------------------------------------------
 
-/**
- * A simple in-memory localStorage replacement that fulfils the subset of the
- * Web Storage API used by settingsStore.ts (getItem / setItem / removeItem).
- */
-function createLocalStorageMock() {
-  const store = new Map<string, string>();
-  return {
-    getItem(key: string) { return store.has(key) ? store.get(key)! : null; },
-    setItem(key: string, value: string) { store.set(key, String(value)); },
-    removeItem(key: string) { store.delete(key); },
-    clear() { store.clear(); },
-    get length() { return store.size; },
-  };
-}
-
-let mockStorage: ReturnType<typeof createLocalStorageMock>;
-
 beforeEach(() => {
-  mockStorage = createLocalStorageMock();
-  vi.stubGlobal('localStorage', mockStorage);
+  _idbStore.clear();
+  _resetCacheForTesting();
 });
 
 afterEach(() => {
-  vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** The localStorage key used by settingsStore.ts. */
+/** The IDB key used by settingsStore.ts. */
 const STORAGE_KEY = 'spaceAgency_settings';
 
 /** Returns a non-default settings object for testing round-trips. */
@@ -95,9 +104,9 @@ describe('settingsStore', () => {
   // -----------------------------------------------------------------------
 
   describe('round-trip', () => {
-    it('should save settings and load them back identically @smoke', () => {
+    it('should save settings and load them back identically @smoke', async () => {
       const settings = customSettings();
-      saveSettings(settings);
+      await saveSettings(settings);
 
       const loaded = loadSettings();
       expect(loaded).to.deep.equal(settings);
@@ -109,7 +118,8 @@ describe('settingsStore', () => {
   // -----------------------------------------------------------------------
 
   describe('default values', () => {
-    it('should return default settings when localStorage is empty', () => {
+    it('should return default settings when IDB is empty', async () => {
+      await initSettings();
       const loaded = loadSettings();
       expect(loaded).to.deep.equal(expectedDefaults());
     });
@@ -120,16 +130,18 @@ describe('settingsStore', () => {
   // -----------------------------------------------------------------------
 
   describe('corrupt data handling', () => {
-    it('should return defaults when stored value is invalid JSON', () => {
-      mockStorage.setItem(STORAGE_KEY, '{not valid json!!!');
+    it('should return defaults when stored value is invalid JSON', async () => {
+      _idbStore.set(STORAGE_KEY, '{not valid json!!!');
 
+      await initSettings();
       const loaded = loadSettings();
       expect(loaded).to.deep.equal(expectedDefaults());
     });
 
-    it('should return defaults when stored value is a bare string', () => {
-      mockStorage.setItem(STORAGE_KEY, '"just a string"');
+    it('should return defaults when stored value is a bare string', async () => {
+      _idbStore.set(STORAGE_KEY, '"just a string"');
 
+      await initSettings();
       const loaded = loadSettings();
       expect(loaded).to.deep.equal(expectedDefaults());
     });
@@ -140,37 +152,41 @@ describe('settingsStore', () => {
   // -----------------------------------------------------------------------
 
   describe('invalid envelope handling', () => {
-    it('should return defaults when envelope has no version field', () => {
-      mockStorage.setItem(STORAGE_KEY, JSON.stringify({
+    it('should return defaults when envelope has no version field', async () => {
+      _idbStore.set(STORAGE_KEY, JSON.stringify({
         settings: expectedDefaults(),
       }));
 
+      await initSettings();
       const loaded = loadSettings();
       expect(loaded).to.deep.equal(expectedDefaults());
     });
 
-    it('should return defaults when envelope has no settings field', () => {
-      mockStorage.setItem(STORAGE_KEY, JSON.stringify({
+    it('should return defaults when envelope has no settings field', async () => {
+      _idbStore.set(STORAGE_KEY, JSON.stringify({
         version: 1,
       }));
 
+      await initSettings();
       const loaded = loadSettings();
       expect(loaded).to.deep.equal(expectedDefaults());
     });
 
-    it('should return defaults when envelope settings field is null', () => {
-      mockStorage.setItem(STORAGE_KEY, JSON.stringify({
+    it('should return defaults when envelope settings field is null', async () => {
+      _idbStore.set(STORAGE_KEY, JSON.stringify({
         version: 1,
         settings: null,
       }));
 
+      await initSettings();
       const loaded = loadSettings();
       expect(loaded).to.deep.equal(expectedDefaults());
     });
 
-    it('should return defaults when stored value is null JSON', () => {
-      mockStorage.setItem(STORAGE_KEY, 'null');
+    it('should return defaults when stored value is null JSON', async () => {
+      _idbStore.set(STORAGE_KEY, 'null');
 
+      await initSettings();
       const loaded = loadSettings();
       expect(loaded).to.deep.equal(expectedDefaults());
     });
@@ -181,24 +197,26 @@ describe('settingsStore', () => {
   // -----------------------------------------------------------------------
 
   describe('wrong version handling', () => {
-    it('should return defaults when envelope has version 0', () => {
-      mockStorage.setItem(STORAGE_KEY, JSON.stringify({
+    it('should return defaults when envelope has version 0', async () => {
+      _idbStore.set(STORAGE_KEY, JSON.stringify({
         version: 0,
         settings: customSettings(),
       }));
 
+      await initSettings();
       const loaded = loadSettings();
       expect(loaded).to.deep.equal(expectedDefaults());
     });
 
-    it('should return defaults when envelope has version 99 (future version) and log a warning', () => {
+    it('should return defaults when envelope has version 99 (future version) and log a warning', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-      mockStorage.setItem(STORAGE_KEY, JSON.stringify({
+      _idbStore.set(STORAGE_KEY, JSON.stringify({
         version: 99,
         settings: customSettings(),
       }));
 
+      await initSettings();
       const loaded = loadSettings();
       expect(loaded).to.deep.equal(expectedDefaults());
       expect(warnSpy).toHaveBeenCalledOnce();
@@ -207,12 +225,13 @@ describe('settingsStore', () => {
       warnSpy.mockRestore();
     });
 
-    it('should return defaults when version is a string instead of number', () => {
-      mockStorage.setItem(STORAGE_KEY, JSON.stringify({
+    it('should return defaults when version is a string instead of number', async () => {
+      _idbStore.set(STORAGE_KEY, JSON.stringify({
         version: '1',
         settings: customSettings(),
       }));
 
+      await initSettings();
       const loaded = loadSettings();
       expect(loaded).to.deep.equal(expectedDefaults());
     });
@@ -223,45 +242,49 @@ describe('settingsStore', () => {
   // -----------------------------------------------------------------------
 
   describe('schema migration', () => {
-    it('should pass a version-1 envelope through the migration path unchanged', () => {
+    it('should pass a version-1 envelope through the migration path unchanged', async () => {
       const settings = customSettings();
-      mockStorage.setItem(STORAGE_KEY, JSON.stringify({
+      _idbStore.set(STORAGE_KEY, JSON.stringify({
         version: 1,
         settings,
       }));
 
+      await initSettings();
       const loaded = loadSettings();
       expect(loaded).to.deep.equal(settings);
     });
 
-    it('should reject version < 1 and return defaults', () => {
-      mockStorage.setItem(STORAGE_KEY, JSON.stringify({
+    it('should reject version < 1 and return defaults', async () => {
+      _idbStore.set(STORAGE_KEY, JSON.stringify({
         version: -1,
         settings: customSettings(),
       }));
 
+      await initSettings();
       const loaded = loadSettings();
       expect(loaded).to.deep.equal(expectedDefaults());
     });
 
-    it('should reject version 0 and return defaults', () => {
-      mockStorage.setItem(STORAGE_KEY, JSON.stringify({
+    it('should reject version 0 and return defaults', async () => {
+      _idbStore.set(STORAGE_KEY, JSON.stringify({
         version: 0,
         settings: customSettings(),
       }));
 
+      await initSettings();
       const loaded = loadSettings();
       expect(loaded).to.deep.equal(expectedDefaults());
     });
 
-    it('should reject version > SCHEMA_VERSION with a console warning', () => {
+    it('should reject version > SCHEMA_VERSION with a console warning', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
-      mockStorage.setItem(STORAGE_KEY, JSON.stringify({
+      _idbStore.set(STORAGE_KEY, JSON.stringify({
         version: 50,
         settings: customSettings(),
       }));
 
+      await initSettings();
       const loaded = loadSettings();
       expect(loaded).to.deep.equal(expectedDefaults());
       expect(warnSpy).toHaveBeenCalledOnce();
@@ -270,15 +293,16 @@ describe('settingsStore', () => {
       warnSpy.mockRestore();
     });
 
-    it('should load valid settings through the full migration code path', () => {
+    it('should load valid settings through the full migration code path', async () => {
       // Write a valid version-1 envelope with non-default settings and verify
       // it loads correctly through isValidEnvelope -> _migrateSettings -> mergeWithDefaults.
       const settings = customSettings();
-      mockStorage.setItem(STORAGE_KEY, JSON.stringify({
+      _idbStore.set(STORAGE_KEY, JSON.stringify({
         version: 1,
         settings,
       }));
 
+      await initSettings();
       const loaded = loadSettings();
       expect(loaded.autoSaveEnabled).to.equal(false);
       expect(loaded.debugMode).to.equal(true);
@@ -286,7 +310,7 @@ describe('settingsStore', () => {
       expect(loaded.malfunctionMode).to.equal(MalfunctionMode.FORCED);
     });
 
-    it('should fill missing fields from defaults after migration (partial envelope)', () => {
+    it('should fill missing fields from defaults after migration (partial envelope)', async () => {
       // Save an envelope at version 1 with only autoSaveEnabled and debugMode.
       // The migration pipeline (isValidEnvelope -> _migrateSettings -> mergeWithDefaults)
       // should preserve the specified fields and fill the rest from defaults.
@@ -297,8 +321,9 @@ describe('settingsStore', () => {
           debugMode: true,
         },
       };
-      mockStorage.setItem(STORAGE_KEY, JSON.stringify(partialEnvelope));
+      _idbStore.set(STORAGE_KEY, JSON.stringify(partialEnvelope));
 
+      await initSettings();
       const loaded = loadSettings();
 
       // Specified fields retain their saved values
@@ -311,15 +336,16 @@ describe('settingsStore', () => {
       expect(loaded.difficultySettings).to.deep.equal({ ...DEFAULT_DIFFICULTY_SETTINGS });
     });
 
-    it('should preserve all fields exactly when a version-1 envelope has every field populated', () => {
+    it('should preserve all fields exactly when a version-1 envelope has every field populated', async () => {
       // A fully-populated version-1 envelope should pass through the migration
       // pipeline completely unchanged — no field should be overwritten by defaults.
       const settings = customSettings();
-      mockStorage.setItem(STORAGE_KEY, JSON.stringify({
+      _idbStore.set(STORAGE_KEY, JSON.stringify({
         version: 1,
         settings,
       }));
 
+      await initSettings();
       const loaded = loadSettings();
       expect(loaded).to.deep.equal(settings);
       // Verify individual fields to confirm nothing was silently replaced
@@ -330,7 +356,7 @@ describe('settingsStore', () => {
       expect(loaded.difficultySettings.malfunctionFrequency).to.equal('high');
     });
 
-    it('should fill all fields from defaults when version-1 envelope has an empty settings object', () => {
+    it('should fill all fields from defaults when version-1 envelope has an empty settings object', async () => {
       // An empty settings object is still a valid object — the envelope passes
       // isValidEnvelope, _migrateSettings is a no-op (version already 1), and
       // mergeWithDefaults fills every field from defaults.
@@ -338,8 +364,9 @@ describe('settingsStore', () => {
         version: 1,
         settings: {},
       };
-      mockStorage.setItem(STORAGE_KEY, JSON.stringify(emptyEnvelope));
+      _idbStore.set(STORAGE_KEY, JSON.stringify(emptyEnvelope));
 
+      await initSettings();
       const loaded = loadSettings();
       expect(loaded).to.deep.equal(expectedDefaults());
     });
@@ -412,9 +439,9 @@ describe('settingsStore', () => {
     // 7. Migration doesn't overwrite existing
     // -------------------------------------------------------------------
 
-    it('should not overwrite existing settings when dedicated key already exists', () => {
+    it('should not overwrite existing settings when dedicated key already exists', async () => {
       const original = customSettings();
-      saveSettings(original);
+      await saveSettings(original);
 
       // Attempt migration with different values
       const legacyState: Record<string, unknown> = {
@@ -437,7 +464,7 @@ describe('settingsStore', () => {
   // -----------------------------------------------------------------------
 
   describe('partial settings merge with defaults', () => {
-    it('should fill in missing fields from defaults', () => {
+    it('should fill in missing fields from defaults', async () => {
       // Manually write an envelope with a partial settings object
       const partialEnvelope = {
         version: 1,
@@ -447,8 +474,9 @@ describe('settingsStore', () => {
           // showPerfDashboard, malfunctionMode, difficultySettings are missing
         },
       };
-      mockStorage.setItem(STORAGE_KEY, JSON.stringify(partialEnvelope));
+      _idbStore.set(STORAGE_KEY, JSON.stringify(partialEnvelope));
 
+      await initSettings();
       const loaded = loadSettings();
       expect(loaded.autoSaveEnabled).to.equal(false);
       expect(loaded.debugMode).to.equal(true);
@@ -457,7 +485,7 @@ describe('settingsStore', () => {
       expect(loaded.difficultySettings).to.deep.equal({ ...DEFAULT_DIFFICULTY_SETTINGS }); // default
     });
 
-    it('should merge partial difficultySettings with defaults', () => {
+    it('should merge partial difficultySettings with defaults', async () => {
       const partialEnvelope = {
         version: 1,
         settings: {
@@ -467,8 +495,9 @@ describe('settingsStore', () => {
           },
         },
       };
-      mockStorage.setItem(STORAGE_KEY, JSON.stringify(partialEnvelope));
+      _idbStore.set(STORAGE_KEY, JSON.stringify(partialEnvelope));
 
+      await initSettings();
       const loaded = loadSettings();
       expect(loaded.difficultySettings.malfunctionFrequency).to.equal('high');
       expect(loaded.difficultySettings.weatherSeverity).to.equal(DEFAULT_DIFFICULTY_SETTINGS.weatherSeverity);
@@ -476,7 +505,7 @@ describe('settingsStore', () => {
       expect(loaded.difficultySettings.injuryDuration).to.equal(DEFAULT_DIFFICULTY_SETTINGS.injuryDuration);
     });
 
-    it('should use default difficultySettings when stored value is not an object', () => {
+    it('should use default difficultySettings when stored value is not an object', async () => {
       const partialEnvelope = {
         version: 1,
         settings: {
@@ -484,8 +513,9 @@ describe('settingsStore', () => {
           autoSaveEnabled: false,
         },
       };
-      mockStorage.setItem(STORAGE_KEY, JSON.stringify(partialEnvelope));
+      _idbStore.set(STORAGE_KEY, JSON.stringify(partialEnvelope));
 
+      await initSettings();
       const loaded = loadSettings();
       expect(loaded.difficultySettings).to.deep.equal({ ...DEFAULT_DIFFICULTY_SETTINGS });
       expect(loaded.autoSaveEnabled).to.equal(false);
@@ -497,27 +527,27 @@ describe('settingsStore', () => {
   // -----------------------------------------------------------------------
 
   describe('independent persistence', () => {
-    it('should survive clearing unrelated localStorage keys', () => {
+    it('should survive clearing unrelated IDB keys', async () => {
       const settings = customSettings();
-      saveSettings(settings);
+      await saveSettings(settings);
 
       // Add and then remove unrelated keys
-      mockStorage.setItem('someOtherApp_data', '{}');
-      mockStorage.setItem('spaceAgency_save_0', '{"state":{}}');
-      mockStorage.removeItem('someOtherApp_data');
-      mockStorage.removeItem('spaceAgency_save_0');
+      _idbStore.set('someOtherApp_data', '{}');
+      _idbStore.set('spaceAgency_save_0', '{"state":{}}');
+      _idbStore.delete('someOtherApp_data');
+      _idbStore.delete('spaceAgency_save_0');
 
       const loaded = loadSettings();
       expect(loaded).to.deep.equal(settings);
     });
 
-    it('should persist independently of save slot data', () => {
+    it('should persist independently of save slot data', async () => {
       const settings = customSettings();
-      saveSettings(settings);
+      await saveSettings(settings);
 
       // Simulate clearing all save slots without affecting settings
       for (let i = 0; i < 5; i++) {
-        mockStorage.removeItem(`spaceAgency_save_${i}`);
+        _idbStore.delete(`spaceAgency_save_${i}`);
       }
 
       const loaded = loadSettings();
