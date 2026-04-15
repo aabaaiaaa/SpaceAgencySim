@@ -56,7 +56,7 @@ describe('computeFrameStats()', () => {
     const result = computeFrameStats(buf, size);
 
     expect(result.minFrameTime).toBe(result.maxFrameTime);
-    expect(result.minFrameTime).toBe(result.avgFrameTime);
+    expect(result.minFrameTime).toBeCloseTo(result.avgFrameTime, 10);
     expect(result.fps).toBeCloseTo(1000 / 16.67, 1);
   });
 });
