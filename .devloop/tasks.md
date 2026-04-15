@@ -25,7 +25,7 @@
 - **Verification**: `npx vitest run src/tests/idbStorage.test.ts` — existing tests pass plus new test for `idbGetAllKeys()`.
 
 ### TASK-005: Migrate saveload.ts from localStorage to IndexedDB
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-004
 - **Description**: Replace all `localStorage.getItem`/`setItem`/`removeItem` calls in `saveload.ts` with `idbGet`/`idbSet`/`idbDelete`. Key changes: `_persistCompressed()` writes to IDB only; `loadGame()` reads from IDB only (remove dual-source logic and sync-back); `deleteSave()` uses `idbDelete`; `exportSave()` reads from IDB; `listSaves()`/`discoverOverflowKeys()` use `idbGetAllKeys()` to scan keys. All public functions are already async. See requirements.md section 2b.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` — all non-removed tests pass (some tests will be updated in TASK-010).

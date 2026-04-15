@@ -1,7 +1,7 @@
 /**
  * saveload.ts — Save/Load system for the Space Agency simulation.
  *
- * Supports up to 5 named save slots in localStorage.
+ * Supports up to 5 named save slots stored in IndexedDB.
  * Storage keys: `spaceAgencySave_0` through `spaceAgencySave_4`.
  *
  * Each slot serialises the full game state as a JSON envelope:
@@ -17,7 +17,7 @@ import { compressToUTF16, decompressFromUTF16 } from 'lz-string';
 import { AstronautStatus, GameMode } from './constants.ts';
 import { crc32 } from './crc32.ts';
 import { logger } from './logger.ts';
-import { idbSet, idbGet, idbDelete, isIdbAvailable } from './idbStorage.ts';
+import { idbSet, idbGet, idbDelete, idbGetAllKeys } from './idbStorage.ts';
 import { loadSettings, migrateSettings, saveSettings } from './settingsStore.ts';
 
 import type { GameState } from './gameState.ts';
@@ -30,7 +30,7 @@ import type { MalfunctionMode as MalfunctionModeType } from './constants.ts';
 /** Total number of available save slots. */
 export const SAVE_SLOT_COUNT = 5;
 
-/** Prefix for localStorage keys. Full key = prefix + slotIndex. */
+/** Prefix for storage keys. Full key = prefix + slotIndex. */
 const SAVE_KEY_PREFIX = 'spaceAgencySave_';
 
 /**
@@ -84,7 +84,7 @@ export function _setSessionStartTimeForTesting(timestampMs: number): void {
 export interface SaveSlotSummary {
   /** Slot index (0–4 for manual slots, -1 for overflow/auto). */
   slotIndex: number;
-  /** The localStorage key for this save (e.g. 'spaceAgencySave_0', 'spaceAgencySave_auto'). */
+  /** The storage key for this save (e.g. 'spaceAgencySave_0', 'spaceAgencySave_auto'). */
   storageKey: string;
   /** Player-assigned label. */
   saveName: string;
@@ -116,7 +116,7 @@ export interface SaveSlotSummary {
   isAutoSave: boolean;
 }
 
-/** Raw save envelope stored in localStorage. */
+/** Raw save envelope stored in IndexedDB. */
 interface SaveEnvelope {
   saveName: string;
   timestamp: string;
@@ -232,7 +232,7 @@ function hasMagicBytes(bytes: Uint8Array): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Returns the localStorage key for a given slot index.
+ * Returns the storage key for a given slot index.
  */
 function slotKey(slotIndex: number): string {
   return `${SAVE_KEY_PREFIX}${slotIndex}`;
@@ -268,7 +268,7 @@ function countLivingCrew(state: { crew?: Array<{ status: AstronautStatus }> }): 
 }
 
 /**
- * Builds a SaveSlotSummary from an envelope object read from localStorage.
+ * Builds a SaveSlotSummary from a parsed envelope object.
  */
 function summaryFromEnvelope(slotIndex: number, envelope: SaveEnvelope, storageKey: string): SaveSlotSummary {
   const s = envelope.state;
@@ -349,24 +349,7 @@ export async function saveGame(state: GameState, slotIndex: number, saveName: st
     ratio: json.length > 0 ? ((1 - compressed.length / json.length) * 100).toFixed(1) + '%' : 'N/A',
   });
 
-  try {
-    localStorage.setItem(key, compressed);
-  } catch (err: unknown) {
-    if (err instanceof DOMException && err.name === 'QuotaExceededError') {
-      // localStorage full — attempt IndexedDB as fallback.
-      if (isIdbAvailable()) {
-        await idbSet(key, compressed);
-        return summaryFromEnvelope(slotIndex, envelope, key);
-      }
-      throw new Error('Storage full — unable to save. Delete old saves to free space.', { cause: err });
-    }
-    throw err;
-  }
-
-  // Mirror to IndexedDB (fire-and-forget).
-  if (isIdbAvailable()) {
-    idbSet(key, compressed).catch(err => logger.debug('saveload', 'IDB mirror write failed', err));
-  }
+  await idbSet(key, compressed);
 
   return summaryFromEnvelope(slotIndex, envelope, key);
 }
@@ -422,8 +405,7 @@ function parseEnvelope(raw: string | null): SaveEnvelope | null {
 /**
  * Loads and returns the full game state stored in the specified slot.
  *
- * Checks both localStorage and IndexedDB, using the most recent valid save.
- * Falls back to localStorage-only if IndexedDB is unavailable or errors.
+ * Reads exclusively from IndexedDB.
  *
  * The session timer is reset after loading so that play time continues
  * to accumulate correctly from this point forward.
@@ -435,40 +417,16 @@ export async function loadGame(slotIndex: number, storageKey?: string): Promise<
   logger.debug('save', 'Loading game', { slotIndex, storageKey });
   const key = storageKey ?? (assertValidSlot(slotIndex), slotKey(slotIndex));
 
-  // Check localStorage.
-  const lsRaw = localStorage.getItem(key);
-  const lsEnvelope = parseEnvelope(lsRaw);
-
-  // Check IndexedDB for a potentially newer or fallback save.
-  let idbEnvelope: SaveEnvelope | null = null;
-  let idbRaw: string | null = null;
-  if (isIdbAvailable()) {
-    try {
-      idbRaw = await idbGet(key);
-      idbEnvelope = parseEnvelope(idbRaw);
-    } catch {
-      // IndexedDB failed — proceed with localStorage only.
-    }
-  }
-
-  // Pick the most recent valid envelope.
-  let envelope: SaveEnvelope | null;
-  if (lsEnvelope && idbEnvelope) {
-    const lsTime = new Date(lsEnvelope.timestamp).getTime();
-    const idbTime = new Date(idbEnvelope.timestamp).getTime();
-    envelope = idbTime > lsTime ? idbEnvelope : lsEnvelope;
-  } else {
-    envelope = lsEnvelope ?? idbEnvelope;
-  }
+  const raw = await idbGet(key);
+  const envelope = parseEnvelope(raw);
 
   if (!envelope) {
-    // Provide specific error messages matching original behaviour.
-    if (lsRaw === null) {
+    if (raw === null) {
       throw new Error(`Save slot ${slotIndex} is empty.`);
     }
-    // localStorage had data but it was invalid — determine why.
+    // Storage had data but it was invalid — determine why.
     try {
-      const json = decompressSaveData(lsRaw);
+      const json = decompressSaveData(raw);
       const parsed = JSON.parse(json);
       if (!parsed || typeof parsed !== 'object' || !parsed.state) {
         throw new Error(`Save slot ${slotIndex} contains corrupt data (missing state field).`);
@@ -480,16 +438,6 @@ export async function loadGame(slotIndex: number, storageKey?: string): Promise<
       throw e;
     }
     throw new Error(`Save slot ${slotIndex} contains corrupt data.`);
-  }
-
-  // Write the chosen envelope back to localStorage if it came from IDB and
-  // localStorage was missing or stale, so subsequent loads see it.
-  if (envelope === idbEnvelope && envelope !== lsEnvelope && idbRaw) {
-    try {
-      localStorage.setItem(key, idbRaw);
-    } catch {
-      // Storage full — not critical, we already have the data.
-    }
   }
 
   // Determine the save format version.  Pre-versioning saves have no version
@@ -545,7 +493,7 @@ export function applyPersistedSettings(state: GameState): void {
 
 /**
  * Backward-compatible alias for loadGame.
- * @deprecated Use loadGame() directly — it now checks both localStorage and IndexedDB.
+ * @deprecated Use loadGame() directly.
  */
 export const loadGameAsync = loadGame;
 
@@ -564,14 +512,9 @@ export const loadGameAsync = loadGame;
  *
  * @throws {RangeError} If slotIndex is out of bounds and no storageKey is provided.
  */
-export function deleteSave(slotIndex: number, storageKey?: string): void {
+export async function deleteSave(slotIndex: number, storageKey?: string): Promise<void> {
   const key = storageKey ?? (assertValidSlot(slotIndex), slotKey(slotIndex));
-  localStorage.removeItem(key);
-
-  // Mirror deletion to IndexedDB (fire-and-forget).
-  if (isIdbAvailable()) {
-    idbDelete(key).catch(err => logger.debug('saveload', 'IDB mirror delete failed', err));
-  }
+  await idbDelete(key);
 }
 
 // ---------------------------------------------------------------------------
@@ -587,13 +530,13 @@ export function deleteSave(slotIndex: number, storageKey?: string): void {
  * (`spaceAgencySave_auto`); only populated slots are included in the
  * overflow section.
  */
-export function listSaves(): (SaveSlotSummary | null)[] {
+export async function listSaves(): Promise<(SaveSlotSummary | null)[]> {
   const result: (SaveSlotSummary | null)[] = [];
 
   // Always include the 5 manual slots (null for empty).
   for (let i = 0; i < SAVE_SLOT_COUNT; i++) {
     const key = slotKey(i);
-    const raw = localStorage.getItem(key);
+    const raw = await idbGet(key);
 
     if (raw === null) {
       result.push(null);
@@ -613,15 +556,19 @@ export function listSaves(): (SaveSlotSummary | null)[] {
     }
   }
 
-  // Scan overflow slots (5–99) and the dedicated auto-save key.
-  const overflowKeys: string[] = [];
-  for (let i = SAVE_SLOT_COUNT; i < 100; i++) {
-    overflowKeys.push(slotKey(i));
+  // Scan IDB for overflow keys (slots 5–99, auto-save, etc.).
+  const allKeys = await idbGetAllKeys();
+  const manualKeySet = new Set<string>();
+  for (let i = 0; i < SAVE_SLOT_COUNT; i++) {
+    manualKeySet.add(slotKey(i));
   }
-  overflowKeys.push('spaceAgencySave_auto');
 
-  for (const key of overflowKeys) {
-    const raw = localStorage.getItem(key);
+  for (const key of allKeys) {
+    // Skip manual slots (already included above) and non-save keys.
+    if (manualKeySet.has(key)) continue;
+    if (!key.startsWith(SAVE_KEY_PREFIX)) continue;
+
+    const raw = await idbGet(key);
     if (raw === null) continue;
 
     try {
@@ -654,10 +601,10 @@ export function listSaves(): (SaveSlotSummary | null)[] {
  * @throws {RangeError} If slotIndex is out of bounds.
  * @throws {Error}      If the slot is empty, corrupt, or no DOM is available.
  */
-export function exportSave(slotIndex: number, storageKey?: string): void {
+export async function exportSave(slotIndex: number, storageKey?: string): Promise<void> {
   const key = storageKey ?? (assertValidSlot(slotIndex), slotKey(slotIndex));
 
-  const raw = localStorage.getItem(key);
+  const raw = await idbGet(key);
   if (raw === null) {
     throw new Error(`Save slot ${slotIndex} is empty; nothing to export.`);
   }
@@ -714,13 +661,13 @@ export function exportSave(slotIndex: number, storageKey?: string): void {
  * 2. **Legacy JSON string**: plain JSON text as exported by older versions.
  *
  * The envelope and its embedded state are checked for required fields and
- * correct types before anything is written to localStorage; invalid input
+ * correct types before anything is written to storage; invalid input
  * is rejected with a descriptive error.
  *
  * @throws {RangeError} If slotIndex is out of bounds.
  * @throws {Error}      If the data is corrupted, malformed, or required fields are absent.
  */
-export function importSave(inputString: string, slotIndex: number): SaveSlotSummary {
+export async function importSave(inputString: string, slotIndex: number): Promise<SaveSlotSummary> {
   assertValidSlot(slotIndex);
 
   // --- Attempt new binary envelope format -----------------------------------
@@ -738,7 +685,7 @@ export function importSave(inputString: string, slotIndex: number): SaveSlotSumm
  *
  * @throws {Error} If the envelope is corrupted, truncated, or contains invalid data.
  */
-function _importBinaryEnvelope(bytes: Uint8Array, slotIndex: number): SaveSlotSummary {
+async function _importBinaryEnvelope(bytes: Uint8Array, slotIndex: number): Promise<SaveSlotSummary> {
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
 
   // Read header fields.
@@ -796,7 +743,7 @@ function _importBinaryEnvelope(bytes: Uint8Array, slotIndex: number): SaveSlotSu
   _validateState(envelope.state);
 
   // Persist — store the LZC string directly (already compressed).
-  _persistImport(lzcString, slotIndex);
+  await _persistImport(lzcString, slotIndex);
 
   return summaryFromEnvelope(slotIndex, envelope, slotKey(slotIndex));
 }
@@ -806,7 +753,7 @@ function _importBinaryEnvelope(bytes: Uint8Array, slotIndex: number): SaveSlotSu
  *
  * @throws {Error} If the JSON is malformed or required fields are absent.
  */
-function _importLegacyJson(jsonString: string, slotIndex: number): SaveSlotSummary {
+async function _importLegacyJson(jsonString: string, slotIndex: number): Promise<SaveSlotSummary> {
   let envelope: SaveEnvelope;
   try {
     envelope = JSON.parse(jsonString);
@@ -824,7 +771,7 @@ function _importLegacyJson(jsonString: string, slotIndex: number): SaveSlotSumma
   // Persist — compress and store.
   const json = JSON.stringify(envelope);
   const compressed = compressSaveData(json);
-  _persistImport(compressed, slotIndex);
+  await _persistImport(compressed, slotIndex);
 
   return summaryFromEnvelope(slotIndex, envelope, slotKey(slotIndex));
 }
@@ -847,25 +794,11 @@ function _validateEnvelopeFields(envelope: SaveEnvelope): void {
 }
 
 /**
- * Writes a compressed save string to localStorage (and mirrors to IndexedDB).
- *
- * @throws {Error} If localStorage is full and IndexedDB is unavailable.
+ * Writes a compressed save string to IndexedDB.
  */
-function _persistImport(compressed: string, slotIndex: number): void {
+async function _persistImport(compressed: string, slotIndex: number): Promise<void> {
   const key = slotKey(slotIndex);
-  try {
-    localStorage.setItem(key, compressed);
-  } catch (err: unknown) {
-    if (err instanceof DOMException && err.name === 'QuotaExceededError') {
-      throw new Error('Storage full — unable to import save. Delete old saves to free space.', { cause: err });
-    }
-    throw err;
-  }
-
-  // Mirror to IndexedDB (fire-and-forget).
-  if (isIdbAvailable()) {
-    idbSet(key, compressed).catch(err => logger.debug('saveload', 'IDB mirror write failed', err));
-  }
+  await idbSet(key, compressed);
 }
 
 // ---------------------------------------------------------------------------

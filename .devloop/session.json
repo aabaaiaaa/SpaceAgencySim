@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 3,
+  "lastIteration": 4,
   "startedAt": "2026-04-15T21:31:22.340Z",
   "iteration": 16,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-004",
-    "taskTitle": "Add getAllKeys to idbStorage.ts",
-    "iterationNumber": 4,
-    "startedAt": "2026-04-15T21:49:18.039Z"
+    "taskId": "TASK-005",
+    "taskTitle": "Migrate saveload.ts from localStorage to IndexedDB",
+    "iterationNumber": 5,
+    "startedAt": "2026-04-15T21:51:08.348Z"
   }
 }
