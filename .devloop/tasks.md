@@ -91,13 +91,13 @@ Implementation plan: `docs/superpowers/plans/2026-04-15-iteration-14.md`
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` — all tests pass.
 
 ### TASK-012: Refine auto-save slot reuse by agency name
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-011
 - **Description**: In `src/core/autoSave.ts`: (1) Modify `_getAutoSaveKey()` to accept `agencyName: string` parameter. (2) First pass: scan slots 0-99 looking for an existing save with `saveName === 'Auto-Save'` and matching `agencyName`. Must decompress saves using `decompressSaveData` (import from saveload.ts). If found, reuse that slot. (3) Second pass: find first empty slot (0-99). (4) Fallback: `spaceAgencySave_auto`. (5) Update `performAutoSave()` to call `_getAutoSaveKey(state.agencyName)`. (6) Add unit tests verifying: slot reuse for same agency, empty slot discovery when no prior auto-save exists. See implementation plan Task 12.
 - **Verification**: `npx vitest run src/tests/autoSave.test.ts` — all tests pass (create the test file if it doesn't exist).
 
 ### TASK-013: Dynamic load screen rendering
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-011, TASK-004
 - **Description**: In `src/ui/mainmenu.ts`: (1) Import `showNotification` from `./notification.ts`. (2) In `_renderLoadScreen`, after the existing loop for slots 0-4, add a second loop for indices 5+ from the `saves` array — only append a card if the entry is non-null. (3) Add `max-height: 70vh` and `overflow-y: auto` to the grid container for scroll support. (4) Update `_buildSaveCard` to include `data-key="${summary.storageKey}"` on action buttons. (5) Update card click handler to read `data-key` and pass it to `_handleLoad`, `_handleExport`, `_handleDeleteConfirm`. (6) In `_handleLoad`, add a version check: read the save envelope, check `envelope.version !== SAVE_VERSION`, and if incompatible show a notification via `showNotification()` and return early without loading. See implementation plan Task 13.
 - **Verification**: `npx tsc --noEmit src/ui/mainmenu.ts` — 0 errors.

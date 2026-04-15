@@ -33,7 +33,7 @@ import {
   _resetAutoSaveSlotForTesting,
 } from '../core/autoSave.ts';
 
-import { decompressSaveData } from '../core/saveload.ts';
+import { compressSaveData, decompressSaveData } from '../core/saveload.ts';
 import { idbSet, idbDelete, isIdbAvailable } from '../core/idbStorage.ts';
 
 // ---------------------------------------------------------------------------
@@ -129,7 +129,7 @@ describe('performAutoSave', () => {
     expect(envelope.saveName).toBe('Auto-Save');
     expect(envelope.state.agencyName).toBe('Test Agency');
     expect(typeof envelope.timestamp).toBe('string');
-    expect(envelope.version).toBe(5);
+    expect(envelope.version).toBe(6);
   });
 
   it('accumulates session play time', async () => {
@@ -284,5 +284,69 @@ describe('auto-save slot isolation', () => {
   it('uses a key distinct from manual save slots (0-4)', () => {
     expect(AUTO_SAVE_KEY).toBe('spaceAgencySave_auto');
     expect(AUTO_SAVE_KEY).not.toMatch(/spaceAgencySave_\d/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// auto-save slot reuse
+// ---------------------------------------------------------------------------
+
+describe('auto-save slot reuse', () => {
+  it('@smoke reuses existing auto-save slot for same agency', async () => {
+    // Pre-populate slot 3 with a compressed auto-save for "NASA"
+    const envelope = JSON.stringify({
+      saveName: 'Auto-Save',
+      timestamp: new Date().toISOString(),
+      version: 6,
+      state: { agencyName: 'NASA' },
+    });
+    const compressed = compressSaveData(envelope);
+    mockStorage.setItem('spaceAgencySave_3', compressed);
+
+    // Fill slots 0-2 with manual saves (not auto-saves)
+    for (let i = 0; i < 3; i++) {
+      const manualEnvelope = JSON.stringify({
+        saveName: `Save ${i}`,
+        timestamp: new Date().toISOString(),
+        version: 6,
+        state: { agencyName: 'NASA' },
+      });
+      mockStorage.setItem(`spaceAgencySave_${i}`, compressSaveData(manualEnvelope));
+    }
+
+    const state = freshState();
+    state.agencyName = 'NASA';
+    const result = await performAutoSave(state);
+
+    expect(result.success).toBe(true);
+    // Should have reused slot 3 (the existing auto-save for NASA)
+    const raw = mockStorage.getItem('spaceAgencySave_3');
+    expect(raw).not.toBeNull();
+    const json = decompressSaveData(raw!);
+    const saved = JSON.parse(json);
+    expect(saved.saveName).toBe('Auto-Save');
+    expect(saved.state.agencyName).toBe('NASA');
+  });
+
+  it('finds first empty slot when no prior auto-save exists', async () => {
+    // Fill slots 0-2 with manual saves
+    for (let i = 0; i < 3; i++) {
+      const manualEnvelope = JSON.stringify({
+        saveName: `Save ${i}`,
+        timestamp: new Date().toISOString(),
+        version: 6,
+        state: { agencyName: 'SpaceX' },
+      });
+      mockStorage.setItem(`spaceAgencySave_${i}`, compressSaveData(manualEnvelope));
+    }
+
+    const state = freshState();
+    state.agencyName = 'SpaceX';
+    const result = await performAutoSave(state);
+
+    expect(result.success).toBe(true);
+    // Should use slot 3 (first empty after 0-2)
+    const raw = mockStorage.getItem('spaceAgencySave_3');
+    expect(raw).not.toBeNull();
   });
 });

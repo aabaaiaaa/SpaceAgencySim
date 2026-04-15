@@ -9,7 +9,7 @@
  */
 
 import { idbSet, idbDelete, isIdbAvailable } from './idbStorage.ts';
-import { compressSaveData, SAVE_VERSION } from './saveload.ts';
+import { compressSaveData, decompressSaveData, SAVE_VERSION } from './saveload.ts';
 import { logger } from './logger.ts';
 
 import type { GameState } from './gameState.ts';
@@ -73,15 +73,34 @@ export function isAutoSaveEnabled(state: GameState | null | undefined): boolean 
  * Falls back to the dedicated auto-save key if all slots are occupied.
  * The choice is remembered for the session so we don't switch slots.
  */
-function _getAutoSaveKey(): string {
+function _getAutoSaveKey(agencyName: string): string {
   if (_autoSaveSlotKey !== null) return _autoSaveSlotKey;
 
+  // First pass: find an existing auto-save slot for the same agency.
+  let firstEmptySlot: string | null = null;
   for (let i = 0; i < 100; i++) {
     const key = `${MANUAL_SAVE_PREFIX}${i}`;
-    if (localStorage.getItem(key) === null) {
-      _autoSaveSlotKey = key;
-      return key;
+    const raw = localStorage.getItem(key);
+    if (raw === null) {
+      if (firstEmptySlot === null) firstEmptySlot = key;
+      continue;
     }
+    try {
+      const json = decompressSaveData(raw);
+      const envelope = JSON.parse(json);
+      if (envelope.saveName === 'Auto-Save' && envelope.state?.agencyName === agencyName) {
+        _autoSaveSlotKey = key;
+        return key;
+      }
+    } catch {
+      // Corrupted or non-JSON data — skip this slot.
+    }
+  }
+
+  // Second pass result: use the first empty slot found during the scan.
+  if (firstEmptySlot !== null) {
+    _autoSaveSlotKey = firstEmptySlot;
+    return firstEmptySlot;
   }
 
   // All slots occupied — fall back to the dedicated auto-save key.
@@ -109,7 +128,7 @@ export async function performAutoSave(
   state.playTimeSeconds = (state.playTimeSeconds ?? 0) + getSessionSeconds();
   resetSessionTimer();
 
-  const saveKey = _getAutoSaveKey();
+  const saveKey = _getAutoSaveKey(state.agencyName);
 
   const envelope = {
     saveName: 'Auto-Save',

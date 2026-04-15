@@ -30,7 +30,9 @@ import {
   SAVE_SLOT_COUNT,
   SAVE_VERSION,
   applyPersistedSettings,
+  decompressSaveData,
 } from '../core/saveload.ts';
+import { showNotification } from './notification.ts';
 import { createGameState } from '../core/gameState.ts';
 import { initializeMissions, reconcileParts } from '../core/missions.ts';
 import { GameMode, FACILITY_DEFINITIONS, SANDBOX_STARTING_MONEY } from '../core/constants.ts';
@@ -279,12 +281,23 @@ function _renderLoadScreen(overlay: HTMLElement, saves: (SaveSlotSummary | null)
   // Build the saves grid.
   const grid: HTMLDivElement = document.createElement('div');
   grid.className = 'mm-saves-grid';
+  grid.style.maxHeight = '70vh';
+  grid.style.overflowY = 'auto';
 
+  // Manual slots 0-4: always show (empty placeholder if unused).
   for (let i = 0; i < SAVE_SLOT_COUNT; i++) {
     const summary = saves[i];
     grid.appendChild(
       summary ? _buildSaveCard(summary) : _buildEmptySlotCard(i)
     );
+  }
+
+  // Overflow and auto-save slots (index 5+): show only if populated.
+  for (let i = SAVE_SLOT_COUNT; i < saves.length; i++) {
+    const summary = saves[i];
+    if (summary) {
+      grid.appendChild(_buildSaveCard(summary));
+    }
   }
 
   screen.appendChild(grid);
@@ -369,9 +382,9 @@ function _buildSaveCard(summary: SaveSlotSummary): HTMLDivElement {
       </div>
     </div>
     <div class="mm-save-card-actions">
-      <button class="mm-btn mm-btn-primary" data-action="load" data-slot="${summary.slotIndex}">Load</button>
-      <button class="mm-btn mm-btn-secondary" data-action="export" data-slot="${summary.slotIndex}">Export</button>
-      <button class="mm-btn mm-btn-danger" data-action="delete" data-slot="${summary.slotIndex}">Delete</button>
+      <button class="mm-btn mm-btn-primary" data-action="load" data-slot="${summary.slotIndex}" data-key="${summary.storageKey}">Load</button>
+      <button class="mm-btn mm-btn-secondary" data-action="export" data-slot="${summary.slotIndex}" data-key="${summary.storageKey}">Export</button>
+      <button class="mm-btn mm-btn-danger" data-action="delete" data-slot="${summary.slotIndex}" data-key="${summary.storageKey}">Delete</button>
     </div>
   `;
 
@@ -381,9 +394,10 @@ function _buildSaveCard(summary: SaveSlotSummary): HTMLDivElement {
     if (!btn) return;
     const action: string | undefined = btn.dataset.action;
     const slot: number   = Number(btn.dataset.slot);
-    if (action === 'load')   { void _handleLoad(slot); }
-    if (action === 'export') { _handleExport(slot); }
-    if (action === 'delete') { _handleDeleteConfirm(slot, summary.saveName); }
+    const key: string    = btn.dataset.key ?? '';
+    if (action === 'load')   { void _handleLoad(slot, key); }
+    if (action === 'export') { _handleExport(slot, key); }
+    if (action === 'delete') { _handleDeleteConfirm(slot, summary.saveName, key); }
   });
 
   return card;
@@ -582,7 +596,28 @@ function _switchScreen(target: 'load' | 'newgame', canGoBack: boolean): void {
 /**
  * Loads the game from the given save slot and begins the game.
  */
-async function _handleLoad(slotIndex: number): Promise<void> {
+async function _handleLoad(slotIndex: number, storageKey?: string): Promise<void> {
+  const key = storageKey || `spaceAgencySave_${slotIndex}`;
+
+  // Version compatibility check.
+  const raw = localStorage.getItem(key);
+  if (raw) {
+    try {
+      const json = decompressSaveData(raw);
+      const envelope = JSON.parse(json);
+      if (envelope.version !== SAVE_VERSION) {
+        showNotification(
+          `Cannot load save — incompatible version (v${envelope.version}, need v${SAVE_VERSION}).`,
+          'error',
+        );
+        return;
+      }
+    } catch {
+      showNotification('Cannot load save — data is corrupt.', 'error');
+      return;
+    }
+  }
+
   try {
     const state = await loadGame(slotIndex);
     reconcileParts(state);
@@ -596,7 +631,7 @@ async function _handleLoad(slotIndex: number): Promise<void> {
 /**
  * Exports the save in the given slot as a JSON file download.
  */
-function _handleExport(slotIndex: number): void {
+function _handleExport(slotIndex: number, _storageKey?: string): void {
   try {
     exportSave(slotIndex);
   } catch (err: unknown) {
@@ -608,14 +643,14 @@ function _handleExport(slotIndex: number): void {
 /**
  * Shows a confirmation dialog then deletes the save if confirmed.
  */
-function _handleDeleteConfirm(slotIndex: number, saveName: string): void {
+function _handleDeleteConfirm(slotIndex: number, saveName: string, storageKey?: string): void {
   _showConfirmModal(
     'Delete Save',
     `Are you sure you want to delete "${escapeHtml(saveName)}"? This cannot be undone.`,
     'Delete',
     () => {
       try {
-        deleteSave(slotIndex);
+        deleteSave(slotIndex, storageKey);
         // Refresh the load screen.
         _switchScreen('load', false);
         const saves = listSaves();
