@@ -43,7 +43,7 @@
 - **Verification**: `npx vitest run src/tests/undoActions.test.ts`
 
 ### TASK-008: Extract computeFrameStats from fpsMonitor with unit tests
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/ui/fpsMonitor.ts`, extract the stats computation loop from `recordFrame()` (lines 138-149) into a named export `computeFrameStats(frameTimes: Float64Array, count: number): { fps: number; avgFrameTime: number; minFrameTime: number; maxFrameTime: number }`. Update `recordFrame()` to call `computeFrameStats(_frameTimes, _frameCount)`. Then create `src/tests/fpsMonitor.test.ts` with unit tests: (1) count=0 returns all zeros. (2) Single frame: fps = 1000/frameTime. (3) Full buffer with varying times: correct min/max/avg. (4) Constant frame times: min === max === avg. See requirements.md Section 4b.
 - **Verification**: `npx vitest run src/tests/fpsMonitor.test.ts`

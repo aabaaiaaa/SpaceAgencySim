@@ -124,6 +124,30 @@ export function hideFpsMonitor(): void {
 }
 
 /**
+ * Compute aggregate stats from a buffer of frame times.
+ * Pure function — no side effects, no DOM access.
+ */
+export function computeFrameStats(
+  frameTimes: Float64Array,
+  count: number,
+): { fps: number; avgFrameTime: number; minFrameTime: number; maxFrameTime: number } {
+  if (count <= 0) return { fps: 0, avgFrameTime: 0, minFrameTime: 0, maxFrameTime: 0 };
+
+  let sum = 0;
+  let min = Infinity;
+  let max = 0;
+  for (let i = 0; i < count; i++) {
+    const t = frameTimes[i];
+    sum += t;
+    if (t < min) min = t;
+    if (t > max) max = t;
+  }
+  const avgFrameTime = sum / count;
+  const fps = avgFrameTime > 0 ? 1000 / avgFrameTime : 0;
+  return { fps, avgFrameTime, minFrameTime: min, maxFrameTime: max };
+}
+
+/**
  * Record a frame time and update the display if enough time has elapsed.
  * Called once per animation frame from the flight loop.
  */
@@ -135,25 +159,14 @@ export function recordFrame(frameTimeMs: number, timestamp: number): void {
   if (_frameCount < HISTORY_SIZE) _frameCount++;
 
   // Compute stats.
-  let sum = 0;
-  let min = Infinity;
-  let max = 0;
-  const count = _frameCount;
-  for (let i = 0; i < count; i++) {
-    const t = _frameTimes[i];
-    sum += t;
-    if (t < min) min = t;
-    if (t > max) max = t;
-  }
-  const avgFrameTime = sum / count;
-  const fps = avgFrameTime > 0 ? 1000 / avgFrameTime : 0;
+  const { fps, avgFrameTime, minFrameTime, maxFrameTime } = computeFrameStats(_frameTimes, _frameCount);
 
   // Update window.__perfStats every frame (lightweight).
   if (typeof window !== 'undefined' && window.__perfStats) {
     window.__perfStats.fps = Math.round(fps);
     window.__perfStats.frameTime = Math.round(avgFrameTime * 10) / 10;
-    window.__perfStats.minFrameTime = Math.round(min * 10) / 10;
-    window.__perfStats.maxFrameTime = Math.round(max * 10) / 10;
+    window.__perfStats.minFrameTime = Math.round(minFrameTime * 10) / 10;
+    window.__perfStats.maxFrameTime = Math.round(maxFrameTime * 10) / 10;
   }
 
   // Only update the DOM display every ~500ms.
@@ -165,7 +178,7 @@ export function recordFrame(frameTimeMs: number, timestamp: number): void {
   _ftText!.textContent = `Frame: ${avgFrameTime.toFixed(1)} ms`;
 
   // Draw mini graph.
-  _drawGraph(min, max);
+  _drawGraph(minFrameTime, maxFrameTime);
 }
 
 /**
