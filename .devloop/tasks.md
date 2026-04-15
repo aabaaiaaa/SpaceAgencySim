@@ -55,7 +55,7 @@
 - **Verification**: `npm run typecheck` passes with no errors in `mainmenu.ts`.
 
 ### TASK-010: Update saveload.test.ts for IDB and remove backward-compat tests
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-005
 - **Description**: Two changes: (1) Rewrite all 48 localStorage references in `saveload.test.ts` to use an IDB mock (e.g. `fake-indexeddb` or the existing test mock pattern). All save round-trip, corruption, version-check, and overflow tests must work against IDB. (2) Remove backward-compat tests: the `loadGame(0) without storageKey` test at line 1908, the `backward compatibility with uncompressed saves` describe block at lines 1417-1470, and the `imports a legacy JSON envelope string` test at line 1655. Keep all version-rejection tests (lines 918, 1032, 1045) and the incompatible-saves-appear-in-UI test (line 619). See requirements.md sections 2h and 3.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` — all remaining tests pass, no localStorage references remain.

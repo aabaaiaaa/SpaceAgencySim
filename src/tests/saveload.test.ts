@@ -2,7 +2,7 @@
  * saveload.test.ts — Unit tests for the save/load system.
  *
  * Because Vitest runs in a Node.js environment (no browser globals),
- * localStorage is mocked in-memory before each test and wiped after.
+ * IndexedDB is mocked via vi.mock() on idbStorage before each test.
  * Fake timers give deterministic control over `playTimeSeconds` tracking.
  *
  * Tests cover:
@@ -45,16 +45,7 @@ declare const Buffer: {
   from(str: string, encoding: string): { toString(encoding: string): string };
 };
 
-/** Minimal localStorage-compatible interface used by the mock. */
-interface MockStorage {
-  getItem(key: string): string | null;
-  setItem(key: string, value: string): void;
-  removeItem(key: string): void;
-  clear(): void;
-  readonly length: number;
-}
-
-/** Shape of the parsed save envelope in localStorage. */
+/** Shape of the parsed save envelope in storage. */
 interface SaveEnvelope {
   saveName: string;
   timestamp: string;
@@ -63,29 +54,30 @@ interface SaveEnvelope {
 }
 
 // ---------------------------------------------------------------------------
-// localStorage mock
+// In-memory IDB mock — shared between mock factory and test code
 // ---------------------------------------------------------------------------
 
-/**
- * A simple in-memory localStorage replacement that fulfils the subset of the
- * Web Storage API used by saveload.js (getItem / setItem / removeItem).
- */
-function createLocalStorageMock(): MockStorage {
-  const store = new Map<string, string>();
-  return {
-    getItem(key: string): string | null { return store.has(key) ? store.get(key)! : null; },
-    setItem(key: string, value: string): void { store.set(key, String(value)); },
-    removeItem(key: string): void { store.delete(key); },
-    clear(): void { store.clear(); },
-    get length(): number { return store.size; },
-  };
-}
+const _idbStore = new Map<string, string>();
 
-let mockStorage: MockStorage;
+vi.mock('../core/idbStorage.js', () => ({
+  idbSet: vi.fn((key: string, value: string) => {
+    _idbStore.set(key, value);
+    return Promise.resolve();
+  }),
+  idbGet: vi.fn((key: string) => {
+    return Promise.resolve(_idbStore.has(key) ? _idbStore.get(key)! : null);
+  }),
+  idbDelete: vi.fn((key: string) => {
+    _idbStore.delete(key);
+    return Promise.resolve();
+  }),
+  idbGetAllKeys: vi.fn(() => {
+    return Promise.resolve([..._idbStore.keys()]);
+  }),
+}));
 
 beforeEach(() => {
-  mockStorage = createLocalStorageMock();
-  vi.stubGlobal('localStorage', mockStorage);
+  _idbStore.clear();
   // Reset fake timers and session clock before every test.
   vi.useFakeTimers();
   vi.setSystemTime(0);
@@ -296,11 +288,11 @@ describe('Slot index validation', () => {
 // ---------------------------------------------------------------------------
 
 describe('saveGame()', () => {
-  it('writes compressed data to the correct localStorage key', async () => {
+  it('writes compressed data to the correct IDB key', async () => {
     const state = freshState();
     await saveGame(state, 2, 'My Agency');
-    const raw = localStorage.getItem('spaceAgencySave_2');
-    expect(raw).not.toBeNull();
+    const raw = _idbStore.get('spaceAgencySave_2');
+    expect(raw).toBeDefined();
     const json = decompressSaveData(raw!);
     const envelope = JSON.parse(json) as SaveEnvelope;
     expect(envelope.saveName).toBe('My Agency');
@@ -434,7 +426,7 @@ describe('saveGame()', () => {
     expect(restoredB.money).toBe(222_222);
 
     // Slots 1, 3, 4 must remain empty.
-    const saves = listSaves();
+    const saves = await listSaves();
     expect(saves[1]).toBeNull();
     expect(saves[3]).toBeNull();
     expect(saves[4]).toBeNull();
@@ -460,12 +452,12 @@ describe('loadGame()', () => {
   });
 
   it('throws on corrupt JSON', async () => {
-    localStorage.setItem('spaceAgencySave_0', 'not { valid json');
+    _idbStore.set('spaceAgencySave_0', 'not { valid json');
     await expect(loadGame(0)).rejects.toThrow(/corrupt/i);
   });
 
   it('throws when stored envelope is missing the state field', async () => {
-    localStorage.setItem('spaceAgencySave_0', JSON.stringify({ saveName: 'x', timestamp: 't' }));
+    _idbStore.set('spaceAgencySave_0', JSON.stringify({ saveName: 'x', timestamp: 't' }));
     await expect(loadGame(0)).rejects.toThrow(/corrupt/i);
   });
 
@@ -492,26 +484,26 @@ describe('loadGame()', () => {
 describe('deleteSave()', () => {
   it('removes the save so that listSaves returns null for that slot', async () => {
     await saveGame(freshState(), 2, 'to delete');
-    deleteSave(2);
-    const saves = listSaves();
+    await deleteSave(2);
+    const saves = await listSaves();
     expect(saves[2]).toBeNull();
   });
 
-  it('does not throw when the slot is already empty', () => {
-    expect(() => deleteSave(4)).not.toThrow();
+  it('does not throw when the slot is already empty', async () => {
+    await deleteSave(4);
   });
 
   it('only removes the targeted slot', async () => {
     await saveGame(freshState(), 0, 'keep me');
     await saveGame(freshState(), 1, 'delete me');
-    deleteSave(1);
-    const saves = listSaves();
+    await deleteSave(1);
+    const saves = await listSaves();
     expect(saves[0]).not.toBeNull();
     expect(saves[1]).toBeNull();
   });
 
-  it('throws RangeError for an out-of-bounds slot', () => {
-    expect(() => deleteSave(-1)).toThrow(RangeError);
+  it('throws RangeError for an out-of-bounds slot', async () => {
+    await expect(deleteSave(-1)).rejects.toThrow(RangeError);
   });
 });
 
@@ -520,13 +512,13 @@ describe('deleteSave()', () => {
 // ---------------------------------------------------------------------------
 
 describe('listSaves()', () => {
-  it('returns an array with exactly SAVE_SLOT_COUNT entries', () => {
-    const saves = listSaves();
+  it('returns an array with exactly SAVE_SLOT_COUNT entries', async () => {
+    const saves = await listSaves();
     expect(saves).toHaveLength(SAVE_SLOT_COUNT);
   });
 
-  it('all entries are null when no saves exist', () => {
-    const saves = listSaves();
+  it('all entries are null when no saves exist', async () => {
+    const saves = await listSaves();
     expect(saves.every((s) => s === null)).toBe(true);
   });
 
@@ -534,7 +526,7 @@ describe('listSaves()', () => {
     await saveGame(freshState(), 0, 'slot 0');
     await saveGame(freshState(), 3, 'slot 3');
 
-    const saves = listSaves();
+    const saves = await listSaves();
     expect(saves[0]).not.toBeNull();
     expect(saves[0]!.saveName).toBe('slot 0');
     expect(saves[1]).toBeNull();
@@ -544,15 +536,15 @@ describe('listSaves()', () => {
     expect(saves[4]).toBeNull();
   });
 
-  it('returns null for corrupt slot data', () => {
-    localStorage.setItem('spaceAgencySave_1', 'CORRUPT{{{');
-    const saves = listSaves();
+  it('returns null for corrupt slot data', async () => {
+    _idbStore.set('spaceAgencySave_1', 'CORRUPT{{{');
+    const saves = await listSaves();
     expect(saves[1]).toBeNull();
   });
 
   it('returned summaries include all required fields', async () => {
     await saveGame(freshState(), 0, 'full test');
-    const summary = listSaves()[0]!;
+    const summary = (await listSaves())[0]!;
     const expectedFields: (keyof SaveSlotSummary)[] = [
       'slotIndex', 'saveName', 'timestamp', 'missionsCompleted',
       'money', 'acceptedMissionCount', 'totalFlights',
@@ -581,16 +573,16 @@ describe('listSaves — dynamic slot discovery', () => {
     });
   }
 
-  it('empty storage returns 5 nulls', () => {
-    const saves = listSaves();
+  it('empty storage returns 5 nulls', async () => {
+    const saves = await listSaves();
     expect(saves).toHaveLength(SAVE_SLOT_COUNT);
     expect(saves.every(s => s === null)).toBe(true);
   });
 
-  it('discovers overflow slot 7', () => {
-    localStorage.setItem('spaceAgencySave_7', makeEnvelopeJSON({ saveName: 'Overflow 7' }));
+  it('discovers overflow slot 7', async () => {
+    _idbStore.set('spaceAgencySave_7', makeEnvelopeJSON({ saveName: 'Overflow 7' }));
 
-    const saves = listSaves();
+    const saves = await listSaves();
     expect(saves.length).toBeGreaterThan(SAVE_SLOT_COUNT);
     const overflow = saves.find(s => s !== null && s.storageKey === 'spaceAgencySave_7');
     expect(overflow).toBeDefined();
@@ -598,10 +590,10 @@ describe('listSaves — dynamic slot discovery', () => {
     expect(overflow!.slotIndex).toBe(-1);
   });
 
-  it('discovers auto-save key', () => {
-    localStorage.setItem('spaceAgencySave_auto', makeEnvelopeJSON({ saveName: 'Auto Save' }));
+  it('discovers auto-save key', async () => {
+    _idbStore.set('spaceAgencySave_auto', makeEnvelopeJSON({ saveName: 'Auto Save' }));
 
-    const saves = listSaves();
+    const saves = await listSaves();
     const autoSave = saves.find(s => s !== null && s.storageKey === 'spaceAgencySave_auto');
     expect(autoSave).toBeDefined();
     expect(autoSave!.saveName).toBe('Auto Save');
@@ -611,12 +603,12 @@ describe('listSaves — dynamic slot discovery', () => {
   it('storageKey present on all summaries', async () => {
     await saveGame(freshState(), 0, 'Slot Zero');
 
-    const saves = listSaves();
+    const saves = await listSaves();
     expect(saves[0]).not.toBeNull();
     expect(saves[0]!.storageKey).toBe('spaceAgencySave_0');
   });
 
-  it('incompatible version saves still appear', () => {
+  it('incompatible version saves still appear', async () => {
     const state = freshState();
     const envelope = {
       saveName: 'Old Version',
@@ -624,9 +616,9 @@ describe('listSaves — dynamic slot discovery', () => {
       version: 1,
       state: JSON.parse(JSON.stringify(state)),
     };
-    localStorage.setItem('spaceAgencySave_0', JSON.stringify(envelope));
+    _idbStore.set('spaceAgencySave_0', JSON.stringify(envelope));
 
-    const saves = listSaves();
+    const saves = await listSaves();
     expect(saves[0]).not.toBeNull();
     expect(saves[0]!.saveName).toBe('Old Version');
     expect(saves[0]!.version).toBe(1);
@@ -638,77 +630,77 @@ describe('listSaves — dynamic slot discovery', () => {
 // ---------------------------------------------------------------------------
 
 describe('importSave()', () => {
-  it('writes a valid envelope JSON to the target slot', () => {
+  it('writes a valid envelope JSON to the target slot', async () => {
     const json = minimalEnvelopeJSON({ saveName: 'Imported' });
-    const summary = importSave(json, 1);
+    const summary = await importSave(json, 1);
     expect(summary.saveName).toBe('Imported');
-    expect(localStorage.getItem('spaceAgencySave_1')).not.toBeNull();
+    expect(_idbStore.has('spaceAgencySave_1')).toBe(true);
   });
 
-  it('returns a SaveSlotSummary matching the imported state', () => {
+  it('returns a SaveSlotSummary matching the imported state', async () => {
     const state = freshState();
     state.money = 42_000;
     const json = JSON.stringify({ saveName: 'Rich', timestamp: 'T', state });
-    const summary = importSave(json, 0);
+    const summary = await importSave(json, 0);
     expect(summary.money).toBe(42_000);
   });
 
-  it('throws on invalid JSON', () => {
-    expect(() => importSave('{{not json', 0)).toThrow(/not valid JSON/i);
+  it('throws on invalid JSON', async () => {
+    await expect(importSave('{{not json', 0)).rejects.toThrow(/not valid JSON/i);
   });
 
   it('does not write to the slot when JSON is malformed', async () => {
     // Pre-populate the slot so we can confirm it was not overwritten.
     await saveGame(freshState(), 2, 'original');
-    const before = localStorage.getItem('spaceAgencySave_2');
+    const before = _idbStore.get('spaceAgencySave_2');
 
-    expect(() => importSave('{broken json}}', 2)).toThrow();
+    await expect(importSave('{broken json}}', 2)).rejects.toThrow();
 
     // The slot must still contain the original data.
-    const after = localStorage.getItem('spaceAgencySave_2');
+    const after = _idbStore.get('spaceAgencySave_2');
     expect(after).toBe(before);
   });
 
   it('does not write to the slot when the envelope is structurally invalid', async () => {
     await saveGame(freshState(), 3, 'keep me');
-    const before = localStorage.getItem('spaceAgencySave_3');
+    const before = _idbStore.get('spaceAgencySave_3');
 
     // Missing the required "state" field.
     const badEnvelope = JSON.stringify({ saveName: 'Bad', timestamp: 'T' });
-    expect(() => importSave(badEnvelope, 3)).toThrow();
+    await expect(importSave(badEnvelope, 3)).rejects.toThrow();
 
-    const after = localStorage.getItem('spaceAgencySave_3');
+    const after = _idbStore.get('spaceAgencySave_3');
     expect(after).toBe(before);
   });
 
-  it('throws when root is not an object', () => {
-    expect(() => importSave('"just a string"', 0)).toThrow(/plain object/i);
+  it('throws when root is not an object', async () => {
+    await expect(importSave('"just a string"', 0)).rejects.toThrow(/plain object/i);
   });
 
-  it('throws when saveName is missing', () => {
+  it('throws when saveName is missing', async () => {
     const env = { timestamp: 'T', state: freshState() };
-    expect(() => importSave(JSON.stringify(env), 0)).toThrow(/saveName/i);
+    await expect(importSave(JSON.stringify(env), 0)).rejects.toThrow(/saveName/i);
   });
 
-  it('throws when timestamp is missing', () => {
+  it('throws when timestamp is missing', async () => {
     const env = { saveName: 'S', state: freshState() };
-    expect(() => importSave(JSON.stringify(env), 0)).toThrow(/timestamp/i);
+    await expect(importSave(JSON.stringify(env), 0)).rejects.toThrow(/timestamp/i);
   });
 
-  it('throws when state is missing', () => {
+  it('throws when state is missing', async () => {
     const env = { saveName: 'S', timestamp: 'T' };
-    expect(() => importSave(JSON.stringify(env), 0)).toThrow(/state/i);
+    await expect(importSave(JSON.stringify(env), 0)).rejects.toThrow(/state/i);
   });
 
-  it('throws RangeError for out-of-bounds slot', () => {
-    expect(() => importSave(minimalEnvelopeJSON(), 10)).toThrow(RangeError);
+  it('throws RangeError for out-of-bounds slot', async () => {
+    await expect(importSave(minimalEnvelopeJSON(), 10)).rejects.toThrow(RangeError);
   });
 
   it('overwrites an existing save in the target slot', async () => {
     await saveGame(freshState(), 0, 'original');
     const imported = { saveName: 'replacement', timestamp: 'T', state: freshState() };
-    importSave(JSON.stringify(imported), 0);
-    expect(listSaves()[0]!.saveName).toBe('replacement');
+    await importSave(JSON.stringify(imported), 0);
+    expect((await listSaves())[0]!.saveName).toBe('replacement');
   });
 });
 
@@ -807,19 +799,19 @@ describe('exportSave()', () => {
   it('throws an informative error in a non-browser environment', async () => {
     // Node has no document or Blob — this exercises the DOM guard.
     await saveGame(freshState(), 0, 'export test');
-    expect(() => exportSave(0)).toThrow(/browser environment/i);
+    await expect(exportSave(0)).rejects.toThrow(/browser environment/i);
   });
 
-  it('throws on an empty slot', () => {
-    expect(() => exportSave(4)).toThrow(/empty/i);
+  it('throws on an empty slot', async () => {
+    await expect(exportSave(4)).rejects.toThrow(/empty/i);
   });
 
-  it('throws RangeError for an out-of-bounds slot', () => {
-    expect(() => exportSave(-1)).toThrow(RangeError);
+  it('throws RangeError for an out-of-bounds slot', async () => {
+    await expect(exportSave(-1)).rejects.toThrow(RangeError);
   });
 
   it('the data stored for export is a valid JSON string containing the full state', async () => {
-    // exportSave() reads the raw (possibly compressed) data from localStorage
+    // exportSave() reads the raw (possibly compressed) data from IDB
     // and decompresses it before sending to the user as a file. Verify that
     // the underlying storage decompresses to well-formed JSON whose
     // envelope.state matches the state that was saved.
@@ -830,7 +822,7 @@ describe('exportSave()', () => {
     await saveGame(state, 0, 'Export Test');
 
     // Read what's in storage and decompress it.
-    const raw = localStorage.getItem('spaceAgencySave_0');
+    const raw = _idbStore.get('spaceAgencySave_0');
     expect(typeof raw).toBe('string');
     const json = decompressSaveData(raw!);
 
@@ -876,7 +868,7 @@ describe('exportSave()', () => {
     vi.stubGlobal('Blob', MockBlob);
     vi.stubGlobal('URL', { createObjectURL: mockCreateObjectURL, revokeObjectURL: mockRevokeObjectURL });
 
-    expect(() => exportSave(1)).not.toThrow();
+    await exportSave(1);
 
     // The Blob content is now a base64-encoded binary envelope (TASK-012).
     // Verify it round-trips through importSave into a different slot.
@@ -885,15 +877,13 @@ describe('exportSave()', () => {
     expect(capturedBlobContent!.length).toBeGreaterThan(0);
 
     // Round-trip: import the exported content into slot 2 and verify state.
-    expect(() => importSave(capturedBlobContent!, 2)).not.toThrow();
+    await importSave(capturedBlobContent!, 2);
     const loaded = await loadGame(2);
     expect(loaded.money).toBe(555_000);
     expect(loaded.rockets[0].name).toBe('Mock Rocket');
 
     // Clean up extra stubs.
     vi.unstubAllGlobals();
-    // Re-apply the localStorage mock so afterEach() cleanup works.
-    vi.stubGlobal('localStorage', mockStorage);
   });
 });
 
@@ -909,8 +899,8 @@ describe('Save format version field', () => {
 
   it('saveGame() includes the version field in the stored envelope', async () => {
     await saveGame(freshState(), 0, 'versioned');
-    const raw = localStorage.getItem('spaceAgencySave_0');
-    const json = decompressSaveData(raw!);
+    const raw = _idbStore.get('spaceAgencySave_0')!;
+    const json = decompressSaveData(raw);
     const envelope = JSON.parse(json) as SaveEnvelope;
     expect(envelope.version).toBe(SAVE_VERSION);
   });
@@ -923,7 +913,7 @@ describe('Save format version field', () => {
       // Intentionally no "version" field — treated as version 0
       state: JSON.parse(JSON.stringify(state)),
     };
-    localStorage.setItem('spaceAgencySave_0', JSON.stringify(legacyEnvelope));
+    _idbStore.set('spaceAgencySave_0', JSON.stringify(legacyEnvelope));
 
     await expect(loadGame(0)).rejects.toThrow(/incompatible version/i);
   });
@@ -947,7 +937,7 @@ describe('Save format version field', () => {
       version: SAVE_VERSION + 5,
       state: JSON.parse(JSON.stringify(state)),
     };
-    localStorage.setItem('spaceAgencySave_0', JSON.stringify(futureEnvelope));
+    _idbStore.set('spaceAgencySave_0', JSON.stringify(futureEnvelope));
 
     await expect(loadGame(0)).rejects.toThrow(/incompatible version/i);
   });
@@ -960,7 +950,7 @@ describe('Save format version field', () => {
       version: SAVE_VERSION - 1,
       state: JSON.parse(JSON.stringify(state)),
     };
-    localStorage.setItem('spaceAgencySave_1', JSON.stringify(oldEnvelope));
+    _idbStore.set('spaceAgencySave_1', JSON.stringify(oldEnvelope));
 
     await expect(loadGame(1)).rejects.toThrow(/incompatible version/i);
   });
@@ -968,8 +958,8 @@ describe('Save format version field', () => {
   it('round-trip save/load preserves the version field in storage', async () => {
     const state = freshState();
     await saveGame(state, 2, 'round-trip');
-    const raw = localStorage.getItem('spaceAgencySave_2');
-    const json = decompressSaveData(raw!);
+    const raw = _idbStore.get('spaceAgencySave_2')!;
+    const json = decompressSaveData(raw);
     const envelope = JSON.parse(json) as SaveEnvelope;
     expect(envelope.version).toBe(SAVE_VERSION);
 
@@ -985,7 +975,7 @@ describe('Save format version field', () => {
 
 describe('Save migration edge cases', () => {
   /**
-   * Helper: writes a raw envelope to localStorage slot 0, bypassing saveGame()
+   * Helper: writes a raw envelope to IDB slot 0, bypassing saveGame()
    * so we can craft envelopes with missing/invalid fields.
    */
   interface EnvelopeOverrides extends Record<string, unknown> {
@@ -1014,7 +1004,7 @@ describe('Save migration edge cases', () => {
       }
       delete envelope._rawStatePatches;
     }
-    localStorage.setItem('spaceAgencySave_0', JSON.stringify(envelope));
+    _idbStore.set('spaceAgencySave_0', JSON.stringify(envelope));
   }
 
   it('loads a save with an invalid malfunctionMode value without crashing', async () => {
@@ -1037,7 +1027,7 @@ describe('Save migration edge cases', () => {
       // No "version" field at all — treated as version 0
       state: rawState,
     };
-    localStorage.setItem('spaceAgencySave_0', JSON.stringify(legacyEnvelope));
+    _idbStore.set('spaceAgencySave_0', JSON.stringify(legacyEnvelope));
 
     await expect(loadGame(0)).rejects.toThrow(/incompatible version/i);
   });
@@ -1319,7 +1309,7 @@ describe('_validateNestedStructures()', () => {
       version: SAVE_VERSION,
       state: JSON.parse(JSON.stringify(state)),
     };
-    localStorage.setItem('spaceAgencySave_0', JSON.stringify(envelope));
+    _idbStore.set('spaceAgencySave_0', JSON.stringify(envelope));
 
     const restored = await loadGame(0);
 
@@ -1385,9 +1375,9 @@ describe('Save compression', () => {
 
       await saveGame(state, 0, 'Compression Test');
 
-      // Verify localStorage contains compressed data (LZC: prefix).
-      const raw = localStorage.getItem('spaceAgencySave_0');
-      expect(raw).not.toBeNull();
+      // Verify IDB contains compressed data (LZC: prefix).
+      const raw = _idbStore.get('spaceAgencySave_0');
+      expect(raw).toBeDefined();
       expect(raw!.startsWith('LZC:')).toBe(true);
 
       const restored = await loadGame(0);
@@ -1407,88 +1397,10 @@ describe('Save compression', () => {
       state.agencyName = 'Listed Agency';
       await saveGame(state, 2, 'Slot 2 Save');
 
-      const saves = listSaves();
+      const saves = await listSaves();
       expect(saves[2]).not.toBeNull();
       expect(saves[2]!.saveName).toBe('Slot 2 Save');
       expect(saves[2]!.agencyName).toBe('Listed Agency');
-    });
-  });
-
-  describe('backward compatibility with uncompressed saves', () => {
-    it('loadGame reads an uncompressed save with the current version', async () => {
-      const state = freshState();
-      state.agencyName = 'Old Agency';
-      state.money = 12345;
-
-      const envelope = {
-        saveName: 'Legacy Save',
-        timestamp: new Date(0).toISOString(),
-        version: SAVE_VERSION,
-        state: JSON.parse(JSON.stringify(state)),
-      };
-      // Write as uncompressed JSON (simulating old save format).
-      localStorage.setItem('spaceAgencySave_0', JSON.stringify(envelope));
-
-      const restored = await loadGame(0);
-
-      expect(restored.agencyName).toBe('Old Agency');
-      expect(restored.money).toBe(12345);
-    });
-
-    it('loadGame rejects an uncompressed save with a mismatched version', async () => {
-      const state = freshState();
-      state.agencyName = 'Ancient Agency';
-
-      const envelope = {
-        saveName: 'Ancient Save',
-        timestamp: new Date(0).toISOString(),
-        version: 1, // Old version — now rejected.
-        state: JSON.parse(JSON.stringify(state)),
-      };
-      localStorage.setItem('spaceAgencySave_1', JSON.stringify(envelope));
-
-      await expect(loadGame(1)).rejects.toThrow(/incompatible version/i);
-    });
-
-    it('listSaves handles a mix of compressed and uncompressed slots', async () => {
-      // Slot 0: uncompressed (legacy).
-      const legacyState = freshState();
-      legacyState.agencyName = 'Legacy';
-      const legacyEnvelope = {
-        saveName: 'Legacy',
-        timestamp: new Date(0).toISOString(),
-        version: 1,
-        state: JSON.parse(JSON.stringify(legacyState)),
-      };
-      localStorage.setItem('spaceAgencySave_0', JSON.stringify(legacyEnvelope));
-
-      // Slot 1: compressed (current).
-      const newState = freshState();
-      newState.agencyName = 'Modern';
-      await saveGame(newState, 1, 'Modern');
-
-      const saves = listSaves();
-      expect(saves[0]).not.toBeNull();
-      expect(saves[0]!.saveName).toBe('Legacy');
-      expect(saves[1]).not.toBeNull();
-      expect(saves[1]!.saveName).toBe('Modern');
-    });
-
-    it('importSave compresses the imported data', () => {
-      const state = freshState();
-      const envelope = {
-        saveName: 'Imported',
-        timestamp: new Date(0).toISOString(),
-        version: 1,
-        state: JSON.parse(JSON.stringify(state)),
-      };
-      const json = JSON.stringify(envelope);
-
-      importSave(json, 3);
-
-      const raw = localStorage.getItem('spaceAgencySave_3');
-      expect(raw).not.toBeNull();
-      expect(raw!.startsWith('LZC:')).toBe(true);
     });
   });
 
@@ -1501,8 +1413,8 @@ describe('Save compression', () => {
       const state = freshState();
       await saveGame(state, 0, 'Version Test');
 
-      const raw = localStorage.getItem('spaceAgencySave_0');
-      const json = decompressSaveData(raw!);
+      const raw = _idbStore.get('spaceAgencySave_0')!;
+      const json = decompressSaveData(raw);
       const envelope = JSON.parse(json) as SaveEnvelope;
       expect(envelope.version).toBe(6);
     });
@@ -1592,15 +1504,15 @@ describe('Save export format', () => {
     ];
     await saveGame(state, 0, 'Binary Export Test');
 
-    // Read the raw LZC string from localStorage.
-    const rawLZC = localStorage.getItem('spaceAgencySave_0');
+    // Read the raw LZC string from IDB mock.
+    const rawLZC = _idbStore.get('spaceAgencySave_0') ?? null;
     expect(rawLZC).not.toBeNull();
 
     // Build a valid binary envelope manually and base64-encode it.
     const base64 = buildTestEnvelope(rawLZC!);
 
     // Import the binary envelope into slot 1.
-    const summary = importSave(base64, 1);
+    const summary = await importSave(base64, 1);
     expect(summary.slotIndex).toBe(1);
     expect(summary.saveName).toBe('Binary Export Test');
 
@@ -1619,11 +1531,11 @@ describe('Save export format', () => {
     state.money = 42_000;
     await saveGame(state, 0, 'CRC Test');
 
-    const rawLZC = localStorage.getItem('spaceAgencySave_0');
-    const base64 = buildTestEnvelope(rawLZC!, { corruptCrc: true });
+    const rawLZC = _idbStore.get('spaceAgencySave_0')!;
+    const base64 = buildTestEnvelope(rawLZC, { corruptCrc: true });
 
     // importSave should throw with a message about checksum or CRC.
-    expect(() => importSave(base64, 1)).toThrow(/checksum|CRC/i);
+    await expect(importSave(base64, 1)).rejects.toThrow(/checksum|CRC/i);
   });
 
   it('falls through to legacy import on wrong magic bytes and fails on invalid JSON', async () => {
@@ -1631,12 +1543,12 @@ describe('Save export format', () => {
     const state = freshState();
     await saveGame(state, 0, 'Magic Test');
 
-    const rawLZC = localStorage.getItem('spaceAgencySave_0');
-    const base64 = buildTestEnvelope(rawLZC!, { badMagic: true });
+    const rawLZC = _idbStore.get('spaceAgencySave_0')!;
+    const base64 = buildTestEnvelope(rawLZC, { badMagic: true });
 
     // Without SASV magic bytes, importSave falls back to legacy JSON import.
     // The base64 string is not valid JSON, so it should throw about invalid JSON.
-    expect(() => importSave(base64, 1)).toThrow(/not valid JSON|plain object/i);
+    await expect(importSave(base64, 1)).rejects.toThrow(/not valid JSON|plain object/i);
   });
 
   it('detects truncated payload and throws', async () => {
@@ -1645,36 +1557,13 @@ describe('Save export format', () => {
     state.money = 99_000;
     await saveGame(state, 0, 'Truncate Test');
 
-    const rawLZC = localStorage.getItem('spaceAgencySave_0');
-    const base64 = buildTestEnvelope(rawLZC!, { truncatePayload: true });
+    const rawLZC = _idbStore.get('spaceAgencySave_0')!;
+    const base64 = buildTestEnvelope(rawLZC, { truncatePayload: true });
 
     // importSave should throw with a message about corrupted or payload length.
-    expect(() => importSave(base64, 1)).toThrow(/corrupted|payload length/i);
+    await expect(importSave(base64, 1)).rejects.toThrow(/corrupted|payload length/i);
   });
 
-  it('imports a legacy JSON envelope string (old-format backward compatibility)', () => {
-    // Create a plain JSON envelope (no binary wrapping, no LZC compression).
-    const state = freshState();
-    state.money = 88_888;
-    state.agencyName = 'Legacy Import Agency';
-
-    const legacyJSON = JSON.stringify({
-      saveName: 'Legacy Save File',
-      timestamp: new Date(0).toISOString(),
-      state: JSON.parse(JSON.stringify(state)),
-    });
-
-    // importSave should accept this as a legacy JSON import.
-    const summary = importSave(legacyJSON, 2);
-    expect(summary.slotIndex).toBe(2);
-    expect(summary.saveName).toBe('Legacy Save File');
-    expect(summary.money).toBe(88_888);
-
-    // Verify the data is persisted and can be loaded back.
-    const saves = listSaves();
-    expect(saves[2]).not.toBeNull();
-    expect(saves[2]!.saveName).toBe('Legacy Save File');
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1833,7 +1722,7 @@ describe('Save/load round-trip for mining/route fields', () => {
 
 describe('Overflow saves via storageKey parameter', () => {
   /**
-   * Writes a compressed save envelope directly to localStorage under the
+   * Writes a compressed save envelope directly to the IDB mock under the
    * given key, bypassing saveGame() (which only accepts slots 0-4).
    */
   function seedOverflowSave(key: string, state: GameState, saveName = 'Overflow Save'): void {
@@ -1845,7 +1734,7 @@ describe('Overflow saves via storageKey parameter', () => {
     };
     const json = JSON.stringify(envelope);
     const compressed = compressSaveData(json);
-    localStorage.setItem(key, compressed);
+    _idbStore.set(key, compressed);
   }
 
   it('loads a save from overflow slot 7 via storageKey', async () => {
@@ -1872,7 +1761,7 @@ describe('Overflow saves via storageKey parameter', () => {
     expect(loaded.agencyName).toBe('Auto Agency');
   });
 
-  it('exports an overflow save without throwing (browser mocks)', () => {
+  it('exports an overflow save without throwing (browser mocks)', async () => {
     const state = freshState();
     state.money = 42_000;
     seedOverflowSave('spaceAgencySave_7', state, 'Export Overflow');
@@ -1896,24 +1785,12 @@ describe('Overflow saves via storageKey parameter', () => {
     vi.stubGlobal('Blob', MockBlob);
     vi.stubGlobal('URL', { createObjectURL: mockCreateObjectURL, revokeObjectURL: mockRevokeObjectURL });
 
-    expect(() => exportSave(-1, 'spaceAgencySave_7')).not.toThrow();
+    await exportSave(-1, 'spaceAgencySave_7');
     expect(mockDocument.createElement).toHaveBeenCalledWith('a');
     expect(mockCreateObjectURL).toHaveBeenCalled();
 
-    // Clean up extra stubs, then re-apply the localStorage mock.
+    // Clean up extra stubs.
     vi.unstubAllGlobals();
-    vi.stubGlobal('localStorage', mockStorage);
   });
 
-  it('loadGame(0) without storageKey still works for manual slots (backward compat)', async () => {
-    const state = freshState();
-    state.money = 11_111;
-    state.agencyName = 'Manual Agency';
-
-    await saveGame(state, 0, 'Manual Save');
-    const loaded = await loadGame(0);
-
-    expect(loaded.money).toBe(11_111);
-    expect(loaded.agencyName).toBe('Manual Agency');
-  });
 });
