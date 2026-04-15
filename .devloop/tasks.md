@@ -49,7 +49,7 @@
 - **Verification**: `npx vitest run src/tests/fpsMonitor.test.ts`
 
 ### TASK-009: Convert ui/vab.ts static imports to dynamic
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Eliminate the static imports of `src/ui/vab.ts` so it is only dynamically imported (fixing the Vite chunk-splitting warning). Two files need changes: (1) `src/ui/topbar.ts` (line ~33): Remove the static `import { syncVabToGameState } from '../ui/vab.ts'`. At the call site (line ~979), use `const { syncVabToGameState } = await import('./vab.ts');` then call it. Ensure the containing function is async. (2) `src/ui/flightController/_init.ts` (line ~20): Remove the static `import { getVabInventoryUsedParts } from '../vab.ts'`. At the call site (line ~180), use `const { getVabInventoryUsedParts } = await import('../vab.ts');` then call it. Ensure the containing function is async. See requirements.md Section 5.
 - **Verification**: `npm run build 2>&1 | grep -i "vab" && npx tsc --noEmit`

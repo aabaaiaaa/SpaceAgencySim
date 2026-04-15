@@ -17,7 +17,6 @@ import { addTransferObject as addTransferObjectFn, getProximityObjects as getPro
 import type { TransferObject as TransferObjectArg } from '../../core/transferObjects.ts';
 import { createDockingState } from '../../core/docking.ts';
 import { getPartById } from '../../data/parts.ts';
-import { getVabInventoryUsedParts } from '../vab.ts';
 import { getFCState, resetFCState, getPhysicsState, setPhysicsState, getFlightState, setFlightState } from './_state.ts';
 import './flightController.css';
 import { onKeyDown, onKeyUp } from './_keyboard.ts';
@@ -108,14 +107,14 @@ function _buildFlightOverlay(container: HTMLElement): void {
  * Initialises the PixiJS renderer, creates the physics state, mounts the HUD
  * overlay, builds the in-flight control overlay, and starts the game loop.
  */
-export function startFlightScene(
+export async function startFlightScene(
   container: HTMLElement,
   state: GameState,
   assembly: RocketAssembly,
   stagingConfig: StagingConfig,
   flightState: FlightState,
   onFlightEnd: (state: GameState | null, results?: unknown, dest?: string) => void,
-): void {
+): Promise<void> {
   logger.debug('flight', 'Starting flight scene', { missionId: flightState.missionId, bodyId: flightState.bodyId });
   const s = getFCState();
 
@@ -177,6 +176,7 @@ export function startFlightScene(
   }
 
   // Attach inventory-sourced part data for wear tracking on recovery.
+  const { getVabInventoryUsedParts } = await import('../vab.ts');
   ps._usedInventoryParts = getVabInventoryUsedParts();
 
   // Expose for E2E testing -- Playwright reads live physics values here.

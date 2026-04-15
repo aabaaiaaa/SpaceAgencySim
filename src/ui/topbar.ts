@@ -30,7 +30,6 @@ import { saveGame, loadGame, listSaves, SAVE_SLOT_COUNT, SAVE_VERSION } from '..
 import { reconcileParts } from '../core/missions.ts';
 import { GameMode, MAX_LOAN_BALANCE } from '../core/constants.ts';
 import { getPartById } from '../data/parts.ts';
-import { syncVabToGameState } from '../ui/vab.ts';
 import { openHelpPanel } from './help.ts';
 import { createListenerTracker } from './listenerTracker.ts';
 import { logger } from '../core/logger.ts';
@@ -974,8 +973,9 @@ function _openSaveSlotPicker(): void {
 
     // Capture slot index in closure
     const slotIndex: number = i;
-    card.addEventListener('click', () => {
+    card.addEventListener('click', async () => {
       const saveName: string = _state!.agencyName || 'New Save';
+      const { syncVabToGameState } = await import('./vab.ts');
       syncVabToGameState();
       void saveGame(_state!, slotIndex, saveName).then(() => {
         backdrop.remove();
