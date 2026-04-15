@@ -3,7 +3,6 @@ import { createGameState } from '../core/gameState.ts';
 import {
   saveGame,
   loadGame,
-  loadGameAsync,
   deleteSave,
   SAVE_VERSION,
   _setSessionStartTimeForTesting,
@@ -350,17 +349,17 @@ describe('deleteSave() IndexedDB mirroring', () => {
 });
 
 // ---------------------------------------------------------------------------
-// loadGameAsync() — dual-layer loading
+// loadGame() — dual-layer loading
 // ---------------------------------------------------------------------------
 
-describe('loadGameAsync()', () => {
+describe('loadGame()', () => {
   it('loads from localStorage when both layers have the same save', async () => {
     const state = freshState();
     state.money = 50_000;
     await saveGame(state, 0, 'Dual');
     await vi.runAllTimersAsync();
 
-    const restored = await loadGameAsync(0);
+    const restored = await loadGame(0);
     expect(restored.money).toBe(50_000);
   });
 
@@ -387,7 +386,7 @@ describe('loadGameAsync()', () => {
     };
     await idbSet('spaceAgencySave_0', JSON.stringify(newEnvelope));
 
-    const restored = await loadGameAsync(0);
+    const restored = await loadGame(0);
     expect(restored.money).toBe(99_000);
   });
 
@@ -414,7 +413,7 @@ describe('loadGameAsync()', () => {
     };
     localStorage.setItem('spaceAgencySave_0', JSON.stringify(newEnvelope));
 
-    const restored = await loadGameAsync(0);
+    const restored = await loadGame(0);
     expect(restored.money).toBe(77_000);
   });
 
@@ -429,7 +428,7 @@ describe('loadGameAsync()', () => {
     };
     await idbSet('spaceAgencySave_2', JSON.stringify(envelope));
 
-    const restored = await loadGameAsync(2);
+    const restored = await loadGame(2);
     expect(restored.money).toBe(88_000);
   });
 
@@ -444,17 +443,17 @@ describe('loadGameAsync()', () => {
     vi.stubGlobal('indexedDB', undefined);
     _resetDbForTesting();
 
-    const restored = await loadGameAsync(0);
+    const restored = await loadGame(0);
     expect(restored.money).toBe(33_000);
   });
 
   it('throws when both layers are empty', async () => {
-    await expect(loadGameAsync(3)).rejects.toThrow(/empty/i);
+    await expect(loadGame(3)).rejects.toThrow(/empty/i);
   });
 
   it('throws RangeError for invalid slot index', async () => {
-    await expect(loadGameAsync(-1)).rejects.toThrow(RangeError);
-    await expect(loadGameAsync(5)).rejects.toThrow(RangeError);
+    await expect(loadGame(-1)).rejects.toThrow(RangeError);
+    await expect(loadGame(5)).rejects.toThrow(RangeError);
   });
 
   it('restores IndexedDB save to localStorage for subsequent sync loads', async () => {
@@ -469,8 +468,8 @@ describe('loadGameAsync()', () => {
     };
     await idbSet('spaceAgencySave_0', JSON.stringify(envelope));
 
-    // loadGameAsync should write it back to localStorage.
-    await loadGameAsync(0);
+    // loadGame should write it back to localStorage.
+    await loadGame(0);
 
     // Now loadGame should work.
     const syncRestored = await loadGame(0);

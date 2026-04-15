@@ -365,25 +365,22 @@ export function compressSaveData(json: string): string {
 
 /**
  * Decompresses a storage string back to JSON.
- * If the string doesn't have the compressed prefix, returns it as-is
- * (backward compatibility with uncompressed saves).
+ * Throws if the compressed prefix is missing (corrupt data).
  */
 export function decompressSaveData(raw: string): string {
-  if (raw.startsWith(COMPRESSED_PREFIX)) {
-    const decompressed = decompressFromUTF16(raw.slice(COMPRESSED_PREFIX.length));
-    if (decompressed === null) {
-      throw new Error('Failed to decompress save data');
-    }
-    return decompressed;
+  if (!raw.startsWith(COMPRESSED_PREFIX)) {
+    throw new Error('Save data is missing the compressed prefix — possibly corrupt.');
   }
-  // Uncompressed (pre-compression) save — return as-is.
-  return raw;
+  const decompressed = decompressFromUTF16(raw.slice(COMPRESSED_PREFIX.length));
+  if (decompressed === null) {
+    throw new Error('Failed to decompress save data');
+  }
+  return decompressed;
 }
 
 /**
- * Parses a raw storage string (possibly compressed) and returns the parsed
- * envelope object, or null if the data is missing, corrupt, or structurally
- * invalid. Handles both compressed and uncompressed formats.
+ * Parses a raw compressed storage string and returns the parsed envelope
+ * object, or null if the data is missing, corrupt, or structurally invalid.
  */
 function parseEnvelope(raw: string | null): SaveEnvelope | null {
   if (raw === null) return null;
@@ -488,11 +485,6 @@ export function applyPersistedSettings(state: GameState): void {
   state.malfunctionMode    = settings.malfunctionMode;
 }
 
-/**
- * Backward-compatible alias for loadGame.
- * @deprecated Use loadGame() directly.
- */
-export const loadGameAsync = loadGame;
 
 // ---------------------------------------------------------------------------
 // Delete
@@ -652,10 +644,9 @@ export async function exportSave(slotIndex: number, storageKey?: string): Promis
 /**
  * Imports a save into the specified slot.
  *
- * Accepts two formats:
- * 1. **New binary envelope** (base64-encoded): starts with "SASV" magic bytes
- *    after base64 decoding.  Contains CRC-32 integrity check and LZC payload.
- * 2. **Legacy JSON string**: plain JSON text as exported by older versions.
+ * Accepts the binary envelope format (base64-encoded): starts with "SASV"
+ * magic bytes after base64 decoding. Contains CRC-32 integrity check and
+ * LZC payload.
  *
  * The envelope and its embedded state are checked for required fields and
  * correct types before anything is written to storage; invalid input
@@ -667,14 +658,12 @@ export async function exportSave(slotIndex: number, storageKey?: string): Promis
 export async function importSave(inputString: string, slotIndex: number): Promise<SaveSlotSummary> {
   assertValidSlot(slotIndex);
 
-  // --- Attempt new binary envelope format -----------------------------------
   const decoded = base64ToUint8(inputString.trim());
   if (decoded !== null && hasMagicBytes(decoded)) {
     return _importBinaryEnvelope(decoded, slotIndex);
   }
 
-  // --- Fall back to legacy JSON import --------------------------------------
-  return _importLegacyJson(inputString, slotIndex);
+  throw new Error('Import failed: unrecognized save format.');
 }
 
 /**
@@ -735,7 +724,7 @@ async function _importBinaryEnvelope(bytes: Uint8Array, slotIndex: number): Prom
     throw new Error('Import failed: JSON root must be a plain object.');
   }
 
-  // Validate envelope and state fields (same checks as legacy path).
+  // Validate envelope and state fields.
   _validateEnvelopeFields(envelope);
   _validateState(envelope.state);
 
@@ -745,33 +734,6 @@ async function _importBinaryEnvelope(bytes: Uint8Array, slotIndex: number): Prom
   return summaryFromEnvelope(slotIndex, envelope, slotKey(slotIndex));
 }
 
-/**
- * Imports a save from the legacy JSON string format (backward compatibility).
- *
- * @throws {Error} If the JSON is malformed or required fields are absent.
- */
-async function _importLegacyJson(jsonString: string, slotIndex: number): Promise<SaveSlotSummary> {
-  let envelope: SaveEnvelope;
-  try {
-    envelope = JSON.parse(jsonString);
-  } catch {
-    throw new Error('Import failed: the provided data is not valid JSON.');
-  }
-
-  if (!envelope || typeof envelope !== 'object' || Array.isArray(envelope)) {
-    throw new Error('Import failed: JSON root must be a plain object.');
-  }
-
-  _validateEnvelopeFields(envelope);
-  _validateState(envelope.state);
-
-  // Persist — compress and store.
-  const json = JSON.stringify(envelope);
-  const compressed = compressSaveData(json);
-  await _persistImport(compressed, slotIndex);
-
-  return summaryFromEnvelope(slotIndex, envelope, slotKey(slotIndex));
-}
 
 /**
  * Validates the top-level envelope fields (saveName, timestamp, state).

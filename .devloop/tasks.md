@@ -73,7 +73,7 @@
 - **Verification**: `npx playwright test e2e/saveload.spec.ts e2e/auto-save.spec.ts` — both pass.
 
 ### TASK-013: Remove backward-compat code from saveload.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-005, TASK-010
 - **Description**: Remove backward-compatibility code from `saveload.ts`: (1) Delete `loadGameAsync` export alias (line 550). (2) Delete `_importLegacyJson()` function (line 809) and the fallback call to it in the import flow. (3) In `decompressSaveData()` (line 389), remove the uncompressed-save fallback — if the compressed prefix is missing, throw an error (treat as corrupt data). Keep all version-check logic. See requirements.md section 3.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts && npm run typecheck` — all tests pass, no type errors. Grep for `loadGameAsync`, `_importLegacyJson`, and `legacy` in `saveload.ts` returns no results.
