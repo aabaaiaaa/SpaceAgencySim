@@ -109,7 +109,7 @@ Implementation plan: `docs/superpowers/plans/2026-04-15-iteration-14.md`
 - **Verification**: `npx playwright test e2e/auto-save.spec.ts e2e/saveload.spec.ts` — all tests pass.
 
 ### TASK-015: Final typecheck, lint, and smoke test verification
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-008, TASK-009, TASK-010, TASK-010a, TASK-011, TASK-012, TASK-013, TASK-014
 - **Description**: Full verification pass. (1) `npx tsc --noEmit` — 0 errors. (2) `npm run lint` — 0 errors, 0 warnings. (3) `npm run test:smoke:unit` — all smoke tests pass. (4) `npm run test:smoke:e2e` — all smoke E2E tests pass. (5) `npm run build` — production build succeeds with no warnings. (6) Verify no Date.now() ID generation patterns remain: `grep -rn "Date.now()" src/core/ --include="*.ts"` should show only timestamp usage (save dates), not entity IDs. Fix any issues found and commit.
 - **Verification**: `npm run test:smoke` — all smoke tests (unit + E2E) pass.
