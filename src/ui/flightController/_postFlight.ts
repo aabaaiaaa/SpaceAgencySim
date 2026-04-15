@@ -517,7 +517,7 @@ export function showPostFlightSummary(
         currentStageIdx: 0,
       };
 
-      startFlightScene(ctr, gs, freshAssembly as RocketAssembly, freshStaging, gs.currentFlight!, endCb as (state: GameState | null, results?: unknown, dest?: string) => void);
+      void startFlightScene(ctr, gs, freshAssembly as RocketAssembly, freshStaging, gs.currentFlight!, endCb as (state: GameState | null, results?: unknown, dest?: string) => void);
     });
     secondaryRow.appendChild(restartBtn);
   }

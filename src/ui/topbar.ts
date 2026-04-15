@@ -973,12 +973,13 @@ function _openSaveSlotPicker(): void {
 
     // Capture slot index in closure
     const slotIndex: number = i;
-    card.addEventListener('click', async () => {
+    card.addEventListener('click', () => {
       const saveName: string = _state!.agencyName || 'New Save';
-      const { syncVabToGameState } = await import('./vab.ts');
-      syncVabToGameState();
-      void saveGame(_state!, slotIndex, saveName).then(() => {
-        backdrop.remove();
+      void import('./vab.ts').then(({ syncVabToGameState }) => {
+        syncVabToGameState();
+        void saveGame(_state!, slotIndex, saveName).then(() => {
+          backdrop.remove();
+        });
       });
     });
 

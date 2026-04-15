@@ -776,7 +776,7 @@ function _doLaunch(
   destroyLaunchPadUI();
 
   if (container) {
-    startFlightScene(
+    void startFlightScene(
       container,
       state,
       assembly,

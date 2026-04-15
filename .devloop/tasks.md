@@ -61,7 +61,7 @@
 - **Verification**: `npm run build 2>&1 | grep -i "vab" && npx tsc --noEmit`
 
 ### TASK-011: Final typecheck, lint, and smoke test verification
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010
 - **Description**: Run full verification suite to confirm no regressions: typecheck, lint, and smoke tests (unit + E2E). Fix any issues found.
 - **Verification**: `npx tsc --noEmit && npm run lint && npm run test:smoke:unit && npm run test:smoke:e2e`

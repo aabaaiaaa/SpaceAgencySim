@@ -268,7 +268,7 @@ function doLaunch(crewIds: string[]): void {
 
   const container = S.container ?? document.getElementById('ui-overlay');
   if (container) {
-    startFlightScene(
+    void startFlightScene(
       container,
       S.gameState,
       S.assembly,

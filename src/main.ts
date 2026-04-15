@@ -152,7 +152,7 @@ async function main() {
         setMalfunctionMode(state, 'off');
       }
 
-      startFlightScene(
+      void startFlightScene(
         uiOverlay,
         state,
         assembly,
