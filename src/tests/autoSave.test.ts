@@ -126,7 +126,8 @@ describe('performAutoSave', () => {
 
     const json = decompressSaveData(raw!);
     const envelope = JSON.parse(json);
-    expect(envelope.saveName).toBe('Auto-Save');
+    expect(envelope.saveName).toBe('Test Agency');
+    expect(envelope.autoSave).toBe(true);
     expect(envelope.state.agencyName).toBe('Test Agency');
     expect(typeof envelope.timestamp).toBe('string');
     expect(envelope.version).toBe(6);
@@ -229,7 +230,8 @@ describe('performAutoSave', () => {
 
     const json = decompressSaveData(raw!);
     const envelope = JSON.parse(json);
-    expect(envelope.saveName).toBe('Auto-Save');
+    expect(envelope.saveName).toBe('Fallback Agency');
+    expect(envelope.autoSave).toBe(true);
     expect(envelope.state.agencyName).toBe('Fallback Agency');
   });
 });
@@ -324,7 +326,8 @@ describe('auto-save slot reuse', () => {
     expect(raw).not.toBeNull();
     const json = decompressSaveData(raw!);
     const saved = JSON.parse(json);
-    expect(saved.saveName).toBe('Auto-Save');
+    expect(saved.saveName).toBe('NASA');
+    expect(saved.autoSave).toBe(true);
     expect(saved.state.agencyName).toBe('NASA');
   });
 

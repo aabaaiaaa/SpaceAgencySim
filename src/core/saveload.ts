@@ -112,6 +112,8 @@ export interface SaveSlotSummary {
   gameMode: string;
   /** Save format version (0 for pre-versioning saves). */
   version: number;
+  /** True if this save was created by auto-save. */
+  isAutoSave: boolean;
 }
 
 /** Raw save envelope stored in localStorage. */
@@ -120,6 +122,7 @@ interface SaveEnvelope {
   timestamp: string;
   version?: number;
   compressed?: boolean;
+  autoSave?: boolean;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- deserialized JSON with unknown shape before migration
   state: any;
 }
@@ -285,6 +288,7 @@ function summaryFromEnvelope(slotIndex: number, envelope: SaveEnvelope, storageK
     flightTimeSeconds: s.flightTimeSeconds ?? 0,
     gameMode: s.gameMode ?? (s.tutorialMode ? GameMode.TUTORIAL : GameMode.FREEPLAY),
     version: envelope.version ?? 0,
+    isAutoSave: envelope.autoSave === true || envelope.saveName === 'Auto-Save',
   };
 }
 

@@ -343,9 +343,14 @@ function _buildSaveCard(summary: SaveSlotSummary): HTMLDivElement {
     ? `<span class="mm-version-warning" data-testid="version-warning">v${summary.version} (current: v${SAVE_VERSION})</span>`
     : '';
 
+  const autoSaveBadge = summary.isAutoSave
+    ? '<span class="mm-mode-badge mm-mode-autosave">AUTO-SAVE</span>'
+    : '';
+  const showAgencyLine = summary.agencyName && summary.agencyName !== summary.saveName;
+
   card.innerHTML = `
-    <p class="mm-save-card-name">${escapeHtml(summary.saveName)} ${modeBadge}</p>
-    ${summary.agencyName ? `<p class="mm-save-card-agency" data-agency-name="${escapeHtml(summary.agencyName)}">${escapeHtml(summary.agencyName)}</p>` : ''}
+    <p class="mm-save-card-name">${escapeHtml(summary.saveName)} ${modeBadge} ${autoSaveBadge}</p>
+    ${showAgencyLine ? `<p class="mm-save-card-agency" data-agency-name="${escapeHtml(summary.agencyName)}">${escapeHtml(summary.agencyName)}</p>` : ''}
     <p class="mm-save-card-date">Saved ${formatDate(summary.timestamp)}${versionBadge}</p>
     <div class="mm-save-card-stats">
       <div class="mm-stat">

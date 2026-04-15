@@ -88,7 +88,7 @@ function _getAutoSaveKey(agencyName: string): string {
     try {
       const json = decompressSaveData(raw);
       const envelope = JSON.parse(json);
-      if (envelope.saveName === 'Auto-Save' && envelope.state?.agencyName === agencyName) {
+      if ((envelope.autoSave === true || envelope.saveName === 'Auto-Save') && envelope.state?.agencyName === agencyName) {
         _autoSaveSlotKey = key;
         return key;
       }
@@ -131,9 +131,10 @@ export async function performAutoSave(
   const saveKey = _getAutoSaveKey(state.agencyName);
 
   const envelope = {
-    saveName: 'Auto-Save',
+    saveName: state.agencyName || 'Auto-Save',
     timestamp: new Date().toISOString(),
     version: SAVE_VERSION,
+    autoSave: true,
     state: JSON.parse(JSON.stringify(state)),
   };
 

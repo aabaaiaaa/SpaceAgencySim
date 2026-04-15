@@ -149,6 +149,11 @@
   color: #60c880;
   border: 1px solid rgba(80, 200, 120, 0.3);
 }
+.mm-mode-autosave {
+  background: rgba(160, 130, 200, 0.2);
+  color: #b0a0d0;
+  border: 1px solid rgba(160, 130, 200, 0.3);
+}
 
 .mm-save-card-agency {
   font-size: 0.82rem;
