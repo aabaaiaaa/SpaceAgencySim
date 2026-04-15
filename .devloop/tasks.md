@@ -7,7 +7,7 @@
 - **Verification**: `npx vitest run src/tests/saveload.test.ts`
 
 ### TASK-002: Wire mainmenu handlers to pass storageKey through
-- **Status**: pending
+- **Status**: in-progress
 - **Dependencies**: TASK-001
 - **Description**: In `src/ui/mainmenu.ts`: (1) In `_handleLoad()` (line ~599), change `loadGame(slotIndex)` to `loadGame(slotIndex, storageKey)`. (2) In `_handleExport()` (line ~634), rename the parameter from `_storageKey` to `storageKey` and change `exportSave(slotIndex)` to `exportSave(slotIndex, storageKey)`. See requirements.md Section 1 for the bug flow.
 - **Verification**: `npx tsc --noEmit src/ui/mainmenu.ts && npx vitest run src/tests/saveload.test.ts`
@@ -31,7 +31,7 @@
 - **Verification**: `npx playwright test e2e/asteroid-belt.spec.ts --grep "belt zones"`
 
 ### TASK-006: Notification stacking guard
-- **Status**: pending
+- **Status**: in-progress
 - **Dependencies**: none
 - **Description**: In `src/ui/notification.ts`, fix the `showNotification()` function so that only one toast is visible at a time. (1) Add a `data-notification-toast` attribute to the toast div when creating it (e.g., `toast.setAttribute('data-notification-toast', '')`). (2) At the top of `showNotification()`, before creating the new toast element, remove any existing toast: `document.querySelector('[data-notification-toast]')?.remove()`. See requirements.md Section 3.
 - **Verification**: `npx vitest run src/tests/ui-helpers.test.ts`

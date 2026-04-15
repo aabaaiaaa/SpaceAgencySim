@@ -7,7 +7,9 @@
  * Show a brief toast notification that auto-dismisses after 4 seconds.
  */
 export function showNotification(message: string, type: 'error' | 'info' = 'info'): void {
+  document.querySelector('[data-notification-toast]')?.remove();
   const toast = document.createElement('div');
+  toast.setAttribute('data-notification-toast', '');
   Object.assign(toast.style, {
     position: 'fixed',
     bottom: '24px',

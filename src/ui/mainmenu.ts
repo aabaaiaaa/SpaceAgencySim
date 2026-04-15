@@ -619,7 +619,7 @@ async function _handleLoad(slotIndex: number, storageKey?: string): Promise<void
   }
 
   try {
-    const state = await loadGame(slotIndex);
+    const state = await loadGame(slotIndex, storageKey);
     reconcileParts(state);
     _beginGame(state);
   } catch (err: unknown) {
@@ -631,9 +631,9 @@ async function _handleLoad(slotIndex: number, storageKey?: string): Promise<void
 /**
  * Exports the save in the given slot as a JSON file download.
  */
-function _handleExport(slotIndex: number, _storageKey?: string): void {
+function _handleExport(slotIndex: number, storageKey?: string): void {
   try {
-    exportSave(slotIndex);
+    exportSave(slotIndex, storageKey);
   } catch (err: unknown) {
     logger.error('mainMenu', 'Export failed', { error: String(err) });
     _showGlobalError(`Export failed: ${(err as Error).message}`);
