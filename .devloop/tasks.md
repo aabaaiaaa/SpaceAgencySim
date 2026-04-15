@@ -37,7 +37,7 @@
 - **Verification**: `npx vitest run src/tests/ui-helpers.test.ts`
 
 ### TASK-007: Export cloneStaging and restoreStaging with unit tests
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/ui/vab/_undoActions.ts`, export the `cloneStaging()` and `restoreStaging()` functions (they are currently module-private). Then create `src/tests/undoActions.test.ts` with unit tests: (1) `cloneStaging` produces independent copy — mutating original doesn't affect clone. (2) Handles empty stages array and empty unstaged array. (3) `restoreStaging` overwrites target properties in-place. (4) Preserves target object reference (same `===` identity after restore). (5) Handles empty config. Import `StagingConfig` type from `src/core/rocketbuilder.ts` for test fixtures. See requirements.md Section 4a.
 - **Verification**: `npx vitest run src/tests/undoActions.test.ts`

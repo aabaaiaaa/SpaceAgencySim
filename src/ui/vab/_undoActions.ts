@@ -21,7 +21,7 @@ import type { StagingConfig, PlacedPart, PartConnection } from '../../core/rocke
 /**
  * Deep-clone a StagingConfig (stages arrays + unstaged array + index).
  */
-function cloneStaging(config: StagingConfig): StagingConfig {
+export function cloneStaging(config: StagingConfig): StagingConfig {
   return {
     stages: config.stages.map(s => ({ instanceIds: [...s.instanceIds] })),
     unstaged: [...config.unstaged],
@@ -33,7 +33,7 @@ function cloneStaging(config: StagingConfig): StagingConfig {
  * Overwrite the contents of `target` with a clone of `source`.
  * Preserves the object reference (important for VAB state).
  */
-function restoreStaging(target: StagingConfig, source: StagingConfig): void {
+export function restoreStaging(target: StagingConfig, source: StagingConfig): void {
   target.stages = source.stages.map(s => ({ instanceIds: [...s.instanceIds] }));
   target.unstaged = [...source.unstaged];
   target.currentStageIdx = source.currentStageIdx;
