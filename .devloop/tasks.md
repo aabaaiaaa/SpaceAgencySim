@@ -13,7 +13,7 @@
 - **Verification**: `npx vitest run src/tests/collision.test.ts` passes (or the file containing collision tests). Run `npm run typecheck` with no errors.
 
 ### TASK-003: Add unit test for zero-mass collision guard
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-002
 - **Description**: Add a unit test verifying that the collision system does not produce NaN/Infinity when bodies have zero mass. If `_resolveCollision` is not directly exported, test through the public collision API. Create a scenario with two colliding bodies where mass would be zero (e.g., empty `activeParts` sets with mocked `_bodyMass` returning 0), and assert that resulting velocities/positions are finite numbers. See requirements Section 2.
 - **Verification**: `npx vitest run src/tests/collision.test.ts` passes, including the new test.

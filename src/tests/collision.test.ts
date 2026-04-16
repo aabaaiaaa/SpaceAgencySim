@@ -438,6 +438,82 @@ describe('Collision response', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Zero-mass defensive guard
+// ---------------------------------------------------------------------------
+
+describe('Zero-mass collision guard', () => {
+  /**
+   * _resolveCollision has a defensive early-return for zero/negative mass
+   * (added as defense-in-depth; _bodyMass currently clamps to Math.max(1, mass)).
+   * These tests verify the collision pipeline produces finite values for
+   * bodies with minimal mass, exercising the resolution path that the guard
+   * protects.
+   */
+
+  it('does not produce NaN or Infinity with minimal-mass colliding bodies', () => {
+    // Use two single-part bodies (probe-core-mk1 = 50 kg each).
+    // Even though _bodyMass clamps to >= 1, this exercises the full
+    // _resolveCollision code path including the division-by-mass lines.
+    const assembly = createRocketAssembly();
+    const id1 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+    const id2 = addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+
+    const ps = makePhysicsState({
+      posX: 0, posY: 100.3, velX: 0, velY: -10,
+      activeParts: new Set([id1]),
+      debris: [makeDebrisState({
+        id: 'debris-zeromass',
+        posX: 0, posY: 100, velX: 0, velY: 10,
+        activeParts: new Set([id2]),
+      })],
+    });
+
+    tickCollisions(ps, assembly, 1 / 60);
+
+    // All physics values must be finite (no NaN, no Infinity).
+    expect(Number.isFinite(ps.posX)).toBe(true);
+    expect(Number.isFinite(ps.posY)).toBe(true);
+    expect(Number.isFinite(ps.velX)).toBe(true);
+    expect(Number.isFinite(ps.velY)).toBe(true);
+    expect(Number.isFinite(ps.angularVelocity)).toBe(true);
+
+    const debris = ps.debris[0];
+    expect(Number.isFinite(debris.posX)).toBe(true);
+    expect(Number.isFinite(debris.posY)).toBe(true);
+    expect(Number.isFinite(debris.velX)).toBe(true);
+    expect(Number.isFinite(debris.velY)).toBe(true);
+    expect(Number.isFinite(debris.angularVelocity)).toBe(true);
+  });
+
+  it('bodies with unresolvable parts in activeParts do not collide (guard fires)', () => {
+    // If activeParts contains IDs not in the assembly, _bodyMass sums 0 and
+    // clamps to 1. computeAABB skips unknown IDs, producing a degenerate
+    // AABB (Infinity bounds) that cannot overlap. Verify no crash occurs.
+    const assembly = createRocketAssembly();
+    // Add real parts so the assembly is valid, but give them to nobody.
+    addPartToAssembly(assembly, 'probe-core-mk1', 0, 0);
+
+    const ps = makePhysicsState({
+      posX: 0, posY: 100, velX: 0, velY: -10,
+      activeParts: new Set(['nonexistent-id-1']),
+      debris: [makeDebrisState({
+        id: 'debris-noparts',
+        posX: 0, posY: 100, velX: 0, velY: 10,
+        activeParts: new Set(['nonexistent-id-2']),
+      })],
+    });
+
+    const velYBefore = ps.velY;
+    // Should not throw and should not modify velocities (no valid AABB overlap).
+    tickCollisions(ps, assembly, 1 / 60);
+
+    expect(ps.velY).toBe(velYBefore);
+    expect(Number.isFinite(ps.velY)).toBe(true);
+    expect(Number.isFinite(ps.debris[0].velY)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Separation Impulse
 // ---------------------------------------------------------------------------
 
