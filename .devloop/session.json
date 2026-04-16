@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 3,
+  "lastIteration": 4,
   "startedAt": "2026-04-16T13:35:03.728Z",
   "iteration": 17,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-004",
-    "taskTitle": "Add IDB availability check at startup",
-    "iterationNumber": 4,
-    "startedAt": "2026-04-16T13:42:57.906Z"
+    "taskId": "TASK-005",
+    "taskTitle": "Improve main.ts generic error handler to show visible errors",
+    "iterationNumber": 5,
+    "startedAt": "2026-04-16T13:45:07.075Z"
   }
 }

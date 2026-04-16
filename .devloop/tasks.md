@@ -25,7 +25,7 @@
 - **Verification**: `npm run typecheck` passes. `npm run build` succeeds. Manual inspection: the `isIdbAvailable()` call exists before `initSettings()`.
 
 ### TASK-005: Improve main.ts generic error handler to show visible errors
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-004
 - **Description**: Update the `main().catch()` handler at `src/main.ts:228-230` to display a user-visible error in the DOM, not just `logger.error()`. Extract the error display logic from TASK-004 into a shared helper (e.g., `_showFatalError(message: string)`) that both the IDB check and the catch handler can use. The helper should create a styled overlay div with the error message. See requirements Section 3.
 - **Verification**: `npm run typecheck` passes. `npm run build` succeeds. Inspect `main.ts` — the catch handler now calls the visible error function.
