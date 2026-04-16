@@ -1,7 +1,7 @@
 # Iteration 18 — Tasks
 
 ### TASK-001: Extract showFatalError to src/ui/fatalError.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create `src/ui/fatalError.ts` containing the `showFatalError` function currently defined at `src/main.ts:68-78`. Copy the function body exactly as-is. The file should export only this one function. See requirements.md section 1 for the exact code.
 - **Verification**: `npx tsc --noEmit src/ui/fatalError.ts` (no type errors)
