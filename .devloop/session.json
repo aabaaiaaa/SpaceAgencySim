@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 31,
+  "lastIteration": 32,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-032",
-    "taskTitle": "Audit remaining src/render/flight/* sub-modules for destroy",
-    "iterationNumber": 32,
-    "startedAt": "2026-04-16T23:43:21.146Z"
+    "taskId": "TASK-033",
+    "taskTitle": "Add unit test for RendererPool drain behaviour",
+    "iterationNumber": 33,
+    "startedAt": "2026-04-16T23:47:51.120Z"
   }
 }

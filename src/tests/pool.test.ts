@@ -313,5 +313,30 @@ describe('RendererPool', () => {
     it('can be called on an empty pool without error', () => {
       expect(() => pool.drain()).not.toThrow();
     });
+
+    it('empties pool holding several Graphics and Text objects', () => {
+      const graphics = [
+        pool.acquireGraphics(),
+        pool.acquireGraphics(),
+        pool.acquireGraphics(),
+      ];
+      const texts = [pool.acquireText(), pool.acquireText()];
+
+      graphics.forEach((g) => pool.releaseGraphics(g));
+      texts.forEach((t) => pool.releaseText(t));
+
+      pool.drain();
+
+      // After drain, pool is empty — each new acquire must produce a brand-new
+      // object distinct from every previously-held one.
+      for (let i = 0; i < 3; i++) {
+        const fresh = pool.acquireGraphics();
+        expect(graphics).not.toContain(fresh);
+      }
+      for (let i = 0; i < 2; i++) {
+        const fresh = pool.acquireText();
+        expect(texts).not.toContain(fresh);
+      }
+    });
   });
 });

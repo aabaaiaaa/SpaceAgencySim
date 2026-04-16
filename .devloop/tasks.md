@@ -217,7 +217,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/render-*.test.ts` passes.
 
 ### TASK-033: Add unit test for RendererPool drain behaviour
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §5.4. Check `src/tests/` for existing RendererPool tests. If drain isn't covered, add a test: acquire several Graphics + Text, call `drain()`, assert pool is empty and assert `destroy()` was called on each acquired item (via mock). Mock PixiJS primitives if needed.
 - **Verification**: `npx vitest run src/tests/render-pool.test.ts` (or wherever the new test lives) passes.
