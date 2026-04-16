@@ -453,6 +453,9 @@ export function applySeparationImpulse(ps: PhysicsState, debris: DebrisLike, ass
  * Resolve a collision between two overlapping bodies.
  */
 function _resolveCollision(a: CollisionBody, b: CollisionBody, assembly: RocketAssembly, dt: number): void {
+  // Defensive guard: prevent NaN/Infinity from division by zero mass.
+  if (!a.mass || a.mass <= 0 || !b.mass || b.mass <= 0) return;
+
   const aabbA = a.aabb!;
   const aabbB = b.aabb!;
 

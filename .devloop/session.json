@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 0,
+  "lastIteration": 1,
   "startedAt": "2026-04-16T13:35:03.728Z",
   "iteration": 17,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-001",
-    "taskTitle": "Fix flaky workerBridgeTimeout test with module isolation",
-    "iterationNumber": 1,
-    "startedAt": "2026-04-16T13:35:03.749Z"
+    "taskId": "TASK-002",
+    "taskTitle": "Add defensive division guard in collision.ts _resolveCollision",
+    "iterationNumber": 2,
+    "startedAt": "2026-04-16T13:36:57.196Z"
   }
 }

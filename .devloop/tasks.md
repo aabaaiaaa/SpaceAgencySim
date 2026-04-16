@@ -7,7 +7,7 @@
 - **Verification**: `npx vitest run src/tests/workerBridgeTimeout.test.ts` passes in under 5 seconds, then `npx vitest run src/tests/workerBridgeTimeout.test.ts src/tests/physics.test.ts src/tests/saveload.test.ts` passes (simulates parallel contention).
 
 ### TASK-002: Add defensive division guard in collision.ts _resolveCollision
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/core/collision.ts`, add an early-return guard at the top of `_resolveCollision()` (before line 495) that returns if `a.mass` or `b.mass` is falsy or <= 0. This prevents NaN/Infinity from division by zero if `_bodyMass()` or `_bodyMoI()` are ever modified to remove their `Math.max(1, ...)` floor. The guard follows the same defensive pattern used in `physics.ts` at lines 1023, 1081, 1127, 1463. See requirements Section 2.
 - **Verification**: `npx vitest run src/tests/collision.test.ts` passes (or the file containing collision tests). Run `npm run typecheck` with no errors.
