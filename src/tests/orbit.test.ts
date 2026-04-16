@@ -244,6 +244,14 @@ describe('computeOrbitalElements', () => {
     const el = computeOrbitalElements(0, 100_000, 7800, 0, 'MARS', 0);
     expect(el).toBeNull();
   });
+
+  it('returns null when radius from body centre is zero (degenerate)', () => {
+    // posX=0 with posY=-R_EARTH puts the craft exactly at the body centre,
+    // yielding r=0. Division by r would corrupt downstream math; guard must
+    // short-circuit to null.
+    const el = computeOrbitalElements(0, -R_EARTH, 0, 0, EARTH, 0);
+    expect(el).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

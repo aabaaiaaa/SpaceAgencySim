@@ -230,6 +230,7 @@ export function computeOrbitalElements(posX: number, posY: number, velX: number,
   const x = posX;
   const y = posY + R;
   const r = Math.sqrt(x * x + y * y);
+  if (r <= 0) return null;
   const v2 = velX * velX + velY * velY;
 
   // Specific angular momentum (scalar, 2D cross product z-component).

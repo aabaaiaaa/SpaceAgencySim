@@ -165,7 +165,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/workerBridgeTimeout.test.ts` passes. Extend the test to cover the new timeout if feasible.
 
 ### TASK-025: Add low-level guard in orbit.ts for r <= 0
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §4.4. Identify the lowest-level helper in `src/core/orbit.ts` that divides by `r` (radius) and add a `if (r <= 0) return null;` guard at the top. Pick the helper that is most upstream in the orbital math chain so the guard propagates naturally. Add a unit test in `src/tests/orbit.test.ts` that exercises the guard.
 - **Verification**: `npx vitest run src/tests/orbit.test.ts` passes.
