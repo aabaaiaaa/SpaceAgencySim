@@ -1892,3 +1892,59 @@ describe('saveGame() — QuotaExceededError propagation', () => {
     await expect(saveGame(state, 0, 'generic test')).rejects.toBe(genericErr);
   });
 });
+
+// ---------------------------------------------------------------------------
+// saveGame — settings-sync failure handling
+// ---------------------------------------------------------------------------
+
+describe('saveGame() — settings-sync failure handling', () => {
+  /**
+   * Install a mock that rejects only on the settings-key write, so the
+   * main save-slot write succeeds. The settings write in saveGame is
+   * intentionally not awaited — its failure must not kill the main save.
+   */
+  function rejectSettingsWrite(err: unknown): void {
+    vi.mocked(idbSet).mockImplementation((key: string, value: string) => {
+      if (key === 'spaceAgency_settings') {
+        return Promise.reject(err);
+      }
+      _idbStore.set(key, value);
+      return Promise.resolve();
+    });
+  }
+
+  afterEach(() => {
+    vi.mocked(idbSet).mockImplementation((key: string, value: string) => {
+      _idbStore.set(key, value);
+      return Promise.resolve();
+    });
+  });
+
+  it('main save still completes when settings sync fails, and failure is logged', async () => {
+    const state = freshState();
+    const settingsErr = Object.assign(new Error('The quota has been exceeded.'), {
+      name: 'QuotaExceededError',
+    });
+    rejectSettingsWrite(settingsErr);
+
+    const warnSpy = vi.spyOn(logger, 'warn');
+
+    // The main save must succeed despite the settings-write rejection.
+    const summary = await saveGame(state, 0, 'settings fail test');
+    expect(summary).toBeDefined();
+    expect(summary.saveName).toBe('settings fail test');
+
+    // Allow the unawaited settings promise's .catch() to run.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // The failure must be surfaced through the logger.
+    const calls = warnSpy.mock.calls;
+    const matched = calls.some(
+      (args) => args[0] === 'save' && String(args[1]).includes('Settings sync failed during save'),
+    );
+    expect(matched).toBe(true);
+
+    warnSpy.mockRestore();
+  });
+});

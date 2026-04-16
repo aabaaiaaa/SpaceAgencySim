@@ -25,7 +25,7 @@
 - **Verification**: `npx vitest run src/tests/saveload.test.ts src/tests/settingsStore.test.ts src/tests/autoSave.test.ts` passes.
 
 ### TASK-005: Fix fire-and-forget saveSettings in saveGame
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-002
 - **Description**: Replace the `void saveSettings(...)` call at `src/core/saveload.ts:320–328` with a `.catch()`-attached variant that logs the failure via `logger.warn('save', 'Settings sync failed during save', err)` and surfaces it to the user (non-fatal toast). The main save must still succeed if the settings sync fails. See requirements §1.2.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` passes, including a new test that simulates a settings-write failure inside saveGame and asserts the main save still completes while the failure is logged.

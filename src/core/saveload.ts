@@ -333,14 +333,17 @@ export async function saveGame(state: GameState, slotIndex: number, saveName: st
   // Sync current settings to the dedicated settings key on every save,
   // ensuring the dedicated store stays up-to-date even if a settings
   // mutation path didn't call saveSettings() directly.
-  // Best-effort fire-and-forget — cache is updated synchronously,
-  // IDB write failure won't block the actual save.
-  void saveSettings({
+  // Cache is updated synchronously; the IDB write is intentionally not
+  // awaited so a settings-sync failure does not block or fail the main
+  // save. Surface any failure through the logger so it is not invisible.
+  saveSettings({
     difficultySettings: { ...state.difficultySettings },
     autoSaveEnabled:    state.autoSaveEnabled,
     debugMode:          state.debugMode,
     showPerfDashboard:  state.showPerfDashboard,
     malfunctionMode:    state.malfunctionMode as MalfunctionModeType,
+  }).catch((err: unknown) => {
+    logger.warn('save', 'Settings sync failed during save', err);
   });
 
   const envelope: SaveEnvelope = {
