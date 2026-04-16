@@ -22,6 +22,8 @@ import {
   buildCrewMember,
   ALL_FACILITIES,
   openSettingsPanel,
+  pressStage,
+  pressThrottleUp,
 } from './helpers.js';
 import {
   orbitalFixture,
@@ -192,8 +194,8 @@ test.describe('Sandbox mode', () => {
       { malfunctionMode: 'off' },
     );
 
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
     await waitForAltitude(page, 200, 15_000);
 
     const ps = await getPhysicsSnapshot(page);

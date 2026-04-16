@@ -5,6 +5,7 @@ import {
   dragPartToCanvas,
   dismissWelcomeModal,
   navigateToVab,
+  dispatchKey,
 } from './helpers.js';
 
 /**
@@ -49,7 +50,7 @@ test.describe('VAB — Undo/Redo', () => {
     expect(partsAfterPlace).toBe(1);
 
     // Press Ctrl+Z to undo.
-    await page.keyboard.press('Control+z');
+    await dispatchKey(page, 'z', { ctrlKey: true });
 
     // Wait for the undo to take effect.
     await page.waitForFunction(

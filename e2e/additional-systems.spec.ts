@@ -35,6 +35,7 @@ import {
   waitForOrbit,
   pressStage,
   pressThrottleUp,
+  pressThrottleCut,
 } from './helpers.js';
 import type { SaveEnvelope, SaveEnvelopeParams } from './helpers.js';
 import {
@@ -622,7 +623,7 @@ test.describe('Tech tree parts', () => {
     await waitForAltitude(page, 200, 15_000);
 
     // Cut engine and stage parachute.
-    await page.keyboard.press('x');
+    await pressThrottleCut(page);
     await page.waitForFunction(
       () => (window.__flightPs?.throttle ?? 1) === 0,
       { timeout: 5_000 },

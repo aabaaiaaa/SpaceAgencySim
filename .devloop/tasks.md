@@ -109,7 +109,7 @@
 - **Verification**: `npx playwright test <the six migrated specs>` passes. Do NOT run the full E2E suite.
 
 ### TASK-019: Migrate remaining E2E specs to dispatchEvent helper
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-018
 - **Description**: Migrate the remaining ~6 specs from the TASK-017 inventory. Same rules as TASK-018. See requirements §4.
 - **Verification**: `npx playwright test <the remaining migrated specs>` passes.

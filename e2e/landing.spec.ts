@@ -4,6 +4,7 @@ import {
   VP_W, VP_H,
   FIRST_FLIGHT_MISSION, buildSaveEnvelope,
   seedAndLoadSave, startTestFlight,
+  pressStage,
 } from './helpers.js';
 
 /**
@@ -59,7 +60,7 @@ async function waitForWarpUnlocked(page: Page): Promise<void> {
 }
 
 async function fireStage1(page: Page): Promise<void> {
-  await page.keyboard.press('Space');
+  await pressStage(page);
   await page.waitForFunction(
     () => (window.__flightPs?.posY ?? 0) > 0,
     { timeout: 3_000 },
@@ -68,7 +69,7 @@ async function fireStage1(page: Page): Promise<void> {
 
 async function fireStage2(page: Page): Promise<void> {
   await waitForWarpUnlocked(page);
-  await page.keyboard.press('Space');
+  await pressStage(page);
   await page.waitForFunction(
     () => (window.__flightPs?.debris?.length ?? 0) > 0,
     { timeout: 5_000 },

@@ -7,6 +7,7 @@ import {
   placePart, seedAndLoadSave, navigateToVab, launchFromVab,
   startTestFlight,
   pressStage,
+  dispatchKey,
 } from './helpers.js';
 
 /**
@@ -151,7 +152,7 @@ test.describe('Flight — Launch & Basic Flight', () => {
     );
     const initialPct: number = Math.round(initialThrottle * 100);
 
-    await page.keyboard.press('s');
+    await dispatchKey(page, 's');
     const decreasedPct: number = Math.max(0, initialPct - 5);
 
     await expect(page.locator('#flight-hud-throttle-pct')).toContainText(
@@ -159,7 +160,7 @@ test.describe('Flight — Launch & Basic Flight', () => {
       { timeout: 2_000 },
     );
 
-    await page.keyboard.press('w');
+    await dispatchKey(page, 'w');
     await expect(page.locator('#flight-hud-throttle-pct')).toContainText(
       `${initialPct}%`,
       { timeout: 2_000 },
