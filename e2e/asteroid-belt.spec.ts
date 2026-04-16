@@ -1985,8 +1985,6 @@ test.describe('Asteroid Belt — heavy arm range, collision cooldown, alignment 
     expect(standardResult!.success).toBe(false);
     expect(standardResult!.reason).toContain('out of range');
 
-    await page.evaluate(() => { window.location.reload(); });
-    await page.waitForLoadState('load');
     await seedAndLoadSave(page, envelope);
 
     const HEAVY_PROBE: string[] = ['probe-core-mk1', 'grabbing-arm-heavy', 'tank-small', 'engine-spark'];
@@ -2235,8 +2233,6 @@ test.describe('Asteroid Belt — heavy arm range, collision cooldown, alignment 
       sciencePoints: 300,
     });
 
-    await page.evaluate(() => { window.location.reload(); });
-    await page.waitForLoadState('load');
     await seedAndLoadSave(page, envelopeT5);
 
     const t5Result = await page.evaluate<TechGateResult | null>(async () => {

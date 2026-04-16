@@ -1,266 +1,154 @@
-# Iteration 16 — IndexedDB Migration, Cleanup & Dependency Upgrades
+# Iteration 17 — Test Stability, Defensive Guards, Error Handling & Cleanup
 
-**Date:** 2026-04-15
-**Scope:** Full IndexedDB migration (drop localStorage), remove backward-compat code, dependency major version jumps, bug fixes, notification queue, CLAUDE.md corrections, coverage exclusion maintenance
-**Builds on:** Iteration 15 (overflow save fix, notification guard, helper extraction, import cleanup)
-**Review driving this iteration:** `.devloop/archive/iteration-15/review.md`
-
----
-
-## 1. Dependency Major Version Jumps (First)
-
-These must be completed before all other tasks in this iteration so that everything is built and tested against the new versions. If breaking changes surface, they are resolved here rather than discovered mid-iteration.
-
-### 1a. Vite 6 → 8
-
-Upgrade Vite to the latest v8 release. Review the Vite 7 and Vite 8 migration guides for breaking changes. Key areas to check:
-
-- `vite.config.ts` — any deprecated config options, changed defaults, or removed APIs
-- `resolve.extensions` behavior — the codebase relies on this to resolve `.ts` files from `.js` import specifiers
-- Dev server and build output — verify `npm run dev` and `npm run build` both work
-- HMR behavior — spot-check that hot module replacement still functions
-
-### 1b. Vitest 3 → 4
-
-Upgrade Vitest to the latest v4 release. Key areas to check:
-
-- `vitest/config` re-export of `defineConfig` — `vite.config.ts` line 1 imports from `vitest/config`
-- Coverage provider (`@vitest/coverage-v8`) — ensure compatible version exists for Vitest 4
-- Test runner behavior — all 4,325+ unit tests must pass
-- Any changed CLI flags or config options used in `package.json` scripts
-
-### 1c. Patch/Minor Updates
-
-Update remaining dependencies to latest compatible versions:
-
-- `@playwright/test` — latest patch
-- `pixi.js` — latest patch within v8
-- `eslint` and `@typescript-eslint/*` — latest compatible
-- `jsdom`, `globals`, `lz-string` — latest compatible
-- `typescript` — latest compatible
-
-After all updates: `npm run build`, `npm run typecheck`, `npm run lint`, and `npm run test:unit` must all pass.
+**Date:** 2026-04-16
+**Scope:** Flaky test fix, collision.ts defensive guards, IDB-unavailable user error, test log noise suppression, smoke tag additions, pure helper extraction
+**Builds on:** Iteration 16 (IndexedDB migration, Vitest 4 upgrade, notification queue)
+**Review driving this iteration:** `.devloop/archive/iteration-16/review.md`
 
 ---
 
-## 2. Full IndexedDB Migration (Drop localStorage)
+## 1. Fix Flaky workerBridgeTimeout Test
 
-### Context
+**Location:** `src/tests/workerBridgeTimeout.test.ts`, line 110
 
-The codebase currently uses localStorage as primary storage with IndexedDB as a mirror/fallback. This iteration makes IndexedDB the sole storage backend and removes all localStorage code. No backward compatibility with localStorage-based saves is needed — existing localStorage saves will simply not be found.
+**Problem:** The test `consumeMainThreadSnapshot returns null when no snapshot available` times out at 5000ms when run in the full suite, but passes reliably in isolation (29ms). The root cause is module-level state contention: the test uses a dynamic `import()` of `_workerBridge.ts` and calls `terminatePhysicsWorker()`, which races with other tests that also import the same module under Vitest's parallel worker pool.
 
-Four systems use localStorage today:
+**Fix:** Isolate the module state per test. The `afterEach` already calls `terminatePhysicsWorker()` and `vi.restoreAllMocks()`, but the dynamic import shares cached module state across the worker. Options:
 
-| System | File | localStorage key pattern |
-|--------|------|--------------------------|
-| Game saves | `saveload.ts` | `spaceAgencySave_0` through `spaceAgencySave_N` |
-| Auto-saves | `autoSave.ts` | `spaceAgencySave_auto`, overflow keys |
-| Settings | `settingsStore.ts` | `spaceAgencySettings` |
-| Design library | `designLibrary.ts` | `spaceAgencyDesignLibrary` |
+- **Option A (preferred):** Use `vi.resetModules()` in `beforeEach` to force a fresh module instance per test, ensuring no shared state leaks between tests. This is the cleanest approach.
+- **Option B:** Add `{ timeout: 15000 }` to the specific test. This masks the symptom rather than fixing the cause — use only if Option A causes other issues.
 
-### 2a. Upgrade idbStorage.ts
-
-The existing `idbStorage.ts` provides `idbSet`, `idbGet`, `idbDelete`, and `isIdbAvailable`. These are sufficient for the migration. The module currently describes itself as a "mirror" of localStorage — update the comments to reflect that it's now the primary (and only) storage backend. Remove the fallback language and `isIdbAvailable` checks that gate IDB usage (IDB is required, not optional).
-
-### 2b. Migrate saveload.ts
-
-Replace all `localStorage.getItem`/`setItem`/`removeItem` calls with `idbGet`/`idbSet`/`idbDelete`. Key changes:
-
-- `_persistCompressed()` — remove localStorage write, keep only IDB write. Remove the "localStorage full — attempt IndexedDB as fallback" code path.
-- `loadGame()` — remove localStorage read. Load exclusively from IDB. Remove the "check both and pick newest" logic. Remove the "write back to localStorage if it came from IDB" sync-back code.
-- `deleteSave()` — remove `localStorage.removeItem`, use only `idbDelete`.
-- `exportSave()` — read from IDB instead of localStorage.
-- `listSaves()` / `discoverOverflowKeys()` — these currently scan localStorage keys. Rewrite to scan IDB keys. The IDB store will need a `getAllKeys()` or equivalent operation (add to `idbStorage.ts` if not present).
-- `loadGameAsync` alias (line 550) — delete entirely. This is a deprecated backward-compat shim.
-
-All public functions that read/write storage are already async or return Promises, so the async nature of IDB should not require API changes to callers.
-
-### 2c. Migrate autoSave.ts
-
-Replace all localStorage calls with IDB equivalents:
-
-- `_findAutoSaveKey()` — scans localStorage for auto-save key; rewrite to scan IDB
-- `triggerAutoSave()` — writes to localStorage then mirrors to IDB; write to IDB only
-- `hasAutoSave()` — checks localStorage; check IDB
-- `deleteAutoSave()` — removes from localStorage; remove from IDB
-
-`hasAutoSave()` is currently synchronous (`localStorage.getItem(...) !== null`). It will need to become async. Check callers and update them.
-
-### 2d. Migrate settingsStore.ts
-
-Replace localStorage with IDB for settings persistence:
-
-- `loadSettings()` — read from IDB instead of localStorage
-- `persistSettings()` — write to IDB instead of localStorage
-- `_hasExistingSettings()` — check IDB instead of localStorage
-
-**Async initialization:** Settings are currently loaded synchronously at startup. With IDB, `loadSettings()` becomes async. The settings module should load settings into an in-memory cache at app init (awaited before anything else runs), then serve reads from the cache synchronously. Only writes go to IDB. This preserves the current synchronous read pattern for consumers.
-
-### 2e. Migrate designLibrary.ts
-
-Replace localStorage with IDB:
-
-- `_loadSharedLibrary()` — read from IDB
-- `_saveSharedLibrary()` — write to IDB
-
-These are likely already called in async contexts. Check callers.
-
-### 2f. Update mainmenu.ts
-
-`mainmenu.ts` reads localStorage for save slot discovery in the load screen. Update to use the migrated `listSaves()` / `discoverOverflowKeys()` functions from saveload.ts (which now read from IDB).
-
-### 2g. Update E2E Test Helpers
-
-9 E2E spec files seed saves via `localStorage.setItem()` in `page.evaluate()` calls. The E2E save seeding helper (`e2e/helpers/_saveFactory.ts` or `_state.ts`) must be updated to seed saves into IndexedDB instead.
-
-Create or update a helper that writes save data to IndexedDB within `page.evaluate()`. IndexedDB operations in `page.evaluate()` are async, so the seeding calls will need `await`. Ensure all E2E specs that seed saves use the updated helper.
-
-### 2h. Update Unit Tests
-
-`saveload.test.ts` has 48 references to localStorage. The test setup likely mocks localStorage — replace with an IDB mock or use the `fake-indexeddb` package (or similar) that Vitest can use in Node.js. All existing save round-trip, corruption, version-check, and overflow tests must be updated to use IDB instead of localStorage.
-
-Similarly update tests in `autoSave.test.ts`, `designLibrary.test.ts`, `settingsStore.test.ts`, `storageErrors.test.ts`, `idbStorage.test.ts`, and `debugMode.test.ts`.
+After the fix, verify the test passes both in isolation (`npx vitest run src/tests/workerBridgeTimeout.test.ts`) and in the full suite (`npm run test:unit`). The test should complete in well under 1 second.
 
 ---
 
-## 3. Remove Backward-Compatibility Code
+## 2. Defensive Division Guards in collision.ts
 
-With localStorage gone and no need for backward compat, remove the following:
+**Location:** `src/core/collision.ts`, lines 495-544 (function `_resolveCollision`)
 
-### In saveload.ts
+**Problem:** The collision response code divides by `a.mass!`, `b.mass!`, `Ia`, and `Ib` at multiple locations without local guards:
 
-- **`loadGameAsync` export** (line 550) — deprecated alias for `loadGame`. Delete.
-- **`_importLegacyJson()` function** (line 809) — imports saves from old JSON string format. Delete the function and the fallback call to it in the import flow.
-- **`decompressSaveData()` uncompressed fallback** (line 389) — the `if (!raw.startsWith(COMPRESSED_PREFIX)) return raw` path handles ancient uncompressed saves. All saves are now compressed. Remove the fallback — if the compressed prefix is missing, throw an error (treat as corrupt data).
+- Line 495: `1 / a.mass! + 1 / b.mass!` (inverse mass sum)
+- Lines 499-502: `j / a.mass!` and `j / b.mass!` (velocity impulse)
+- Lines 530, 534: `torqueA * dt / Ia` and `torqueB * dt / Ib` (angular impulse)
+- Lines 541-544: `1 / a.mass!` and `1 / b.mass!` (positional correction)
 
-### In saveload.test.ts
+These divisions are currently safe because `_bodyMass()` (line 198) returns `Math.max(1, mass)` and `_bodyMoI()` (line 238) returns `Math.max(1, I)`. However, the division code relies entirely on this upstream guarantee. If the helpers are ever modified, the collision system will silently produce NaN/Infinity.
 
-- **Line 1908** — `loadGame(0) without storageKey still works for manual slots (backward compat)` — delete.
-- **Lines 1417-1470ish** — `backward compatibility with uncompressed saves` describe block — delete the entire block.
-- **Line 1655** — `imports a legacy JSON envelope string (old-format backward compatibility)` — delete.
-
-### Keep (data integrity, not backward compat)
-
-- **Version check** in `loadGame()` (line 499) — rejects saves with incompatible version numbers. Keep.
-- **Version rejection tests** (lines 918, 1032, 1045) — test that old/future versions are rejected. Keep.
-- **Incompatible saves appear in UI** (test line 619) — verifies the UI shows incompatible saves as non-loadable. Keep.
-
----
-
-## 4. `totalMass > 0` Guard in physics.ts
-
-**Location:** `src/core/physics.ts:1214-1215`
+**Fix:** Add an early-return guard at the top of `_resolveCollision()`, before any division:
 
 ```typescript
-let accX: number = netFX / totalMass;
-let accY: number = netFY / totalMass;
+if (!a.mass || a.mass <= 0 || !b.mass || b.mass <= 0) return;
 ```
 
-Add a guard: if `totalMass <= 0`, set `accX` and `accY` to `0` instead of dividing. This matches the defensive pattern used at lines 1023, 1081, 1127, and 1463 in the same file.
+This matches the defensive pattern used at four locations in `physics.ts` (lines 1023, 1081, 1127, 1463) and makes the collision code self-protecting.
 
-Add a unit test: given a physics state where `totalMass` computes to 0, verify that `tick()` produces finite position/velocity values (no NaN/Infinity propagation).
-
----
-
-## 5. HTML-Escape `data-key` Attribute in mainmenu.ts
-
-**Location:** `src/ui/mainmenu.ts:390-392`
-
-The `data-key="${summary.storageKey}"` interpolation doesn't use the `escapeHtml` utility (which is already imported). Apply `escapeHtml()` to `summary.storageKey` in all three button template literals (Load, Export, Delete). Zero-cost defense-in-depth.
+**Tests:** Add a unit test in `src/tests/collision.test.ts` (or the appropriate existing test file) that verifies `_resolveCollision` does not produce NaN/Infinity when given zero-mass bodies. If `_resolveCollision` is not directly exported, test through the public collision API that calls it.
 
 ---
 
-## 6. Notification Queue
+## 3. IDB-Unavailable Startup Error
 
-Replace the current single-toast notification system with a stacking queue.
+**Problem:** With IndexedDB as the sole storage backend, if IDB is unavailable (e.g., private browsing in older Safari, storage quota exceeded, browser security restrictions), the game fails silently. `main.ts:228-230` catches the error with `logger.error()` to the console only — the player sees a blank or broken page with no explanation.
 
-### Current Behavior (notification.ts)
+The `isIdbAvailable()` function exists in `idbStorage.ts:79-81` but is never called at startup.
 
-`showNotification()` removes any existing toast before creating a new one. Only one toast is ever visible.
+**Fix:** Add an IDB availability check at the very start of `main()` in `src/main.ts`, before `initSettings()`. If `isIdbAvailable()` returns false, display a user-visible error message in the DOM and return early (do not continue initialization). The error should:
 
-### New Behavior
+- Be displayed in the existing `#ui-overlay` element (or a new element if the overlay isn't yet available at that point)
+- Use plain, non-technical language: e.g., "This game requires IndexedDB for saving. Your browser may be blocking storage access. Try disabling private browsing mode or checking your browser settings."
+- Be styled consistently with the game's existing UI (dark background, readable text)
+- Not attempt to initialize the renderer, settings, or any other system
 
-- Multiple toasts can be visible simultaneously, stacked vertically from the bottom of the screen.
-- Each toast auto-dismisses after 4 seconds (same as current).
-- New toasts appear at the bottom of the stack; existing toasts shift up.
-- When a toast dismisses, remaining toasts shift down to fill the gap.
-- Cap at a reasonable maximum (e.g., 5 visible toasts). If the cap is reached, the oldest toast is removed when a new one arrives.
-- The fade-out animation (0.3s opacity transition) remains.
+Also update the generic `main().catch()` handler at line 228 to display a visible error in the DOM rather than only logging to console, since any uncaught startup error (not just IDB) leaves the player stranded on a blank page.
 
-### Unit Tests
-
-Add unit tests for `notification.ts`:
-
-- Single notification creates one toast element
-- Two notifications in sequence create two toast elements
-- Toasts are stacked (different bottom positions)
-- After 4+ seconds, toasts are removed from DOM
-- Maximum cap is enforced — adding beyond the cap removes the oldest
+**Tests:** Add a unit test that verifies: when `isIdbAvailable()` returns false, the startup path displays an error and does not call `initSettings()`. This may require extracting the check into a testable function.
 
 ---
 
-## 7. Fix CLAUDE.md Inaccuracies
+## 4. Suppress Debug Log Spam in Tests
 
-The root `CLAUDE.md` has several statements that no longer reflect reality:
+**Problem:** The test suite outputs hundreds of `[DEBUG] [save] Compression stats` lines during `npm run test:unit`. This comes from `src/core/saveload.ts:343`:
 
-1. **Line 98** — References a `jsToTsResolve` Vite plugin that doesn't exist. The actual mechanism is `resolve.extensions: ['.ts', '.js', ...]` in `vite.config.ts` line 5. Fix the description.
+```typescript
+logger.debug('save', 'Compression stats', { rawSize, compressedSize, ratio });
+```
 
-2. **Multiple references to JS modules** — The Architecture section says modules "remain JS" and references `.js` file extensions. The entire codebase is now TypeScript. Update all affected sections:
-   - Core section: remove "the rest remain JS with JSDoc types"
-   - File references: update `.js` extensions to `.ts` where they appear in the module listing
-   - TypeScript & Linting section: remove "Four core modules are TypeScript. The rest of the codebase remains JavaScript."
-   - Remove any references to `checkJs`, `allowJs` being relevant for source files
+The logger (`src/core/logger.ts:16`) defaults to `'debug'` level in non-production environments, so all debug output appears during test runs. Other test files (like `branchCoverage.test.ts`) already call `logger.setLevel('warn')` to suppress this, but `saveload.test.ts` and several other high-traffic test files don't.
 
-3. **Testing section** — E2E test references may say `.spec.js`; update to `.spec.ts`.
+**Fix:** Add `logger.setLevel('warn')` in the `beforeEach` (or `beforeAll`) of test files that exercise save/load code paths, and restore the original level in `afterEach`/`afterAll`. The affected test files are:
 
-4. After dependency upgrades, update any version-specific references if applicable.
+- `src/tests/saveload.test.ts` (primary source of compression stats spam)
+- `src/tests/autoSave.test.ts`
+- `src/tests/storageErrors.test.ts`
+- `src/tests/debugMode.test.ts`
+
+Alternatively, if there's a Vitest setup file that runs before all tests, setting the logger level there would be a single-point fix. Check for `vitest.setup.ts` or similar.
+
+After the fix, run `npm run test:unit` and verify that `[DEBUG]` lines no longer appear in the output (warnings and errors should still appear).
 
 ---
 
-## 8. Coverage Exclusion List Maintenance
+## 5. Add @smoke Tags to IDB Round-Trip Tests
 
-**Location:** `vite.config.ts:34-94`
+**Context:** The `@smoke` tag system allows running a fast subset of critical-path tests. Currently only one IDB test has a smoke tag (`saveload.test.ts:1372` — compressed save/load cycle). The IDB migration was the largest change in iteration 16, and the core persistence path should have better smoke coverage.
 
-The explicit exclusion list requires manual updates as modules are added or split. Review the current list against the actual file tree:
+**Add `@smoke` to these tests:**
 
-- Check for files in the exclusion list that no longer exist (stale entries)
-- Check for new DOM-heavy or PixiJS-heavy files that should be excluded but aren't
-- Verify that no testable pure-logic modules are incorrectly excluded
+- **`saveload.test.ts`**: One test for `listSaves()` returning saved games (verifies IDB key scanning works)
+- **`autoSave.test.ts`**: One test for the auto-save round-trip (trigger → check exists → load)
+- **`settingsStore.test.ts`**: One test for settings persistence round-trip (save → load from IDB → verify cache)
+- **`idbStorage.test.ts`**: One test for basic `idbSet` → `idbGet` round-trip
 
-If there are many stale entries or the list is hard to maintain, consider switching to a pattern-based exclusion (e.g., exclude barrel re-export files matching `**/index.ts`) where feasible, while keeping explicit entries for files that don't fit a pattern.
+Pick the most representative test in each file — the one that exercises the broadest code path. Tag it by adding `@smoke` to its description string.
+
+After tagging, verify with `npm run test:smoke:unit` that the new smoke tests are discovered and pass.
+
+Also update `test-map.json` if any new mappings are needed for the affected test files.
+
+---
+
+## 6. Extract Preview Scaling Math from rocketCardUtil.ts
+
+**Location:** `src/ui/rocketCardUtil.ts`, lines 110-133
+
+**Context:** The review identified three helper extraction candidates. Two are already done:
+- `_staging.ts` → `computeStageDeltaV` already extracted to `src/core/stagingCalc.ts`
+- `map.ts` → orbit math already imported from `core/orbit.ts`, `core/mapView.ts`, `core/mapGeometry.ts`
+
+The remaining candidate is `rocketCardUtil.ts`, which contains ~10 lines of pure preview scaling math embedded in the canvas rendering function `renderRocketPreview()`.
+
+**What to extract:** The bounding-box calculation (lines 95-106: min/max X/Y from parts) and the scale/offset computation (lines 110-121: computing `scale`, `cx`, `cy`, `midX`, `midY` from the bounding box and preview dimensions) are pure geometry with no DOM or canvas dependency. The actual canvas drawing (lines 122-133: `ctx.fillRect`/`ctx.strokeRect`) stays in the UI module.
+
+**Extract to:** A new function in an existing core utility or a small new file (e.g., `src/core/previewLayout.ts`) that takes an array of part positions/sizes and preview dimensions, and returns `{ scale, offsetX, offsetY }`. The UI function then uses these values for the canvas drawing.
+
+**Tests:** Add a unit test for the extracted function: given known part positions and preview dimensions, verify the computed scale and offsets are correct. Test edge cases: single part, parts in a vertical line (rocketW ≈ 0), parts in a horizontal line (rocketH ≈ 0).
 
 ---
 
 ## Testing Strategy
 
-### Unit Tests
-
-| Area | What changes |
+| Area | What Changes |
 |------|-------------|
-| `saveload.test.ts` | Rewrite all 48 localStorage references to use IDB mock; remove backward-compat tests; keep version-check tests |
-| `autoSave.test.ts` | Update storage mocking from localStorage to IDB |
-| `settingsStore.test.ts` | Update storage mocking from localStorage to IDB |
-| `designLibrary.test.ts` | Update storage mocking from localStorage to IDB |
-| `storageErrors.test.ts` | Update error scenarios for IDB instead of localStorage |
-| `idbStorage.test.ts` | May need updates if `idbStorage.ts` API changes (e.g., `getAllKeys`) |
-| `debugMode.test.ts` | Update if it references localStorage |
-| `physics.test.ts` | Add test for totalMass=0 guard |
-| `notification.test.ts` (new) | Stacking queue behavior tests |
-
-### E2E Tests
-
-All 9 E2E spec files that seed saves via localStorage must be updated to seed via IDB. The seeding helper should abstract this so individual specs don't need IDB boilerplate.
+| `workerBridgeTimeout.test.ts` | Add `vi.resetModules()` in beforeEach; verify passes in full suite |
+| `collision.test.ts` (or equivalent) | Add test for zero-mass collision guard |
+| `main.ts` / new startup test | Test IDB-unavailable error display |
+| `saveload.test.ts` | Add `logger.setLevel('warn')` to suppress debug spam |
+| `autoSave.test.ts` | Add `logger.setLevel('warn')` and `@smoke` tag |
+| `settingsStore.test.ts` | Add `@smoke` tag |
+| `idbStorage.test.ts` | Add `@smoke` tag |
+| `previewLayout.test.ts` (new) | Unit tests for extracted scaling math |
 
 ### Verification
 
-After all changes: `npm run build`, `npm run typecheck`, `npm run lint`, `npm run test:unit`, and `npm run test:smoke:e2e` must all pass.
+After all changes: `npm run build`, `npm run typecheck`, `npm run lint`, and `npm run test:unit` must all pass with zero errors. `npm run test:smoke:unit` must include the newly tagged smoke tests.
 
 ---
 
 ## Technical Decisions
 
-- **IDB is required, not optional.** No feature detection or localStorage fallback. All modern browsers support IndexedDB. If IDB is unavailable, the game cannot save (fail loudly).
-- **Settings use in-memory cache.** Loaded async from IDB at init, served synchronously from cache thereafter. Only writes touch IDB.
-- **No backward compat.** Old localStorage saves are not migrated. Old save formats (uncompressed, legacy JSON) are not supported. Version-incompatible saves are rejected (data integrity, not compat).
-- **Dependency upgrades first.** Vite and Vitest major jumps happen before any functional changes so the entire iteration is built and tested on the new toolchain.
-- **Notification stacking, not replacing.** Multiple toasts stack from bottom with auto-dismiss. Capped at a reasonable maximum.
+- **Module isolation over timeouts.** The flaky test is fixed by resetting module cache, not by increasing timeouts. Timeouts mask problems.
+- **Early-return guard pattern.** Collision guards use early return (not clamping), matching the existing physics.ts defensive style.
+- **User-visible startup errors.** Any fatal startup error (IDB or otherwise) should produce a visible DOM message, not just a console log.
+- **Logger suppression in tests.** Per-file `logger.setLevel('warn')` in beforeEach/afterEach, not a global test setup change, to keep the fix targeted and visible.
+- **Minimal extraction scope.** Only the bounding-box and scale computation are extracted from rocketCardUtil.ts — the canvas rendering stays in place.
