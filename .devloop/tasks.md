@@ -55,7 +55,7 @@
 - **Verification**: `npx vitest run --testNamePattern "@smoke" src/tests/saveload.test.ts src/tests/autoSave.test.ts src/tests/settingsStore.test.ts src/tests/idbStorage.test.ts` finds and runs at least 4 smoke-tagged tests (plus the existing one in saveload), all passing.
 
 ### TASK-010: Update test-map.json for new smoke coverage
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-009
 - **Description**: Review `test-map.json` and ensure the mappings for `src/core/idbStorage.ts`, `src/core/autoSave.ts`, `src/core/settingsStore.ts`, and `src/core/saveload.ts` include their respective test files. Add any missing mappings. See requirements Section 5.
 - **Verification**: `node scripts/run-affected.mjs --dry-run` runs without errors. Inspect `test-map.json` — all four source modules map to their test files.
