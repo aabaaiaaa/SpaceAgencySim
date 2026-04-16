@@ -73,7 +73,7 @@
 - **Verification**: `npx vitest run src/tests/previewLayout.test.ts` passes with all 4+ tests green.
 
 ### TASK-013: Final typecheck, lint, build, and smoke test verification
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012
 - **Description**: Run the full verification suite to confirm all changes work together. Check for any regressions. Verify no debug log spam in test output. Verify smoke tests include the new tags.
 - **Verification**: All of these pass with 0 errors: `npm run build`, `npm run typecheck`, `npm run lint`, `npm run test:unit`, `npm run test:smoke:unit`.
