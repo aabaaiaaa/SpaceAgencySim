@@ -62,6 +62,7 @@ import {
   updateUndoRedoButtons,
 } from './_panels.ts';
 import { setUndoRedoChangeCallback, setUndoRedoErrorCallback, clearUndoRedo } from '../../core/undoRedo.ts';
+import { initVabListenerTracker, destroyVabListenerTracker } from './_listenerTracker.ts';
 
 // ---------------------------------------------------------------------------
 // Wrapped helpers that close over the public API
@@ -192,6 +193,10 @@ export function initVabUI(
   S.onBack    = onBack ?? null;
   S.container = container;
 
+  // ── Listener tracker ─────────────────────────────────────────────────────
+  // Created per-session so every window/document listener registered by
+  // VAB sub-modules can be bulk-removed on destroy.
+  initVabListenerTracker();
 
   // ── Root DOM ──────────────────────────────────────────────────────────────
   const root = document.createElement('div');
@@ -376,6 +381,7 @@ export function initVabUI(
  * empty rocket.
  */
 export function resetVabUI(): void {
+  destroyVabListenerTracker();
   const S = getVabState();
   S.assembly         = null;
   S.stagingConfig    = null;
@@ -386,6 +392,18 @@ export function resetVabUI(): void {
     S.gameState.vabAssembly     = null;
     S.gameState.vabStagingConfig = null;
   }
+}
+
+/**
+ * Tear down the VAB overlay: remove every tracked window/document listener
+ * and remove the root DOM node. Intended for the "back to hub" navigation
+ * path where the VAB DOM is discarded but the assembly state is preserved
+ * (so the next `initVabUI` can restore it).
+ */
+export function destroyVabUI(): void {
+  destroyVabListenerTracker();
+  const root = document.getElementById('vab-root');
+  if (root) root.remove();
 }
 
 /**

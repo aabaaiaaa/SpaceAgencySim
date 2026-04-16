@@ -9,6 +9,7 @@ export {
   syncVabToGameState,
   initVabUI,
   resetVabUI,
+  destroyVabUI,
   vabRefreshParts,
   getVabInventoryUsedParts,
   vabSetLaunchEnabled,

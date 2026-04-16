@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 6,
+  "lastIteration": 7,
   "startedAt": "2026-04-16T18:55:54.489Z",
   "iteration": 18,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-007",
-    "taskTitle": "Route flightHud X/Z keys through setThrottleInstant",
-    "iterationNumber": 7,
-    "startedAt": "2026-04-16T19:09:24.899Z"
+    "taskId": "TASK-008",
+    "taskTitle": "Introduce listenerTracker instance in VAB init/destroy",
+    "iterationNumber": 8,
+    "startedAt": "2026-04-16T19:10:54.719Z"
   }
 }

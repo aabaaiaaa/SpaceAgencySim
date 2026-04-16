@@ -43,7 +43,7 @@
 - **Verification**: `npx vitest run src/tests/flightHud.test.ts` (or the nearest existing test covering this handler) passes, and a manual grep confirms no direct `_ps.throttle =` or `_ps.targetTWR =` assignments remain in `src/ui/flightHud.ts`.
 
 ### TASK-008: Introduce listenerTracker instance in VAB init/destroy
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In the VAB lifecycle module (likely `src/ui/vab.ts` or `src/ui/vab/index.ts`), create a module-scoped `listenerTracker` instance on init and call `tracker.removeAll()` on destroy. Plumb the tracker into `_panels.ts` and `_canvasInteraction.ts` via function parameters or a shared module-scoped getter (match the pattern in `crewAdmin.ts`). Does not update individual listener call sites yet. See requirements §2.2.
 - **Verification**: `npx vitest run src/tests/` targeted at existing VAB tests passes with no regression; `npx tsc --noEmit` passes.

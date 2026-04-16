@@ -344,8 +344,7 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
         showVabScene();
         vabMod.initVabUI(container, state, {
           onBack: () => {
-            const vabRoot = document.getElementById('vab-root');
-            if (vabRoot) vabRoot.remove();
+            vabMod.destroyVabUI();
             _vabInitialized = false;
             hideVabScene();
             showHubScene();
