@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 28
-- **Remaining**: 76
-- **Last Updated**: 2026-04-16T23:36:32.450Z
+- **Completed**: 29
+- **Remaining**: 75
+- **Last Updated**: 2026-04-16T23:38:31.558Z
 
 ## Iteration Log
 
@@ -259,4 +259,13 @@
 - **Exit Status**: success
 - **Tokens**: 1,852,850 total (28 in, 8,679 out, 85,751 cache-create, 1,758,392 cache-read)
 - **Cost**: $1.6323
+
+### Iteration 29 - 2026-04-16T23:38:31.555Z
+- **Task Attempted**: TASK-029
+- **Task Completed**: TASK-029
+- **Summary**: Completed Audit src/render/flight/camera.ts for destroy
+- **Duration**: 1m 57s
+- **Exit Status**: success
+- **Tokens**: 1,008,735 total (98 in, 4,653 out, 66,573 cache-create, 937,411 cache-read)
+- **Cost**: $1.0016
 

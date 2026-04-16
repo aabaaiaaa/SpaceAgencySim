@@ -193,7 +193,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/render-*.test.ts` passes.
 
 ### TASK-029: Audit src/render/flight/camera.ts for destroy
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §5.3. Same treatment, `src/render/flight/camera.ts`.
 - **Verification**: `npm run typecheck` passes.

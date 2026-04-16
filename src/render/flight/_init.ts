@@ -13,7 +13,7 @@ import { getAirDensity as bodyAirDensity } from '../../data/bodies.ts';
 import type { ReadonlyPhysicsState, ReadonlyAssembly, ReadonlySurfaceItem } from '../types.ts';
 import { getFlightRenderState } from './_state.ts';
 import { MIN_ZOOM, MAX_ZOOM } from './_constants.ts';
-import { updateCamera } from './_camera.ts';
+import { updateCamera, resetCameraState } from './_camera.ts';
 import { updateBodyVisuals, renderSky, renderStars, renderHorizon, renderWeatherHaze, generateStars } from './_sky.ts';
 import { renderGround, renderSurfaceItems, renderBiomeLabel } from './_ground.ts';
 import { renderRocket, hitTestFlightPart as _hitTestFlightPart, destroyRocketRender } from './_rocket.ts';
@@ -87,14 +87,7 @@ export function initFlightRenderer(): void {
   s.lastTrailTime = null;
   s.plumeStates   = new Map();
 
-  s.camWorldX   = 0;
-  s.camWorldY   = 0;
-  s.lastCamTime = null;
-  s.camSnap     = true;
-  s.prevTargetX = null;
-  s.prevTargetY = null;
-  s.camOffsetX  = 0;
-  s.camOffsetY  = 0;
+  resetCameraState();
 
   s.currentBiomeName = null;
   s.biomeLabelAlpha  = 0;
@@ -221,14 +214,7 @@ export function destroyFlightRenderer(): void {
   s.currentBiomeName      = null;
   s.biomeLabelAlpha       = 0;
 
-  s.camWorldX   = 0;
-  s.camWorldY   = 0;
-  s.lastCamTime = null;
-  s.camSnap     = true;
-  s.prevTargetX = null;
-  s.prevTargetY = null;
-  s.camOffsetX  = 0;
-  s.camOffsetY  = 0;
+  resetCameraState();
 
   if (s.wheelHandler) {
     window.removeEventListener('wheel', s.wheelHandler);

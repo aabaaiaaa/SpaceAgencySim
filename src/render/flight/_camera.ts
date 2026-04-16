@@ -188,3 +188,25 @@ export function updateCamera(ps: ReadonlyPhysicsState, assembly: ReadonlyAssembl
     s.camWorldY = targetY! + s.camOffsetY;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Lifecycle
+// ---------------------------------------------------------------------------
+
+/**
+ * Reset camera state fields to their defaults. Camera owns no PixiJS
+ * containers, so there is nothing to destroy — only module-shared state
+ * to clear. Called from both initFlightRenderer (fresh scene) and
+ * destroyFlightRenderer (teardown) to keep camera concerns in one place.
+ */
+export function resetCameraState(): void {
+  const s = getFlightRenderState();
+  s.camWorldX   = 0;
+  s.camWorldY   = 0;
+  s.lastCamTime = null;
+  s.camSnap     = true;
+  s.prevTargetX = null;
+  s.prevTargetY = null;
+  s.camOffsetX  = 0;
+  s.camOffsetY  = 0;
+}
