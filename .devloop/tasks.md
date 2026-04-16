@@ -19,7 +19,7 @@
 - **Verification**: `npx vitest run src/tests/collision.test.ts` passes, including the new test.
 
 ### TASK-004: Add IDB availability check at startup
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: At the start of `main()` in `src/main.ts` (before `initSettings()` on line 68), add a check: if `isIdbAvailable()` returns false, display a user-visible error in the DOM and return early. Import `isIdbAvailable` from `./core/idbStorage.ts`. The error message should be plain language (e.g., "This game requires IndexedDB for saving. Your browser may be blocking storage access."), displayed in a styled div inserted into `document.body`, and should prevent any further initialization. See requirements Section 3.
 - **Verification**: `npm run typecheck` passes. `npm run build` succeeds. Manual inspection: the `isIdbAvailable()` call exists before `initSettings()`.

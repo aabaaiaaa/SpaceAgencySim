@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 2,
+  "lastIteration": 3,
   "startedAt": "2026-04-16T13:35:03.728Z",
   "iteration": 17,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-003",
-    "taskTitle": "Add unit test for zero-mass collision guard",
-    "iterationNumber": 3,
-    "startedAt": "2026-04-16T13:38:19.865Z"
+    "taskId": "TASK-004",
+    "taskTitle": "Add IDB availability check at startup",
+    "iterationNumber": 4,
+    "startedAt": "2026-04-16T13:42:57.906Z"
   }
 }

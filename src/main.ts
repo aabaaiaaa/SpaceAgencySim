@@ -24,6 +24,7 @@ import { autoSaveImmediate } from './ui/autoSaveToast.ts';
 import { isAutoSaveEnabled, AUTO_SAVE_KEY } from './core/autoSave.ts';
 import { initSettings } from './core/settingsStore.ts';
 import { logger } from './core/logger.ts';
+import { isIdbAvailable } from './core/idbStorage.ts';
 
 // E2E test API options for programmatic flight launches.
 interface E2eFlightOpts {
@@ -59,8 +60,37 @@ declare global {
   }
 }
 
+/**
+ * Displays a fatal error message in the DOM when the game cannot start.
+ * Inserts a styled div into document.body so the player sees an explanation
+ * instead of a blank/broken page.
+ */
+function showFatalError(message: string): void {
+  const el = document.createElement('div');
+  el.style.cssText = [
+    'position:fixed', 'inset:0', 'display:flex', 'align-items:center',
+    'justify-content:center', 'background:#000', 'color:#b0d0f0',
+    'font-family:system-ui,sans-serif', 'font-size:1.2rem',
+    'padding:2rem', 'text-align:center', 'z-index:9999',
+  ].join(';');
+  el.textContent = message;
+  document.body.appendChild(el);
+}
+
 async function main() {
   logger.debug('app', 'Game starting');
+
+  // ── Storage check ──────────────────────────────────────────────────────
+  // IndexedDB is the sole storage backend. If it's unavailable the game
+  // cannot save or load — show an error and bail out immediately.
+  if (!isIdbAvailable()) {
+    showFatalError(
+      'This game requires IndexedDB for saving. Your browser may be ' +
+      'blocking storage access. Try disabling private browsing mode or ' +
+      'checking your browser settings.',
+    );
+    return;
+  }
 
   // ── Settings ───────────────────────────────────────────────────────────
   // Load persisted settings from IndexedDB into the in-memory cache before
@@ -227,4 +257,5 @@ async function main() {
 
 main().catch((err) => {
   logger.error('app', 'Fatal startup error', { error: String(err) });
+  showFatalError('Something went wrong while starting the game. Please try refreshing the page.');
 });
