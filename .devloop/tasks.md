@@ -67,7 +67,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx playwright test e2e/keyboard-nav.spec.ts` — the migrated tests pass (tests using remaining untouched lines may still pass or may fail individually; the migration is partial).
 
 ### TASK-010: Migrate keyboard-nav.spec.ts — second batch
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-009
 - **Description**: Continue migrating `e2e/keyboard-nav.spec.ts` call sites at lines 147, 152, 156, 186, 206, 228, 245, 287, 310, 324 to `dispatchKey`. After this task, the file should contain zero `page.keyboard.press` references.
 - **Verification**: `npx playwright test e2e/keyboard-nav.spec.ts` passes fully. `grep -n "page.keyboard" e2e/keyboard-nav.spec.ts` returns empty.

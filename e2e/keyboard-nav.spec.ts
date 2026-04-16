@@ -144,16 +144,16 @@ test.describe('Keyboard Navigation', () => {
     await expect(firstItem).toBeFocused();
 
     // Arrow down moves to next item.
-    await page.keyboard.press('ArrowDown');
+    await dispatchKey(page, 'ArrowDown');
     const secondItem = page.locator('#topbar-dropdown .topbar-dropdown-item').nth(1);
     await expect(secondItem).toBeFocused();
 
     // Arrow up goes back.
-    await page.keyboard.press('ArrowUp');
+    await dispatchKey(page, 'ArrowUp');
     await expect(firstItem).toBeFocused();
 
     // Escape closes the dropdown.
-    await page.keyboard.press('Escape');
+    await dispatchKey(page, 'Escape');
     await expect(page.locator('#topbar-dropdown')).not.toBeVisible({ timeout: 5_000 });
 
     // Focus should return to the menu button.
@@ -183,7 +183,7 @@ test.describe('Keyboard Navigation', () => {
     // Tab repeatedly until we land on a settings option button.
     let foundSettingsBtn: boolean = false;
     for (let i: number = 0; i < 20; i++) {
-      await page.keyboard.press('Tab');
+      await dispatchKey(page, 'Tab');
       const isSettingsBtn: boolean = await page.evaluate((): boolean =>
         document.activeElement?.classList.contains('settings-option-btn') ?? false
       );
@@ -203,7 +203,7 @@ test.describe('Keyboard Navigation', () => {
     expect(outlineStyle).not.toBe('none');
 
     // Escape closes the settings panel.
-    await page.keyboard.press('Escape');
+    await dispatchKey(page, 'Escape');
     await expect(page.locator('#settings-panel')).not.toBeVisible({ timeout: 5_000 });
   });
 
@@ -225,7 +225,7 @@ test.describe('Keyboard Navigation', () => {
     // Tab through toolbar buttons — collect focused element IDs.
     const focusedIds: string[] = [];
     for (let i: number = 0; i < 20; i++) {
-      await page.keyboard.press('Tab');
+      await dispatchKey(page, 'Tab');
       const id: string | null = await page.evaluate((): string | null => document.activeElement?.id || null);
       if (id && !focusedIds.includes(id)) focusedIds.push(id);
     }
@@ -242,7 +242,7 @@ test.describe('Keyboard Navigation', () => {
     // Tab into the parts panel — part cards should be focusable.
     let foundPartCard: boolean = false;
     for (let i: number = 0; i < 30; i++) {
-      await page.keyboard.press('Tab');
+      await dispatchKey(page, 'Tab');
       const isPartCard: boolean = await page.evaluate((): boolean =>
         document.activeElement?.classList.contains('vab-part-card') ?? false
       );
@@ -284,7 +284,7 @@ test.describe('Keyboard Navigation', () => {
     // Tab through — should reach a tab button.
     let foundMcTab: boolean = false;
     for (let i: number = 0; i < 20; i++) {
-      await page.keyboard.press('Tab');
+      await dispatchKey(page, 'Tab');
       const isMcTab: boolean = await page.evaluate((): boolean =>
         document.activeElement?.classList.contains('mc-tab') ?? false
       );
@@ -307,7 +307,7 @@ test.describe('Keyboard Navigation', () => {
     if (firstLabel) tabLabels.push(firstLabel);
 
     for (let i: number = 0; i < 10; i++) {
-      await page.keyboard.press('Tab');
+      await dispatchKey(page, 'Tab');
       const isMcTab: boolean = await page.evaluate((): boolean =>
         document.activeElement?.classList.contains('mc-tab') ?? false
       );
@@ -321,7 +321,7 @@ test.describe('Keyboard Navigation', () => {
     expect(tabLabels.length).toBeGreaterThanOrEqual(2);
 
     // Escape closes Mission Control and returns to hub.
-    await page.keyboard.press('Escape');
+    await dispatchKey(page, 'Escape');
     await expect(page.locator('#mission-control-overlay')).not.toBeVisible({ timeout: 5_000 });
     await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });
   });
