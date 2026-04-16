@@ -17,6 +17,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
   isIdbAvailable: vi.fn(() => true),
+  registerIdbErrorHandler: vi.fn(),
   initSettings: vi.fn(() => Promise.resolve()),
   initRenderer: vi.fn(() => Promise.resolve()),
   initVabRenderer: vi.fn(),
@@ -51,6 +52,7 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('../core/idbStorage.ts', () => ({
   isIdbAvailable: mocks.isIdbAvailable,
+  registerIdbErrorHandler: mocks.registerIdbErrorHandler,
 }));
 vi.mock('../core/settingsStore.ts', () => ({
   initSettings: mocks.initSettings,
