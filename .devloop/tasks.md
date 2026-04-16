@@ -89,7 +89,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes on the new file (`npx tsc --noEmit src/tests/setup.ts` — or confirm inclusion via full typecheck).
 
 ### TASK-013: Create vitest.config.ts with setup, workers, timeouts, coverage
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-012
 - **Description**: Per requirements §3.1. Create `vitest.config.ts` at the repo root with: `setupFiles: ['./src/tests/setup.ts']`; explicit worker cap (match Playwright's 2 workers on Windows); default test timeout (e.g., 10_000); `coverage` config using `@vitest/coverage-v8` with `include: ['src/']`, `exclude: ['src/tests/**', 'src/main.ts']`. Don't set `globals: true` — tests already import `describe`, `it`, etc. explicitly.
 - **Verification**: `npx vitest run src/tests/logger.test.ts` (or any single test) passes with the new config. `npm run typecheck` passes.
