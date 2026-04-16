@@ -53,6 +53,7 @@ import {
   recordDeletion,
   recordMove,
 } from './_undoActions.ts';
+import { getVabListenerTracker } from './_listenerTracker.ts';
 
 import type { GameState } from '../../core/gameState.ts';
 
@@ -297,11 +298,13 @@ export function initContextMenu(): void {
   document.body.appendChild(S.ctxMenu);
 
   // Clicking anywhere outside the menu dismisses it.
-  document.addEventListener('pointerdown', (e: PointerEvent) => {
+  const tracker = getVabListenerTracker();
+  if (!tracker) throw new Error('VAB listener tracker not initialised');
+  tracker.add(document, 'pointerdown', ((e: PointerEvent) => {
     if (S.ctxMenu && !S.ctxMenu.contains(e.target as Node)) {
       S.ctxMenu.setAttribute('hidden', '');
     }
-  }, { capture: true });
+  }) as EventListener, { capture: true });
 }
 
 /**
@@ -378,9 +381,11 @@ export function startDrag(partId: string, instanceId: string | null, clientX: nu
   if (instanceId !== null) {
     vabSetDragGhost(partId, clientX, clientY);
   }
-  window.addEventListener('pointermove',  onDragMove,   { capture: true });
-  window.addEventListener('pointerup',    onDragEnd,    { capture: true });
-  window.addEventListener('pointercancel', cancelDrag,  { capture: true });
+  const tracker = getVabListenerTracker();
+  if (!tracker) throw new Error('VAB listener tracker not initialised');
+  tracker.add(window, 'pointermove',   onDragMove   as EventListener, { capture: true });
+  tracker.add(window, 'pointerup',     onDragEnd    as EventListener, { capture: true });
+  tracker.add(window, 'pointercancel', cancelDrag   as EventListener, { capture: true });
 }
 
 /**

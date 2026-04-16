@@ -55,7 +55,7 @@
 - **Verification**: `npx vitest run src/tests/` existing VAB tests pass; grep confirms no `window.addEventListener` remains directly in `_panels.ts`.
 
 ### TASK-010: Route vab/_canvasInteraction.ts window/document listeners through tracker
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-008
 - **Description**: Replace the `document.addEventListener('pointerdown', ...)` at line 300 and the drag-flow `window.addEventListener('pointermove/pointerup/pointercancel', ...)` at lines 381–383 with tracker-registered listeners. Keep the existing `removeEventListener` calls in `onDragEnd` for early cleanup during normal drag lifecycle; the tracker guards the teardown-during-drag edge case. See requirements §2.3.
 - **Verification**: `npx vitest run src/tests/` existing VAB tests pass; manual grep confirms only canvas-element-scoped listeners (not window/document) remain outside the tracker.
