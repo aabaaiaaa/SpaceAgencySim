@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 3,
+  "lastIteration": 4,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-004",
-    "taskTitle": "Verify no close-proximity auto-save triggers in _loop.ts / _menuActions.ts",
-    "iterationNumber": 4,
-    "startedAt": "2026-04-16T22:35:13.173Z"
+    "taskId": "TASK-005",
+    "taskTitle": "Add E2E regression test for hub-return toast visibility",
+    "iterationNumber": 5,
+    "startedAt": "2026-04-16T22:35:50.346Z"
   }
 }

@@ -182,6 +182,37 @@ test.describe('Auto-Save System', () => {
     expect(agencyName).toBe(AUTO_SAVE_AGENCY);
   });
 
+  test('auto-save toast appears on hub after returning from flight @smoke', async ({ page }) => {
+    await page.setViewportSize({ width: VP_W, height: VP_H });
+
+    const envelope = buildSaveEnvelope({
+      parts: UNLOCKED_PARTS,
+      autoSaveEnabled: true,
+    });
+    await seedAndLoadSave(page, envelope);
+    await dismissWelcomeModal(page);
+
+    await startTestFlight(page, UNLOCKED_PARTS);
+    await teleportCraft(page, { posX: 0, posY: 5, velX: 0, velY: 0, grounded: true, landed: true, crashed: true });
+
+    // Wait for the post-flight summary to appear, then return to hub quickly.
+    await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
+    await page.click('#post-flight-return-btn', { timeout: 1_000 });
+
+    // The hub scene should be visible and the auto-save toast should appear.
+    await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#auto-save-toast')).toBeVisible({ timeout: 5_000 });
+
+    // Toast should complete the save with a 'Saved' confirmation.
+    await page.waitForFunction(
+      (): boolean => {
+        const toast = document.getElementById('auto-save-toast');
+        return toast?.textContent?.includes('Saved') ?? false;
+      },
+      { timeout: 5_000 },
+    );
+  });
+
   test('disabling auto-save in settings prevents toast', async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 

@@ -33,7 +33,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: Grep output for `triggerAutoSave` across `src/ui/flightController/**` and `src/ui/` is listed in the task's final message. No close-proximity issues found.
 
 ### TASK-005: Add E2E regression test for hub-return toast visibility
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-003
 - **Description**: Per requirements §1.2. Add `e2e/auto-save-hub-return.spec.ts` (or extend `e2e/auto-save.spec.ts`). Test should: start a flight from a fixture that can quickly reach landed state, click "Return to Space Agency" within 1 second, and assert the auto-save toast DOM element becomes visible on the hub scene. Tag `@smoke`. If a new spec file is created, add an entry `'e2e/auto-save-hub-return.spec.ts': ['core/saveload', 'ui/utilities']` to `E2E_SPEC_AREAS` in `scripts/generate-test-map.mjs`.
 - **Verification**: `npx playwright test e2e/auto-save-hub-return.spec.ts` (or the extended auto-save.spec.ts) passes.

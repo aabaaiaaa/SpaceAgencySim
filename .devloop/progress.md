@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 4
-- **Remaining**: 100
-- **Last Updated**: 2026-04-16T22:35:48.666Z
+- **Completed**: 5
+- **Remaining**: 99
+- **Last Updated**: 2026-04-16T22:37:51.722Z
 
 ## Iteration Log
 
@@ -43,4 +43,13 @@
 - **Exit Status**: success
 - **Tokens**: 145,069 total (8 in, 1,465 out, 42,532 cache-create, 101,064 cache-read)
 - **Cost**: $0.3530
+
+### Iteration 5 - 2026-04-16T22:37:51.720Z
+- **Task Attempted**: TASK-005
+- **Task Completed**: TASK-005
+- **Summary**: Completed Add E2E regression test for hub-return toast visibility
+- **Duration**: 2m 1s
+- **Exit Status**: success
+- **Tokens**: 1,187,088 total (23 in, 4,804 out, 62,360 cache-create, 1,119,901 cache-read)
+- **Cost**: $1.0699
 
