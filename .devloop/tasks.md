@@ -187,7 +187,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/hub*.test.ts` passes.
 
 ### TASK-028: Audit src/render/flight/rocket.ts for destroy
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §5.3. Read `src/render/flight/rocket.ts`. Identify the container(s) it creates. Add a destroy hook callable from the flight scene's teardown path.
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/render-*.test.ts` passes.

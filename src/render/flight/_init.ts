@@ -16,7 +16,7 @@ import { MIN_ZOOM, MAX_ZOOM } from './_constants.ts';
 import { updateCamera } from './_camera.ts';
 import { updateBodyVisuals, renderSky, renderStars, renderHorizon, renderWeatherHaze, generateStars } from './_sky.ts';
 import { renderGround, renderSurfaceItems, renderBiomeLabel } from './_ground.ts';
-import { renderRocket, hitTestFlightPart as _hitTestFlightPart } from './_rocket.ts';
+import { renderRocket, hitTestFlightPart as _hitTestFlightPart, destroyRocketRender } from './_rocket.ts';
 import {
   emitSmokeSegments, updateTrails, renderTrails,
   updatePlumeStates, renderPlumes,
@@ -194,8 +194,7 @@ export function destroyFlightRenderer(): void {
   if (s.surfaceItemsGraphics) app.stage.removeChild(s.surfaceItemsGraphics);
   if (s.debrisContainer)      app.stage.removeChild(s.debrisContainer);
   if (s.trailContainer)       app.stage.removeChild(s.trailContainer);
-  if (s.rocketContainer)      app.stage.removeChild(s.rocketContainer);
-  if (s.canopyContainer)      app.stage.removeChild(s.canopyContainer);
+  destroyRocketRender();
   if (s.biomeLabelContainer)  app.stage.removeChild(s.biomeLabelContainer);
   if (s.hazeGraphics)         app.stage.removeChild(s.hazeGraphics);
   if (s.asteroidsContainer)   app.stage.removeChild(s.asteroidsContainer);
@@ -208,8 +207,6 @@ export function destroyFlightRenderer(): void {
   s.surfaceItemsGraphics  = null;
   s.debrisContainer       = null;
   s.trailContainer        = null;
-  s.rocketContainer       = null;
-  s.canopyContainer       = null;
   s.biomeLabelContainer   = null;
   s.hazeGraphics          = null;
   s.asteroidsContainer    = null;

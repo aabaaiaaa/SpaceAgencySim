@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 26,
+  "lastIteration": 27,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-027",
-    "taskTitle": "Audit src/render/hub.ts for scene-root destroy",
-    "iterationNumber": 27,
-    "startedAt": "2026-04-16T23:30:54.725Z"
+    "taskId": "TASK-028",
+    "taskTitle": "Audit src/render/flight/rocket.ts for destroy",
+    "iterationNumber": 28,
+    "startedAt": "2026-04-16T23:33:24.464Z"
   }
 }

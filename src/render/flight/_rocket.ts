@@ -643,3 +643,34 @@ export function hitTestFlightPart(screenX: number, screenY: number, ps: Readonly
 
   return null;
 }
+
+// ---------------------------------------------------------------------------
+// Teardown
+// ---------------------------------------------------------------------------
+
+/**
+ * Destroy the rocket- and canopy-containers and clear the hit-grid cache.
+ * Pooled Graphics/Text children are released back to the pool first so the
+ * destroy call doesn't corrupt pool entries. Called from destroyFlightRenderer.
+ * Safe to call when containers were never initialised.
+ */
+export function destroyRocketRender(): void {
+  const s = getFlightRenderState();
+
+  if (s.rocketContainer) {
+    releaseContainerChildren(s.rocketContainer);
+    if (s.rocketContainer.parent) s.rocketContainer.parent.removeChild(s.rocketContainer);
+    s.rocketContainer.destroy({ children: true });
+    s.rocketContainer = null;
+  }
+  if (s.canopyContainer) {
+    releaseContainerChildren(s.canopyContainer);
+    if (s.canopyContainer.parent) s.canopyContainer.parent.removeChild(s.canopyContainer);
+    s.canopyContainer.destroy({ children: true });
+    s.canopyContainer = null;
+  }
+
+  _hitGrid          = null;
+  _hitGridPartsRef  = null;
+  _hitGridPartsSize = -1;
+}
