@@ -35,6 +35,9 @@ import {
   STARTER_FACILITIES,
   FacilityId,
   openConstructionPanel,
+  pressStage,
+  pressThrottleUp,
+  pressThrottleCut,
 } from './helpers.js';
 import {
   freshStartFixture,
@@ -573,8 +576,8 @@ test.describe('Contract objectives complete in-flight', () => {
     await startTestFlight(page, BASIC_ROCKET);
 
     // Stage and throttle up
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
 
     // Wait for altitude objective to complete
     await waitForContractObjectiveComplete(page, 'contract-altitude', 'obj-alt-1', 30_000);
@@ -619,8 +622,8 @@ test.describe('Contract REACH_SPEED objective', () => {
 
   test('(1) REACH_SPEED objective completes when speed is reached', async () => {
     await startTestFlight(page, BASIC_ROCKET);
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
 
     await waitForContractObjectiveComplete(page, 'contract-speed', 'obj-speed-1', 30_000);
 
@@ -743,8 +746,8 @@ test.describe('Contract over-performance bonus', () => {
 
   test('(1) bonus objectives are tracked alongside main objectives', async () => {
     await startTestFlight(page, BASIC_ROCKET);
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
 
     // Wait for both main and bonus altitude to be reached
     await waitForAltitude(page, 100, 15_000);
@@ -1008,12 +1011,12 @@ test.describe('Crew skill XP gains from flight events', () => {
     });
 
     // Stage engine and launch
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
     await waitForAltitude(page, 200, 10_000);
 
     // Cut engine and let parachute bring it down
-    await page.keyboard.press('x');
+    await pressThrottleCut(page);
 
     // Return to agency (should land with parachute = safe landing)
     await returnToAgency(page);
@@ -1776,8 +1779,8 @@ test.describe('Full contract lifecycle — accept -> fly -> complete -> reward',
 
   test('(2) objective completes during flight', async () => {
     await startTestFlight(page, BASIC_ROCKET);
-    await page.keyboard.press('Space');
-    await page.keyboard.press('z');
+    await pressStage(page);
+    await pressThrottleUp(page);
 
     await waitForContractObjectiveComplete(page, 'contract-lifecycle', 'obj-lc-1', 30_000);
 

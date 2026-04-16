@@ -30,6 +30,8 @@ import {
   teleportCraft,
   waitForOrbit,
   stageAndLaunch,
+  pressThrottleCut,
+  dispatchKey,
 } from './helpers.js';
 import type { SaveEnvelope, SaveEnvelopeParams } from './helpers.js';
 import {
@@ -387,7 +389,7 @@ test.describe('Celestial body data drives physics and rendering', () => {
 
     // Cut throttle and check velocity — on airless body, velocity shouldn't
     // decrease much except from gravity (no atmospheric drag).
-    await page.keyboard.press('x');
+    await pressThrottleCut(page);
     const ps1 = (await getPhysicsSnapshot(page))!;
     // Wait for physics to run a few frames (position changes due to gravity)
     await page.waitForFunction(
@@ -1891,7 +1893,7 @@ test.describe('Map view controls during transfer', () => {
     await setTransferState(page, 'EARTH', 'MARS');
 
     // Toggle map view (key 'c' or 'm' depending on implementation).
-    await page.keyboard.press('c');
+    await dispatchKey(page, 'c');
     // Wait for map view state to change
     await page.evaluate(() => new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
 
@@ -1903,7 +1905,7 @@ test.describe('Map view controls during transfer', () => {
     });
 
     // Toggle back.
-    await page.keyboard.press('c');
+    await dispatchKey(page, 'c');
     await page.evaluate(() => new Promise<void>(r => requestAnimationFrame(() => requestAnimationFrame(() => r()))));
 
     // Reset transfer state to orbit so we can return cleanly.

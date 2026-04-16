@@ -103,7 +103,7 @@
 - **Verification**: The helper compiles (`npx tsc --noEmit`) and a sanity-check E2E spec that uses it passes: `npx playwright test e2e/<chosen-spec>.spec.ts`.
 
 ### TASK-018: Migrate first batch of E2E specs to dispatchEvent helper
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-017
 - **Description**: Pick ~6 of the 12 specs (prioritize the ones most frequently failing or with the most `keyboard.press` call sites). Replace every `page.keyboard.press` with the helper from TASK-017. Preserve behaviour — no test logic changes. See requirements §4.
 - **Verification**: `npx playwright test <the six migrated specs>` passes. Do NOT run the full E2E suite.

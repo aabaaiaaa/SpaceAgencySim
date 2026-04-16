@@ -3,6 +3,7 @@ import {
   VP_W, VP_H,
   FIRST_FLIGHT_MISSION, buildSaveEnvelope,
   seedAndLoadSave, startTestFlight, teleportCraft,
+  pressStage, pressThrottleUp, pressThrottleCut,
 } from './helpers.js';
 
 /**
@@ -32,8 +33,8 @@ async function setupFlight(page: Page): Promise<void> {
 }
 
 async function stageAndThrottle(page: Page): Promise<void> {
-  await page.keyboard.press('Space');
-  await page.keyboard.press('z');
+  await pressStage(page);
+  await pressThrottleUp(page);
 }
 
 test.describe('Relaunch — Takeoff, Land, Takeoff Again', () => {
@@ -69,7 +70,7 @@ test.describe('Relaunch — Takeoff, Land, Takeoff Again', () => {
     );
 
     // Cut throttle and teleport near ground with gentle descent.
-    await page.keyboard.press('x');
+    await pressThrottleCut(page);
     await teleportCraft(page, { posY: 0.1, velX: 0, velY: -0.5, grounded: false, landed: false });
 
     // Wait for the teleported position to take effect before checking landing.
@@ -110,7 +111,7 @@ test.describe('Relaunch — Takeoff, Land, Takeoff Again', () => {
     );
 
     // Cut throttle and land gently.
-    await page.keyboard.press('x');
+    await pressThrottleCut(page);
     await teleportCraft(page, { posY: 0.1, velX: 0, velY: -0.5, grounded: false, landed: false });
 
     // Wait for the teleported position to take effect before checking landing.
@@ -143,7 +144,7 @@ test.describe('Relaunch — Takeoff, Land, Takeoff Again', () => {
     });
 
     // Full throttle to re-liftoff.
-    await page.keyboard.press('z');
+    await pressThrottleUp(page);
 
     await page.waitForFunction(
       () => (window.__flightPs?.posY ?? 0) > 5,

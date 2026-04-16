@@ -26,6 +26,7 @@ import {
   waitForOrbit,
   setTestTimeWarp,
   ALL_FACILITIES,
+  pressStage,
 } from './helpers.js';
 import { ALL_PARTS } from './fixtures.js';
 
@@ -129,7 +130,7 @@ test.describe('Phase Transition: PRELAUNCH → LAUNCH', () => {
     expect(initialPhase).toBe('PRELAUNCH');
 
     // Press Space to stage (ignite the engine).
-    await page.keyboard.press('Space');
+    await pressStage(page);
 
     // Wait for LAUNCH phase to appear in the phaseLog — this proves the
     // transition happened through evaluateAutoTransitions, not direct mutation.
@@ -160,7 +161,7 @@ test.describe('Phase Transition: LAUNCH → FLIGHT', () => {
     await startTestFlight(page, BASIC_ROCKET);
 
     // Stage the engine to go PRELAUNCH → LAUNCH → FLIGHT.
-    await page.keyboard.press('Space');
+    await pressStage(page);
 
     // Wait for FLIGHT phase — the rocket lifts off the pad.
     await waitForPhaseInLog(page, 'FLIGHT', 10_000);
@@ -471,7 +472,7 @@ test.describe('Phase Transition: Landing', () => {
     });
 
     // Stage the engine (stage 0) → PRELAUNCH → LAUNCH → FLIGHT.
-    await page.keyboard.press('Space');
+    await pressStage(page);
     await waitForPhaseInLog(page, 'FLIGHT', 10_000);
 
     // Teleport to 2 km altitude with slow downward velocity.
@@ -483,7 +484,7 @@ test.describe('Phase Transition: Landing', () => {
     });
 
     // Stage the parachute (stage 1) so it deploys.
-    await page.keyboard.press('Space');
+    await pressStage(page);
 
     // Wait for parachute to be deploying or deployed.
     await page.waitForFunction(() => {

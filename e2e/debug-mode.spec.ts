@@ -2,6 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import {
   VP_W, VP_H,
   buildSaveEnvelope, seedAndLoadSave, dismissWelcomeModal,
+  dispatchKey,
 } from './helpers.js';
 
 // ---------------------------------------------------------------------------
@@ -20,7 +21,7 @@ test.describe('Debug Mode Toggle', () => {
     await seedAndLoadSave(page, envelope);
     await dismissWelcomeModal(page);
 
-    await page.keyboard.press('Control+Shift+D');
+    await dispatchKey(page, 'D', { ctrlKey: true, shiftKey: true });
     // Panel should not appear — verify with assertion timeout (no hard wait)
     await expect(page.locator('#debug-save-panel')).not.toBeVisible({ timeout: 2_000 });
   });
@@ -32,7 +33,7 @@ test.describe('Debug Mode Toggle', () => {
     await dismissWelcomeModal(page);
 
     await page.evaluate(() => window.__enableDebugMode());
-    await page.keyboard.press('Control+Shift+D');
+    await dispatchKey(page, 'D', { ctrlKey: true, shiftKey: true });
     await expect(page.locator('#debug-save-panel')).toBeVisible({ timeout: 5_000 });
     await page.click('.debug-save-close-btn');
   });
@@ -61,7 +62,7 @@ test.describe('Debug Mode Toggle', () => {
     await dismissWelcomeModal(page);
 
     expect(await page.evaluate(() => window.__gameState.debugMode)).toBe(true);
-    await page.keyboard.press('Control+Shift+D');
+    await dispatchKey(page, 'D', { ctrlKey: true, shiftKey: true });
     await expect(page.locator('#debug-save-panel')).toBeVisible({ timeout: 5_000 });
     await page.click('.debug-save-close-btn');
   });
@@ -73,7 +74,7 @@ test.describe('Debug Mode Toggle', () => {
     await dismissWelcomeModal(page);
 
     await page.evaluate(() => { window.__gameState.debugMode = false; });
-    await page.keyboard.press('Control+Shift+D');
+    await dispatchKey(page, 'D', { ctrlKey: true, shiftKey: true });
     // Panel should not appear — verify with assertion timeout (no hard wait)
     await expect(page.locator('#debug-save-panel')).not.toBeVisible({ timeout: 2_000 });
   });
@@ -88,7 +89,7 @@ test.describe('Debug Mode Toggle', () => {
     await page.evaluate(() => window.__enableDebugMode());
     expect(await page.evaluate(() => window.__gameState.debugMode)).toBe(true);
 
-    await page.keyboard.press('Control+Shift+D');
+    await dispatchKey(page, 'D', { ctrlKey: true, shiftKey: true });
     await expect(page.locator('#debug-save-panel')).toBeVisible({ timeout: 5_000 });
     await page.click('.debug-save-close-btn');
   });

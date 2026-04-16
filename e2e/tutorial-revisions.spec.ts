@@ -27,6 +27,7 @@ import {
   teleportCraft,
   pressStage,
   pressThrottleUp,
+  pressThrottleCut,
   stageAndLaunch,
 } from './helpers.js';
 import type { FacilityState, CrewMember, SaveEnvelope } from './helpers.js';
@@ -564,7 +565,7 @@ test.describe('Tutorial Revisions', () => {
       await stage(page); // Stage 0: fire engine
       await pressThrottleUp(page);
       await waitForAltitude(page, 1_400);
-      await page.keyboard.press('x'); // cut throttle
+      await pressThrottleCut(page); // cut throttle
 
       // Deploy parachute (Stage 1).
       await stage(page);
@@ -920,7 +921,7 @@ test.describe('Tutorial Revisions', () => {
       // Continue climbing past 5000m.
       await setWarp(page, 100);
       await waitForAltitude(page, 5_000);
-      await page.keyboard.press('x'); // cut throttle
+      await pressThrottleCut(page); // cut throttle
 
       // Wait for science to be collected.
       await page.waitForFunction(
@@ -1102,7 +1103,7 @@ test.describe('Tutorial Revisions', () => {
 
       // Climb to ~500m so free-fall gives >=50 m/s impact.
       await waitForAltitude(page, 500);
-      await page.keyboard.press('x'); // cut throttle
+      await pressThrottleCut(page); // cut throttle
 
       // Let it crash.
       await waitLanded(page, 60_000);
@@ -1138,7 +1139,7 @@ test.describe('Tutorial Revisions', () => {
       await stage(page);
       await pressThrottleUp(page);
       await waitForAltitude(page, 1_400);
-      await page.keyboard.press('x'); // cut throttle
+      await pressThrottleCut(page); // cut throttle
 
       // Stage 1: deploy parachute.
       await stage(page);
