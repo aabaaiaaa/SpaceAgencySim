@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { dismissWelcomeModal, navigateToVab } from './helpers.js';
+import { dismissWelcomeModal, dispatchKey, navigateToVab } from './helpers.js';
 
 /**
  * E2E — Keyboard Navigation
@@ -26,7 +26,7 @@ test.describe('Keyboard Navigation', () => {
     await expect(page.locator('#mm-agency-name-input')).toBeFocused();
 
     // Tab forward through mode option cards.
-    await page.keyboard.press('Tab');
+    await dispatchKey(page, 'Tab');
     const tutorialOption = page.locator('.mm-mode-option[data-mode="tutorial"]');
     await expect(tutorialOption).toBeFocused();
 
@@ -37,21 +37,21 @@ test.describe('Keyboard Navigation', () => {
     expect(outlineStyle).not.toBe('none');
 
     // Tab to next mode option.
-    await page.keyboard.press('Tab');
+    await dispatchKey(page, 'Tab');
     await expect(page.locator('.mm-mode-option[data-mode="freeplay"]')).toBeFocused();
 
-    await page.keyboard.press('Tab');
+    await dispatchKey(page, 'Tab');
     await expect(page.locator('.mm-mode-option[data-mode="sandbox"]')).toBeFocused();
 
     // Enter activates the focused mode option.
-    await page.keyboard.press('Enter');
+    await dispatchKey(page, 'Enter');
     await expect(page.locator('.mm-mode-option[data-mode="sandbox"]')).toHaveClass(/selected/, { timeout: 5_000 });
 
     // Tab through to the Start button and activate it.
     // Continue tabbing until we reach the start button.
     // After sandbox option → sandbox checkboxes → Start button.
     for (let i: number = 0; i < 10; i++) {
-      await page.keyboard.press('Tab');
+      await dispatchKey(page, 'Tab');
       const focused: string | undefined = await page.evaluate((): string | undefined => document.activeElement?.id);
       if (focused === 'mm-start-btn') break;
     }
@@ -61,7 +61,7 @@ test.describe('Keyboard Navigation', () => {
 
     // Focus the start button and press Enter.
     await page.focus('#mm-start-btn');
-    await page.keyboard.press('Enter');
+    await dispatchKey(page, 'Enter');
 
     // Should transition to hub.
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
@@ -85,7 +85,7 @@ test.describe('Keyboard Navigation', () => {
     // Tab repeatedly until we land on a hub building (topbar buttons come first).
     let foundBuilding: boolean = false;
     for (let i: number = 0; i < 15; i++) {
-      await page.keyboard.press('Tab');
+      await dispatchKey(page, 'Tab');
       const isBuilding: boolean = await page.evaluate((): boolean =>
         document.activeElement?.classList.contains('hub-building') ?? false
       );
@@ -111,7 +111,7 @@ test.describe('Keyboard Navigation', () => {
     if (firstId) buildingIds.push(firstId);
 
     for (let i: number = 0; i < 8; i++) {
-      await page.keyboard.press('Tab');
+      await dispatchKey(page, 'Tab');
       const id: string | null = await page.evaluate((): string | null =>
         document.activeElement?.getAttribute('data-building-id') || null
       );
