@@ -101,7 +101,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` passes.
 
 ### TASK-015: Remove per-file logger.setLevel('warn') from autoSave.test.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-013
 - **Description**: Per requirements §3.1. Same treatment as TASK-014, applied to `src/tests/autoSave.test.ts`.
 - **Verification**: `npx vitest run src/tests/autoSave.test.ts` passes.
