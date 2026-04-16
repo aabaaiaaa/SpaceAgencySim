@@ -21,7 +21,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx playwright test e2e/flight-hud-surface.spec.ts` passes.
 
 ### TASK-003: Remove triggerAutoSave('post-flight') call in _postFlight.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §1.2. Open `src/ui/flightController/_postFlight.ts:647`. Remove the `triggerAutoSave(state, 'post-flight')` call and any imports that become unused. The hub-return call at `src/ui/index.ts:185` remains the sole auto-save trigger around flight end.
 - **Verification**: `npm run typecheck` passes and `npx vitest run src/tests/autoSave.test.ts` passes.

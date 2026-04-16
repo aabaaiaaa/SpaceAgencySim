@@ -13,7 +13,6 @@ import { getSurfaceHubsForRecovery } from '../../core/hubs.ts';
 import { refreshTopBar } from '../topbar.ts';
 import { getFCState } from './_state.ts';
 import { stopFlightScene, startFlightScene } from './_init.ts';
-import { triggerAutoSave } from '../autoSaveToast.ts';
 import { showUnlockNotification } from '../missionControl/_missionsTab.ts';
 
 import type { PhysicsState } from '../../core/physics.ts';
@@ -641,9 +640,4 @@ export function showPostFlightSummary(
   }
 
   host.appendChild(overlay);
-
-  // Trigger auto-save when the post-flight summary appears.
-  if (state) {
-    triggerAutoSave(state, 'post-flight');
-  }
 }
