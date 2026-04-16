@@ -1051,6 +1051,23 @@ describe('fireNextStage() — debris integration via physics.js', () => {
     fireNextStage(ps, assembly, staging, fs); // stage 3: upper decoupler
     expect(ps.debris).toHaveLength(4); // 2 decouplers + 2 disconnected stages
   });
+
+  it('produces debris with finite angularVelocity when ps.angularVelocity is NaN', () => {
+    const { assembly, staging } = makeTwoStageRocket();
+    const fs = makeFlightState();
+    const ps = createPhysicsState(assembly, fs);
+
+    // Corrupt the rocket's angular velocity to simulate upstream numerical instability.
+    ps.angularVelocity = NaN;
+
+    fireNextStage(ps, assembly, staging, fs); // stage 1: engine ignites
+    fireNextStage(ps, assembly, staging, fs); // stage 2: separation → creates debris
+
+    expect(ps.debris.length).toBeGreaterThan(0);
+    for (const debris of ps.debris) {
+      expect(Number.isFinite(debris.angularVelocity)).toBe(true);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

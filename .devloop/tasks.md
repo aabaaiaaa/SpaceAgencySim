@@ -73,7 +73,7 @@
 - **Verification**: `npx vitest run src/tests/physics.test.ts` passes with a new test that exercises the radial check with a non-Earth body and asserts the correct `radOutX`/`radOutY` sign.
 
 ### TASK-013: Replace ?? fallback with Number.isFinite guard in staging.ts debris angularVelocity
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: At `src/core/staging.ts:870`, replace `(ps.angularVelocity ?? 0)` with `(Number.isFinite(ps.angularVelocity) ? ps.angularVelocity : 0)`. Grep `src/core/` for other numeric `?? 0` patterns where the source could plausibly be NaN (velocities, angles, forces) and convert to `Number.isFinite` guards where appropriate — limit scope to obvious NaN-risk sites, do not churn the whole codebase. See requirements §3.2.
 - **Verification**: `npx vitest run src/tests/staging.test.ts` passes with a new test that passes `{ angularVelocity: NaN }` through the debris creation path and asserts the resulting debris has a finite `angularVelocity`.

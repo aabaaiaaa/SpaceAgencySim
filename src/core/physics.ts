@@ -2247,8 +2247,8 @@ function _checkToppleCrash(ps: PhysicsState, assembly: RocketAssembly, flightSta
 
   // Compute tip speed: linear velocity of the farthest part from the
   // tipping contact pivot.
-  const cx: number = ps.tippingContactX ?? 0;
-  const cy: number = ps.tippingContactY ?? 0;
+  const cx: number = Number.isFinite(ps.tippingContactX) ? ps.tippingContactX : 0;
+  const cy: number = Number.isFinite(ps.tippingContactY) ? ps.tippingContactY : 0;
   let maxDist = 0;
   let minThreshold = Infinity;
   for (const instanceId of ps.activeParts) {
