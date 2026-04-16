@@ -127,7 +127,7 @@
 - **Verification**: `grep -n "console.warn" src/core/settingsStore.ts` returns nothing; `npx vitest run src/tests/settingsStore.test.ts` passes.
 
 ### TASK-022: Final typecheck, lint, build, smoke, and affected E2E verification
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012, TASK-013, TASK-014, TASK-015, TASK-016, TASK-017, TASK-018, TASK-019, TASK-020, TASK-021
 - **Description**: Run `npm run typecheck`, `npm run lint`, `npm run build`, `npm run test:unit`, and `npm run test:smoke:unit` and confirm all pass with zero errors. Do NOT run the full E2E suite. See requirements §6.
 - **Verification**: All five commands exit 0.
