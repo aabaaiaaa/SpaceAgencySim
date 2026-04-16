@@ -351,3 +351,193 @@ describe('comms — getCommsLinkLabel', () => {
     expect(getCommsLinkLabel(CommsLinkType.NONE)).toBe('No Signal');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Additional branch coverage tests
+// ---------------------------------------------------------------------------
+
+describe('comms — Moon body link with no local satellite network', () => {
+  it('has NO_SIGNAL at Moon without comm-sats, relay, or tracking station', () => {
+    // Moon with no comm-sats, no relay sats, no tracking station T3.
+    // _canBodyLinkToEarth(MOON) checks T3 first (false), then Earth comm-sats (none).
+    // _hasLocalCoverage fails (no local comm-sats), _hasRelayChain fails (no relay sats).
+    const state = freshState();
+    const fs = flightAt('MOON', FlightPhase.ORBIT);
+    const result = evaluateComms(state, fs, { altitude: 50_000, posX: 0, posY: 0 });
+    expect(result.status).toBe(CommsStatus.NO_SIGNAL);
+    expect(result.linkType).toBe(CommsLinkType.NONE);
+  });
+
+  it('connects at Moon via LOCAL_NETWORK when Earth has comm-sats for backhaul', () => {
+    // Moon comm-sats provide local coverage, Earth comm-sats provide the backhaul
+    // via _canBodyLinkToEarth(MOON) -> Earth comm-sats check (no T3 needed).
+    const state = freshState();
+    state.hubs[0].facilities[FacilityId.SATELLITE_OPS] = { built: true, tier: 3 };
+    deployCommSats(state, 'MOON', 3, MOON_ELEMENTS);
+    deployCommSats(state, 'EARTH', 1, LEO_ELEMENTS);
+    const fs = flightAt('MOON', FlightPhase.ORBIT);
+    const result = evaluateComms(state, fs, { altitude: 50_000, posX: 0, posY: 0 });
+    expect(result.status).toBe(CommsStatus.CONNECTED);
+    expect(result.linkType).toBe(CommsLinkType.LOCAL_NETWORK);
+  });
+});
+
+describe('comms — onboard relay antenna (crewed craft)', () => {
+  it('provides ONBOARD_RELAY for crewed craft with relay antenna part', () => {
+    // A crewed craft with a relay antenna should get ONBOARD_RELAY link type,
+    // which is the highest priority link and checked first in _resolveLink.
+    const state = freshState();
+    const relayRocket: RocketDesign = {
+      id: 'r-crew-relay',
+      name: 'Crewed Relay Ship',
+      parts: [
+        { partId: 'relay-antenna', position: { x: 0, y: 0 } },
+        { partId: 'command-module-mk1', position: { x: 0, y: 1 } },
+      ],
+      staging: { stages: [[]], unstaged: [] },
+      totalMass: 200,
+      totalThrust: 0,
+      createdDate: '2026-01-01',
+      updatedDate: '2026-01-01',
+    };
+    state.rockets = [relayRocket];
+    const fs = flightAt('MARS', FlightPhase.ORBIT, ['crew-1'], 'r-crew-relay');
+    const result = evaluateComms(state, fs, { altitude: 150_000, posX: 0, posY: 0 });
+    expect(result.status).toBe(CommsStatus.CONNECTED);
+    expect(result.linkType).toBe(CommsLinkType.ONBOARD_RELAY);
+    // Crewed + onboard relay = full control and transmit.
+    expect(result.canTransmit).toBe(true);
+    expect(result.controlLocked).toBe(false);
+  });
+});
+
+describe('comms — shadow zone (craft behind body)', () => {
+  it('loses local network coverage when craft is in shadow zone behind body', () => {
+    // Deploy fewer than COMMS_FULL_COVERAGE_THRESHOLD comm-sats so partial coverage
+    // applies and shadow zone check is triggered.
+    // Shadow zone math: cy = posY + R, craftAngle = atan2(cx, cy).
+    // For shadow: craftAngle near PI -> cx ≈ 0, cy < 0, dist >= R.
+    // Need posY < -R so cy < 0, and posY <= -2R so dist = |cy| = |posY + R| >= R.
+    const state = freshState();
+    state.hubs[0].facilities[FacilityId.SATELLITE_OPS] = { built: true, tier: 3 };
+    state.hubs[0].facilities[FacilityId.TRACKING_STATION] = { built: true, tier: 3 };
+    // 2 comm-sats at Moon = partial coverage, shadow zone check applies.
+    deployCommSats(state, 'MOON', 2, MOON_ELEMENTS);
+
+    const R = BODY_RADIUS.MOON; // 1_737_400
+    const fs = flightAt('MOON', FlightPhase.ORBIT);
+    // posY = -2R - 50_000 -> cy = -R - 50_000, dist = R + 50_000 > R, angle = PI.
+    const shadowPosY = -(2 * R + 50_000);
+    const result = evaluateComms(state, fs, { altitude: 50_000, posX: 0, posY: shadowPosY });
+    // Craft is in the shadow zone, so local coverage fails.
+    // Falls through to relay chain check which also fails (no relay sats at Moon).
+    expect(result.linkType).not.toBe(CommsLinkType.LOCAL_NETWORK);
+  });
+
+  it('retains local network coverage with full constellation even on far side', () => {
+    // With >= 3 comm-sats (full coverage), shadow zone is irrelevant.
+    const state = freshState();
+    state.hubs[0].facilities[FacilityId.SATELLITE_OPS] = { built: true, tier: 3 };
+    state.hubs[0].facilities[FacilityId.TRACKING_STATION] = { built: true, tier: 3 };
+    deployCommSats(state, 'MOON', 3, MOON_ELEMENTS);
+
+    const R = BODY_RADIUS.MOON;
+    const fs = flightAt('MOON', FlightPhase.ORBIT);
+    const shadowPosY = -(2 * R + 50_000);
+    const result = evaluateComms(state, fs, { altitude: 50_000, posX: 0, posY: shadowPosY });
+    // Full constellation means full coverage, no shadow zone gaps.
+    expect(result.status).toBe(CommsStatus.CONNECTED);
+    expect(result.linkType).toBe(CommsLinkType.LOCAL_NETWORK);
+  });
+});
+
+describe('comms — relay chain multi-hop and cycle detection', () => {
+  it('connects via multi-hop relay chain (Mars -> Earth relay sats)', () => {
+    // Relay sats at Mars and Earth. Mars body walks to Earth via relay chain.
+    // _walkRelayChain(MARS) -> checks relay sats at MARS (yes) ->
+    // gets bodies within relay range -> EARTH is reachable (sibling via SUN) ->
+    // relay sats at EARTH (yes) -> _walkRelayChain(EARTH) = true (base case).
+    const state = freshState();
+    state.hubs[0].facilities[FacilityId.SATELLITE_OPS] = { built: true, tier: 3 };
+    deployRelaySats(state, 'EARTH', 1);
+    deployRelaySats(state, 'MARS', 1);
+    // No local comm-sats at Mars — rely purely on relay sat range check.
+    const fs = flightAt('MARS', FlightPhase.ORBIT);
+    // Altitude must be within COMMS_LOCAL_NETWORK_RANGE for _isWithinRelaySatRange.
+    const result = evaluateComms(state, fs, { altitude: 150_000, posX: 0, posY: 0 });
+    expect(result.status).toBe(CommsStatus.CONNECTED);
+    expect(result.linkType).toBe(CommsLinkType.RELAY);
+  });
+
+  it('does not infinite loop on relay chain cycles (visited set prevents revisit)', () => {
+    // Deploy relay sats at Saturn and Titan (Saturn <-> Titan mutual cycle).
+    // The visited set in _walkRelayChain prevents TITAN from re-visiting SATURN.
+    // The function must terminate (not hang). The actual link result depends on
+    // whether a path to Earth exists — here T3 satellite ops may enable one.
+    const state = freshState();
+    state.hubs[0].facilities[FacilityId.SATELLITE_OPS] = { built: true, tier: 3 };
+    deployRelaySats(state, 'SATURN', 1);
+    deployRelaySats(state, 'TITAN', 1);
+    const fs = flightAt('SATURN', FlightPhase.ORBIT);
+    const result = evaluateComms(state, fs, { altitude: 150_000, posX: 0, posY: 0 });
+    // Key assertion: the function terminates (no infinite loop).
+    // The cycle detection prevents revisiting Saturn via Titan.
+    expect(result).toBeDefined();
+    expect(result.status).toBeDefined();
+  });
+});
+
+describe('comms — transfer state relay evaluation', () => {
+  it('connects via RELAY during transfer when origin body has relay coverage', () => {
+    // Craft in TRANSFER phase between Earth and Mars.
+    // _resolveLink falls through to transferState check:
+    //   _canBodyLinkToEarth(originBodyId=EARTH) -> true (Earth is Earth)
+    //   _hasRelaySatsAtBody(originBodyId=EARTH) -> true (relay sats at Earth)
+    // Result: RELAY link type.
+    const state = freshState();
+    state.hubs[0].facilities[FacilityId.SATELLITE_OPS] = { built: true, tier: 3 };
+    deployRelaySats(state, 'EARTH', 1);
+    const fs = flightAt('EARTH', FlightPhase.TRANSFER, []);
+    fs.transferState = {
+      originBodyId: 'EARTH',
+      destinationBodyId: 'MARS',
+      departureTime: 0,
+      estimatedArrival: 100_000,
+      departureDV: 3500,
+      captureDV: 1500,
+      totalDV: 5000,
+      trajectoryPath: [],
+    };
+    // Place craft far beyond direct/T3 range — deep space during transfer.
+    const deepSpaceAlt = 1_000_000_000;
+    const result = evaluateComms(state, fs, { altitude: deepSpaceAlt, posX: 0, posY: 0 });
+    expect(result.status).toBe(CommsStatus.CONNECTED);
+    expect(result.linkType).toBe(CommsLinkType.RELAY);
+  });
+
+  it('connects via RELAY during transfer when destination body has relay coverage and Earth link', () => {
+    // Craft in TRANSFER arriving at Mars.
+    // Transfer check: _canBodyLinkToEarth(MARS) -> _hasRelayChain(MARS) -> relay sats
+    //   at Mars + Earth -> chain reaches Earth.
+    // _hasRelaySatsAtBody(MARS) -> true.
+    const state = freshState();
+    state.hubs[0].facilities[FacilityId.SATELLITE_OPS] = { built: true, tier: 3 };
+    deployRelaySats(state, 'EARTH', 1);
+    deployRelaySats(state, 'MARS', 1);
+    const fs = flightAt('EARTH', FlightPhase.TRANSFER, []);
+    fs.transferState = {
+      originBodyId: 'EARTH',
+      destinationBodyId: 'MARS',
+      departureTime: 0,
+      estimatedArrival: 100_000,
+      departureDV: 3500,
+      captureDV: 1500,
+      totalDV: 5000,
+      trajectoryPath: [],
+    };
+    const deepSpaceAlt = 1_000_000_000;
+    const result = evaluateComms(state, fs, { altitude: deepSpaceAlt, posX: 0, posY: 0 });
+    expect(result.status).toBe(CommsStatus.CONNECTED);
+    expect(result.linkType).toBe(CommsLinkType.RELAY);
+  });
+});

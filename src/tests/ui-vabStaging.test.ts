@@ -115,7 +115,7 @@ const mockDocument: MockDocument = {
 vi.stubGlobal('document', mockDocument);
 
 import { setVabState, resetVabState } from '../ui/vab/_state.ts';
-import { syncStagingWithAssembly } from '../core/rocketbuilder.ts';
+import { syncStagingWithAssembly, validateStagingConfig } from '../core/rocketbuilder.ts';
 import {
   setStagingCallbacks,
   syncAndRenderStaging,
@@ -516,6 +516,105 @@ describe('VAB Staging', () => {
       expect(body._innerHTML).toContain('Air density:');
       expect(body._innerHTML).toContain('kg/m');
       mockDocument.getElementById.mockReturnValue(null);
+    });
+
+    it('renders validation warnings when present', () => {
+      const body = makeMockBody();
+      mockDocument.getElementById.mockReturnValue(body);
+
+      vi.mocked(validateStagingConfig).mockReturnValueOnce(['No ignition source in Stage 1']);
+
+      const assembly = createTestAssembly([
+        ['t1', { instanceId: 't1', partId: 'tank-1', x: 0, y: 0 }],
+      ]);
+      const staging = createTestStaging([['t1']], []);
+
+      setVabState({ assembly, stagingConfig: staging, dvAltitude: 0 });
+      renderStagingPanel();
+
+      expect(body._innerHTML).toContain('vab-staging-warnings');
+      expect(body._innerHTML).toContain('No ignition source in Stage 1');
+      mockDocument.getElementById.mockReturnValue(null);
+    });
+
+    it('does not render warnings section when no warnings', () => {
+      const body = makeMockBody();
+      mockDocument.getElementById.mockReturnValue(body);
+
+      const assembly = createTestAssembly([
+        ['e1', { instanceId: 'e1', partId: 'engine-1', x: 0, y: 0 }],
+      ]);
+      const staging = createTestStaging([['e1']], []);
+
+      setVabState({ assembly, stagingConfig: staging, dvAltitude: 0 });
+      renderStagingPanel();
+
+      expect(body._innerHTML).not.toContain('vab-staging-warnings');
+      mockDocument.getElementById.mockReturnValue(null);
+    });
+
+    it('renders "FIRES FIRST" label on stage 1', () => {
+      const body = makeMockBody();
+      mockDocument.getElementById.mockReturnValue(body);
+
+      const assembly = createTestAssembly([
+        ['e1', { instanceId: 'e1', partId: 'engine-1', x: 0, y: 0 }],
+        ['srb1', { instanceId: 'srb1', partId: 'srb-1', x: 20, y: 0 }],
+      ]);
+      const staging = createTestStaging([['e1'], ['srb1']], []);
+
+      setVabState({ assembly, stagingConfig: staging, dvAltitude: 0 });
+      renderStagingPanel();
+
+      expect(body._innerHTML).toContain('FIRES FIRST');
+      mockDocument.getElementById.mockReturnValue(null);
+    });
+
+    it('does not show drag handle for single stage', () => {
+      const body = makeMockBody();
+      mockDocument.getElementById.mockReturnValue(body);
+
+      const assembly = createTestAssembly([
+        ['e1', { instanceId: 'e1', partId: 'engine-1', x: 0, y: 0 }],
+      ]);
+      const staging = createTestStaging([['e1']], []);
+
+      setVabState({ assembly, stagingConfig: staging, dvAltitude: 0 });
+      renderStagingPanel();
+
+      expect(body._innerHTML).not.toContain('vab-stage-drag-handle');
+      mockDocument.getElementById.mockReturnValue(null);
+    });
+
+    it('shows drag handles for multiple stages', () => {
+      const body = makeMockBody();
+      mockDocument.getElementById.mockReturnValue(body);
+
+      const assembly = createTestAssembly([
+        ['e1', { instanceId: 'e1', partId: 'engine-1', x: 0, y: 0 }],
+        ['srb1', { instanceId: 'srb1', partId: 'srb-1', x: 20, y: 0 }],
+      ]);
+      const staging = createTestStaging([['e1'], ['srb1']], []);
+
+      setVabState({ assembly, stagingConfig: staging, dvAltitude: 0 });
+      renderStagingPanel();
+
+      expect(body._innerHTML).toContain('vab-stage-drag-handle');
+      mockDocument.getElementById.mockReturnValue(null);
+    });
+
+    it('returns early when staging panel body element not found', () => {
+      mockDocument.getElementById.mockReturnValue(null);
+
+      const assembly = createTestAssembly([
+        ['e1', { instanceId: 'e1', partId: 'engine-1', x: 0, y: 0 }],
+      ]);
+      const staging = createTestStaging([['e1']], []);
+
+      setVabState({ assembly, stagingConfig: staging, dvAltitude: 0 });
+
+      // Should not throw
+      expect(() => renderStagingPanel()).not.toThrow();
     });
   });
 });

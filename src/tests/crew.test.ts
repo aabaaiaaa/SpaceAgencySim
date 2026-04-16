@@ -15,6 +15,9 @@ import {
   checkInjuryRecovery,
   getAssignableCrew,
   processFlightInjuries,
+  awardFlightXP,
+  awardSkillXP,
+  assignToTraining,
 } from '../core/crew.ts';
 import {
   AstronautStatus,
@@ -24,7 +27,11 @@ import {
   MEDICAL_CARE_COST,
   HARD_LANDING_SPEED_MIN,
   HARD_LANDING_SPEED_MAX,
+  HARD_LANDING_INJURY_MIN,
+  HARD_LANDING_INJURY_MAX,
   EJECTION_INJURY_PERIODS,
+  TRAINING_COURSE_COST,
+  FacilityId,
 } from '../core/constants.ts';
 import { makeCrewMember, makeFlightState as makeFlightStateFactory, makePhysicsState as makePhysicsStateFactory } from './_factories.js';
 
@@ -860,5 +867,370 @@ describe('processFlightInjuries()', () => {
     });
     const injuries2 = processFlightInjuries(state, flightState2, ps);
     expect(injuries2[0].periods).toBe(3);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// processFlightInjuries() — expanded branch coverage
+// ---------------------------------------------------------------------------
+
+describe('processFlightInjuries() — expanded branches', () => {
+  let state: GameState;
+  beforeEach(() => { state = freshState(); state.currentPeriod = 5; });
+
+  it('hard landing at minimum speed yields HARD_LANDING_INJURY_MIN periods', () => {
+    const a = hireOne(state, 'MinSpeed');
+    const fs = makeFlightStateFactory({
+      crewIds: [a.id],
+      events: [{ type: 'LANDING', speed: HARD_LANDING_SPEED_MIN, time: 10, description: '' }],
+      timeElapsed: 10,
+    });
+    const ps = makePhysicsStateFactory({ crashed: false });
+    const injuries = processFlightInjuries(state, fs, ps);
+    expect(injuries).toHaveLength(1);
+    expect(injuries[0].periods).toBe(HARD_LANDING_INJURY_MIN);
+  });
+
+  it('hard landing at mid-range speed yields interpolated periods', () => {
+    const a = hireOne(state, 'MidSpeed');
+    const midSpeed = (HARD_LANDING_SPEED_MIN + HARD_LANDING_SPEED_MAX) / 2;
+    const fs = makeFlightStateFactory({
+      crewIds: [a.id],
+      events: [{ type: 'LANDING', speed: midSpeed, time: 10, description: '' }],
+      timeElapsed: 10,
+    });
+    const ps = makePhysicsStateFactory({ crashed: false });
+    const injuries = processFlightInjuries(state, fs, ps);
+    expect(injuries).toHaveLength(1);
+    const t = (midSpeed - HARD_LANDING_SPEED_MIN) / (HARD_LANDING_SPEED_MAX - HARD_LANDING_SPEED_MIN);
+    const expected = Math.round(HARD_LANDING_INJURY_MIN + t * (HARD_LANDING_INJURY_MAX - HARD_LANDING_INJURY_MIN));
+    expect(injuries[0].periods).toBe(expected);
+  });
+
+  it('hard landing just below maximum speed yields HARD_LANDING_INJURY_MAX periods', () => {
+    const a = hireOne(state, 'NearMax');
+    const fs = makeFlightStateFactory({
+      crewIds: [a.id],
+      events: [{ type: 'LANDING', speed: HARD_LANDING_SPEED_MAX - 0.01, time: 10, description: '' }],
+      timeElapsed: 10,
+    });
+    const ps = makePhysicsStateFactory({ crashed: false });
+    const injuries = processFlightInjuries(state, fs, ps);
+    expect(injuries).toHaveLength(1);
+    expect(injuries[0].periods).toBe(HARD_LANDING_INJURY_MAX);
+  });
+
+  it('landing at exactly HARD_LANDING_SPEED_MAX does NOT cause injury (exclusive upper bound)', () => {
+    const a = hireOne(state, 'ExactMax');
+    const fs = makeFlightStateFactory({
+      crewIds: [a.id],
+      events: [{ type: 'LANDING', speed: HARD_LANDING_SPEED_MAX, time: 10, description: '' }],
+      timeElapsed: 10,
+    });
+    const ps = makePhysicsStateFactory({ crashed: false });
+    const injuries = processFlightInjuries(state, fs, ps);
+    expect(injuries).toHaveLength(0);
+    expect(a.injuryEnds).toBeNull();
+  });
+
+  it('ejection with ejectedCrewIds injures only ejected crew', () => {
+    const a = hireOne(state, 'Ejected');
+    const b = hireOne(state, 'NotEjected');
+    const ejected = new Set([a.id]);
+    const fs = makeFlightStateFactory({
+      crewIds: [a.id, b.id],
+      events: [{ type: 'CREW_EJECTED', altitude: 3000, time: 20, description: '' }],
+      timeElapsed: 20,
+    });
+    const ps = makePhysicsStateFactory({ crashed: true, ejectedCrewIds: ejected });
+    const injuries = processFlightInjuries(state, fs, ps);
+    // Only a is ejected; b is not ejected and crash killed b (not in survivingIds)
+    expect(injuries).toHaveLength(1);
+    expect(injuries[0].crewId).toBe(a.id);
+    expect(injuries[0].cause).toBe('Ejection');
+  });
+
+  it('combined crash + ejection: ejected crew get ejection injury, non-ejected are dead (no injury)', () => {
+    const a = hireOne(state, 'EjectedPilot');
+    const b = hireOne(state, 'CrashedCrew');
+    const ejected = new Set([a.id]);
+    const fs = makeFlightStateFactory({
+      crewIds: [a.id, b.id],
+      events: [{ type: 'CREW_EJECTED', altitude: 5000, time: 10, description: '' }],
+      timeElapsed: 10,
+    });
+    const ps = makePhysicsStateFactory({ crashed: true, ejectedCrewIds: ejected });
+    const injuries = processFlightInjuries(state, fs, ps);
+    // b was not ejected and crash happened → b is filtered out of survivingIds → no injury for b
+    // a was ejected → a survives → ejection injury
+    expect(injuries).toHaveLength(1);
+    expect(injuries[0].crewId).toBe(a.id);
+    expect(injuries[0].cause).toBe('Ejection');
+    expect(b.injuryEnds).toBeNull();
+  });
+
+  it('ejection injury records altitude from the CREW_EJECTED event', () => {
+    const a = hireOne(state, 'AltPilot');
+    const ejected = new Set([a.id]);
+    const fs = makeFlightStateFactory({
+      crewIds: [a.id],
+      events: [{ type: 'CREW_EJECTED', altitude: 7777, time: 15, description: '' }],
+      timeElapsed: 15,
+    });
+    const ps = makePhysicsStateFactory({ crashed: true, ejectedCrewIds: ejected });
+    const injuries = processFlightInjuries(state, fs, ps);
+    expect(injuries[0].altitude).toBe(7777);
+  });
+
+  it('no LANDING event and no CREW_EJECTED event produces no injuries', () => {
+    const a = hireOne(state, 'SafePilot');
+    const fs = makeFlightStateFactory({
+      crewIds: [a.id],
+      events: [{ type: 'LAUNCH', time: 0, description: '' }],
+      timeElapsed: 100,
+    });
+    const ps = makePhysicsStateFactory({ crashed: false });
+    const injuries = processFlightInjuries(state, fs, ps);
+    expect(injuries).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// awardSkillXP() — diminishing returns
+// ---------------------------------------------------------------------------
+
+describe('awardSkillXP()', () => {
+  it('at skill 0, full XP is applied', () => {
+    const a = makeCrewMember({ skills: { piloting: 0, engineering: 0, science: 0 } });
+    awardSkillXP(a, 'piloting', 10);
+    // formula: 0 + 10 * (100 - 0) / 100 = 10
+    expect(a.skills.piloting).toBe(10);
+  });
+
+  it('at skill 50, half the raw XP is applied (diminishing returns)', () => {
+    const a = makeCrewMember({ skills: { piloting: 50, engineering: 0, science: 0 } });
+    awardSkillXP(a, 'piloting', 10);
+    // formula: 50 + 10 * (100 - 50) / 100 = 50 + 5 = 55
+    expect(a.skills.piloting).toBe(55);
+  });
+
+  it('at skill 90, only 10% of raw XP is applied', () => {
+    const a = makeCrewMember({ skills: { piloting: 90, engineering: 0, science: 0 } });
+    awardSkillXP(a, 'piloting', 10);
+    // formula: 90 + 10 * (100 - 90) / 100 = 90 + 1 = 91
+    expect(a.skills.piloting).toBe(91);
+  });
+
+  it('skill cannot exceed 100', () => {
+    const a = makeCrewMember({ skills: { piloting: 99, engineering: 0, science: 0 } });
+    awardSkillXP(a, 'piloting', 500);
+    expect(a.skills.piloting).toBe(100);
+  });
+
+  it('at skill 100, no XP is gained (ceiling)', () => {
+    const a = makeCrewMember({ skills: { piloting: 100, engineering: 0, science: 0 } });
+    awardSkillXP(a, 'piloting', 20);
+    // formula: 100 + 20 * (100 - 100) / 100 = 100 + 0 = 100
+    expect(a.skills.piloting).toBe(100);
+  });
+
+  it('initializes skills object if null', () => {
+    const a = makeCrewMember({ skills: { piloting: 0, engineering: 0, science: 0 } });
+    // @ts-expect-error intentionally testing null skills
+    a.skills = null;
+    awardSkillXP(a, 'science', 10);
+    expect(a.skills.science).toBe(10);
+    expect(a.skills.piloting).toBe(0);
+  });
+
+  it('works independently on each skill', () => {
+    const a = makeCrewMember({ skills: { piloting: 0, engineering: 50, science: 80 } });
+    awardSkillXP(a, 'piloting', 10);
+    awardSkillXP(a, 'engineering', 10);
+    awardSkillXP(a, 'science', 10);
+    expect(a.skills.piloting).toBe(10);       // 0 + 10 * 1.0
+    expect(a.skills.engineering).toBe(55);     // 50 + 10 * 0.5
+    expect(a.skills.science).toBe(82);         // 80 + 10 * 0.2
+  });
+});
+
+// ---------------------------------------------------------------------------
+// awardFlightXP() — conditional XP paths
+// ---------------------------------------------------------------------------
+
+describe('awardFlightXP()', () => {
+  let state: GameState;
+  beforeEach(() => { state = freshState(); });
+
+  it('awards base piloting XP (3) even with zero flight stats', () => {
+    const a = hireOne(state, 'Pilot');
+    const results = awardFlightXP(state, [a.id], {
+      safeLanding: false,
+      stagingEvents: 0,
+      partsRecovered: 0,
+      scienceReturns: 0,
+      scienceActivations: 0,
+    });
+    expect(results).toHaveLength(1);
+    expect(results[0].piloting).toBeGreaterThan(0);
+    expect(results[0].engineering).toBe(0);
+    expect(results[0].science).toBe(0);
+  });
+
+  it('awards extra piloting XP for safeLanding', () => {
+    const a = hireOne(state, 'SafePilot');
+    const resultsNoLanding = awardFlightXP(state, [a.id], {
+      safeLanding: false, stagingEvents: 0, partsRecovered: 0, scienceReturns: 0, scienceActivations: 0,
+    });
+    const pilotNoLanding = resultsNoLanding[0].piloting;
+
+    // Reset skill for comparison
+    const b = hireOne(state, 'SafePilot2');
+    const resultsWithLanding = awardFlightXP(state, [b.id], {
+      safeLanding: true, stagingEvents: 0, partsRecovered: 0, scienceReturns: 0, scienceActivations: 0,
+    });
+    const pilotWithLanding = resultsWithLanding[0].piloting;
+
+    expect(pilotWithLanding).toBeGreaterThan(pilotNoLanding);
+  });
+
+  it('awards piloting and engineering XP for stagingEvents', () => {
+    const a = hireOne(state, 'StagerPilot');
+    const results = awardFlightXP(state, [a.id], {
+      safeLanding: false, stagingEvents: 2, partsRecovered: 0, scienceReturns: 0, scienceActivations: 0,
+    });
+    expect(results[0].piloting).toBeGreaterThan(0);
+    expect(results[0].engineering).toBeGreaterThan(0);
+  });
+
+  it('awards engineering XP for partsRecovered', () => {
+    const a = hireOne(state, 'RecoveryEng');
+    const results = awardFlightXP(state, [a.id], {
+      safeLanding: false, stagingEvents: 0, partsRecovered: 3, scienceReturns: 0, scienceActivations: 0,
+    });
+    expect(results[0].engineering).toBeGreaterThan(0);
+    expect(results[0].science).toBe(0);
+  });
+
+  it('awards science XP for scienceReturns', () => {
+    const a = hireOne(state, 'SciReturn');
+    const results = awardFlightXP(state, [a.id], {
+      safeLanding: false, stagingEvents: 0, partsRecovered: 0, scienceReturns: 2, scienceActivations: 0,
+    });
+    expect(results[0].science).toBeGreaterThan(0);
+  });
+
+  it('awards science XP for scienceActivations', () => {
+    const a = hireOne(state, 'SciActivate');
+    const results = awardFlightXP(state, [a.id], {
+      safeLanding: false, stagingEvents: 0, partsRecovered: 0, scienceReturns: 0, scienceActivations: 4,
+    });
+    expect(results[0].science).toBeGreaterThan(0);
+  });
+
+  it('skips non-active crew members', () => {
+    const a = hireOne(state, 'Active');
+    const b = hireOne(state, 'Fired');
+    fireCrew(state, b.id);
+    const results = awardFlightXP(state, [a.id, b.id], {
+      safeLanding: true, stagingEvents: 1, partsRecovered: 1, scienceReturns: 1, scienceActivations: 1,
+    });
+    expect(results).toHaveLength(1);
+    expect(results[0].id).toBe(a.id);
+  });
+
+  it('awards XP to multiple crew members', () => {
+    const a = hireOne(state, 'Crew1');
+    const b = hireOne(state, 'Crew2');
+    const results = awardFlightXP(state, [a.id, b.id], {
+      safeLanding: true, stagingEvents: 0, partsRecovered: 0, scienceReturns: 0, scienceActivations: 0,
+    });
+    expect(results).toHaveLength(2);
+    expect(results[0].piloting).toBeGreaterThan(0);
+    expect(results[1].piloting).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// assignToTraining() — error conditions
+// ---------------------------------------------------------------------------
+
+describe('assignToTraining()', () => {
+  let state: GameState;
+  beforeEach(() => {
+    state = freshState();
+    // Add crew admin facility at tier 2 so training slots are available (tier 2 = 1 slot)
+    const hub = state.hubs.find((h) => h.id === 'earth');
+    if (hub) {
+      hub.facilities[FacilityId.CREW_ADMIN] = { built: true, tier: 2 };
+    }
+  });
+
+  it('succeeds when all conditions are met', () => {
+    const a = hireOne(state, 'Trainee');
+    const result = assignToTraining(state, a.id, 'piloting');
+    expect(result.success).toBe(true);
+    expect(result.cost).toBe(TRAINING_COURSE_COST);
+    expect(a.trainingSkill).toBe('piloting');
+  });
+
+  it('returns error for injured crew', () => {
+    const a = hireOne(state, 'Injured');
+    state.currentPeriod = 1;
+    injureCrew(state, a.id, 5); // injuryEnds = 6
+    const result = assignToTraining(state, a.id, 'piloting');
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/injured/i);
+  });
+
+  it('returns error for crew already in training', () => {
+    const a = hireOne(state, 'AlreadyTraining');
+    assignToTraining(state, a.id, 'piloting');
+    // Now try to train again — upgrade to tier 3 to have enough slots
+    const hub = state.hubs.find((h) => h.id === 'earth');
+    if (hub) hub.facilities[FacilityId.CREW_ADMIN] = { built: true, tier: 3 };
+    const result = assignToTraining(state, a.id, 'engineering');
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/already in training/i);
+  });
+
+  it('returns error for crew assigned to a rocket', () => {
+    const a = hireOne(state, 'OnRocket');
+    assignToCrew(state, a.id, 'rocket-1');
+    const result = assignToTraining(state, a.id, 'science');
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/assigned to a rocket/i);
+  });
+
+  it('returns error when no training slots available', () => {
+    // Tier 2 has only 1 slot; fill it, then try another
+    const a = hireOne(state, 'Slot1');
+    assignToTraining(state, a.id, 'piloting');
+    const b = hireOne(state, 'Slot2');
+    const result = assignToTraining(state, b.id, 'engineering');
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/no training slots/i);
+  });
+
+  it('returns error when funds are insufficient', () => {
+    const a = hireOne(state, 'Broke');
+    state.money = TRAINING_COURSE_COST - 1;
+    const result = assignToTraining(state, a.id, 'piloting');
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/insufficient funds/i);
+  });
+
+  it('returns error for non-existent astronaut', () => {
+    const result = assignToTraining(state, 'nobody', 'piloting');
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/not found/i);
+  });
+
+  it('returns error for non-active astronaut', () => {
+    const a = hireOne(state, 'Fired');
+    fireCrew(state, a.id);
+    const result = assignToTraining(state, a.id, 'piloting');
+    expect(result.success).toBe(false);
+    expect(result.error).toMatch(/not active/i);
   });
 });

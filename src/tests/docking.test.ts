@@ -20,6 +20,7 @@ import {
   DOCKING_MAX_RELATIVE_SPEED,
   DOCKING_MAX_ORIENTATION_DIFF,
   DOCKING_MAX_LATERAL_OFFSET,
+  BODY_RADIUS,
 } from '../core/constants.ts';
 import {
   createDockingState,
@@ -580,5 +581,272 @@ describe('Docking constants', () => {
 
   it('DOCKING_MAX_LATERAL_OFFSET is defined and positive', () => {
     expect(DOCKING_MAX_LATERAL_OFFSET).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// tickDocking state machine transitions
+// ---------------------------------------------------------------------------
+
+/**
+ * Helper: creates a flight state + game state + docking state where the craft
+ * and target are in near-identical circular orbits around Earth, separated by
+ * a predictable along-track distance.  The docking offset fields on the
+ * PhysicsState are set so that the *effective* distance equals `desiredEffDist`.
+ *
+ * With e=0 and timeElapsed=0 the orbital solver is trivial:
+ *   altitude = SMA - R_EARTH,  angularPosition = M0 * (180/PI).
+ * Along-track = M0_diff * (R + avgAlt).
+ */
+function buildTickScenario(desiredEffDist: number, dockingState: string) {
+  const SMA = 6_471_000;
+  const R = BODY_RADIUS['EARTH']; // 6_371_000
+  const alt = SMA - R;            // 100_000
+  const orbitRadius = R + alt;     // 6_471_000
+
+  // Choose a physical along-track separation of 200 m (comfortably within guidance range).
+  const physicalAlongTrack = 200;
+  const meanAnomalyDiff = physicalAlongTrack / orbitRadius; // tiny angle in radians
+
+  const ds = createDockingState();
+  ds.state = dockingState as typeof ds.state;
+  ds.targetId = 'station-1';
+  // Set prevDist to the desired distance so relSpeed = 0 (no change) — keeps speedOk true.
+  ds.targetDistance = desiredEffDist;
+
+  const assembly = stubAssemblyWithDockingPort();
+
+  // Docking-mode offset: bring the effective distance down to desiredEffDist.
+  // effectiveDist = sqrt((along - offsetAlong)^2 + (radial - offsetRadial)^2)
+  // With radialDist = 0 and offsetRadial = 0, effectiveDist = |along - offsetAlong|.
+  // So offsetAlong = physicalAlongTrack - desiredEffDist.
+  const offsetAlong = physicalAlongTrack - desiredEffDist;
+
+  const ps = stubPs({
+    activeParts: new Set(['part-1', 'dock-1']),
+    controlMode: ControlMode.DOCKING,
+    angle: 0,
+    dockingOffsetAlongTrack: offsetAlong,
+    dockingOffsetRadial: 0,
+  });
+
+  const fs = freshFlightState();
+  fs.timeElapsed = 0; // keeps orbital solver trivial
+  fs.orbitalElements = {
+    semiMajorAxis: SMA,
+    eccentricity: 0,
+    argPeriapsis: 0,
+    meanAnomalyAtEpoch: 0,
+    epoch: 0,
+  };
+  fs.dockingState = ds;
+
+  const state = createGameState();
+  state.orbitalObjects = [
+    {
+      id: 'station-1',
+      bodyId: 'EARTH',
+      type: OrbitalObjectType.STATION,
+      name: 'Test Station',
+      elements: {
+        semiMajorAxis: SMA,
+        eccentricity: 0,
+        argPeriapsis: 0,
+        meanAnomalyAtEpoch: meanAnomalyDiff,
+        epoch: 0,
+      },
+    },
+  ];
+
+  return { ds, ps, assembly, fs, state };
+}
+
+describe('tickDocking state machine transitions', () => {
+  it('resets to IDLE when targetId is null', () => {
+    const ds = createDockingState();
+    ds.state = DockingState.APPROACHING;
+    ds.targetId = null; // no target set
+    const ps = stubPs();
+    const assembly = stubAssemblyWithDockingPort();
+    const fs = freshFlightState();
+    const state = stubGameState();
+
+    const result = tickDocking(ds, ps, assembly, fs, state, 1 / 60);
+    expect(result.docked).toBe(false);
+    expect(ds.state).toBe(DockingState.IDLE);
+  });
+
+  it('clears target when craft has no orbitalElements', () => {
+    const ds = createDockingState();
+    ds.state = DockingState.APPROACHING;
+    ds.targetId = 'station-1';
+    const ps = stubPs();
+    const assembly = stubAssemblyWithDockingPort();
+    const fs = freshFlightState();
+    fs.orbitalElements = null; // no orbital elements
+    const state = stubGameState();
+
+    const result = tickDocking(ds, ps, assembly, fs, state, 1 / 60);
+    expect(result.docked).toBe(false);
+    expect(ds.state).toBe(DockingState.IDLE);
+    expect(ds.targetId).toBeNull();
+  });
+
+  it('transitions APPROACHING -> ALIGNING when effective distance <= guidance range', () => {
+    // Effective distance = 300, which is <= DOCKING_GUIDANCE_RANGE (500)
+    const { ds, ps, assembly, fs, state } = buildTickScenario(300, DockingState.APPROACHING);
+
+    tickDocking(ds, ps, assembly, fs, state, 1 / 60);
+    expect(ds.state).toBe(DockingState.ALIGNING);
+  });
+
+  it('transitions ALIGNING -> APPROACHING when effective distance > guidance range * 1.5', () => {
+    // Need effective distance > 750 (DOCKING_GUIDANCE_RANGE * 1.5).
+    // Use a larger physical separation so we can have effectiveDist = 800.
+    const SMA = 6_471_000;
+    const R = BODY_RADIUS['EARTH'];
+    const orbitRadius = R + (SMA - R);
+    const physicalAlong = 1000; // 1 km actual separation
+    const meanAnomalyDiff = physicalAlong / orbitRadius;
+    const desiredEffDist = 800;
+
+    const ds = createDockingState();
+    ds.state = DockingState.ALIGNING;
+    ds.targetId = 'station-1';
+    ds.targetDistance = desiredEffDist; // prev dist matches so relSpeed = 0
+
+    const assembly = stubAssemblyWithDockingPort();
+    const ps = stubPs({
+      activeParts: new Set(['part-1', 'dock-1']),
+      controlMode: ControlMode.DOCKING,
+      angle: 0,
+      dockingOffsetAlongTrack: physicalAlong - desiredEffDist,
+      dockingOffsetRadial: 0,
+    });
+
+    const fs = freshFlightState();
+    fs.timeElapsed = 0;
+    fs.orbitalElements = {
+      semiMajorAxis: SMA, eccentricity: 0, argPeriapsis: 0,
+      meanAnomalyAtEpoch: 0, epoch: 0,
+    };
+
+    const state = createGameState();
+    state.orbitalObjects = [{
+      id: 'station-1', bodyId: 'EARTH', type: OrbitalObjectType.STATION,
+      name: 'Test Station',
+      elements: {
+        semiMajorAxis: SMA, eccentricity: 0, argPeriapsis: 0,
+        meanAnomalyAtEpoch: meanAnomalyDiff, epoch: 0,
+      },
+    }];
+
+    tickDocking(ds, ps, assembly, fs, state, 1 / 60);
+    expect(ds.state).toBe(DockingState.APPROACHING);
+  });
+
+  it('transitions ALIGNING -> FINAL_APPROACH when close and all indicators OK', () => {
+    // Effective distance = 10, within DOCKING_AUTO_RANGE (15).
+    // All indicators must be OK: speed, orientation, lateral.
+    const { ds, ps, assembly, fs, state } = buildTickScenario(10, DockingState.ALIGNING);
+
+    // Ensure angle is 0 (orientation diff will be 0, within DOCKING_MAX_ORIENTATION_DIFF 0.15)
+    ps.angle = 0;
+
+    tickDocking(ds, ps, assembly, fs, state, 1 / 60);
+    expect(ds.state).toBe(DockingState.FINAL_APPROACH);
+  });
+
+  it('aborts FINAL_APPROACH when effective distance > auto range * 2', () => {
+    // DOCKING_AUTO_RANGE * 2 = 30. Set effective distance to 35.
+    const { ds, ps, assembly, fs, state } = buildTickScenario(35, DockingState.FINAL_APPROACH);
+
+    const result = tickDocking(ds, ps, assembly, fs, state, 1 / 60);
+    expect(ds.state).toBe(DockingState.ALIGNING);
+    expect(result.event).toBe('AUTO_DOCK_ABORT');
+    expect(result.docked).toBe(false);
+  });
+
+  it('interpolates docking offsets during FINAL_APPROACH when distance > 1', () => {
+    // Effective distance = 10 (within auto range, > 1).
+    const { ds, ps, assembly, fs, state } = buildTickScenario(10, DockingState.FINAL_APPROACH);
+
+    const offsetBefore = ps.dockingOffsetAlongTrack;
+
+    tickDocking(ds, ps, assembly, fs, state, 1 / 60);
+
+    // The offset should have changed towards the along-track distance.
+    expect(ps.dockingOffsetAlongTrack).not.toBe(offsetBefore);
+    // State stays FINAL_APPROACH (not docked yet, not aborted).
+    expect(ds.state).toBe(DockingState.FINAL_APPROACH);
+  });
+
+  it('completes docking when effective distance <= 1 during FINAL_APPROACH', () => {
+    // Effective distance = 0.5 (<= 1).
+    const { ds, ps, assembly, fs, state } = buildTickScenario(0.5, DockingState.FINAL_APPROACH);
+
+    const result = tickDocking(ds, ps, assembly, fs, state, 1 / 60);
+    expect(result.docked).toBe(true);
+    expect(result.event).toBe('DOCKING_COMPLETE');
+    expect(ds.state).toBe(DockingState.DOCKED);
+    expect(ds.dockedObjectIds).toContain('station-1');
+    // Target object should be removed from orbital objects.
+    expect(state.orbitalObjects.find(o => o.id === 'station-1')).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// undock edge cases
+// ---------------------------------------------------------------------------
+
+describe('undock edge cases', () => {
+  it('undocks the last object when no undockTargetId is given and multiple are docked', () => {
+    const ds = createDockingState();
+    ds.state = DockingState.DOCKED;
+    ds.dockedObjectIds = ['craft-a', 'craft-b', 'craft-c'];
+    ds.combinedMass = 10000;
+
+    const assembly = stubAssemblyWithDockingPort();
+    const ps = stubPs({
+      activeParts: new Set(['part-1', 'dock-1', 'tank-1']),
+      fuelStore: new Map([['tank-1', 200]]),
+    });
+    const flightState = freshFlightState();
+    flightState.dockingState = ds;
+    const state = createGameState();
+    state.orbitalObjects = [];
+
+    // No undockTargetId — should undock the last one ('craft-c')
+    const result = undock(ds, ps, assembly, flightState, state);
+    expect(result.success).toBe(true);
+    expect(result.undockedObjectId).toBe('craft-c');
+    expect(ds.dockedObjectIds).toEqual(['craft-a', 'craft-b']);
+    // Still docked to others, so state stays DOCKED
+    expect(ds.state).toBe(DockingState.DOCKED);
+    // The undocked object is added back to orbital objects
+    expect(state.orbitalObjects.length).toBe(1);
+    expect(state.orbitalObjects[0].id).toBe('craft-c');
+  });
+
+  it('returns error when undocking a non-existent target ID', () => {
+    const ds = createDockingState();
+    ds.state = DockingState.DOCKED;
+    ds.dockedObjectIds = ['craft-a', 'craft-b'];
+
+    const assembly = stubAssemblyWithDockingPort();
+    const ps = stubPs({
+      activeParts: new Set(['part-1', 'dock-1']),
+      fuelStore: new Map(),
+    });
+    const flightState = freshFlightState();
+    flightState.dockingState = ds;
+    const state = createGameState();
+    state.orbitalObjects = [];
+
+    const result = undock(ds, ps, assembly, flightState, state, 'nonexistent-id');
+    expect(result.success).toBe(false);
+    expect(result.reason).toContain('not in docked list');
+    // dockedObjectIds unchanged
+    expect(ds.dockedObjectIds).toEqual(['craft-a', 'craft-b']);
   });
 });

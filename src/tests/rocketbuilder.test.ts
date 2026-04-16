@@ -29,6 +29,8 @@ import {
   findSnapCandidates,
   findMirrorCandidate,
   validateStagingConfig,
+  addSymmetryPair,
+  getMirrorPartId,
 } from '../core/rocketbuilder.ts';
 import {
   getTotalMass,
@@ -590,5 +592,474 @@ describe('Mirror candidate — picks corresponding vertical position', () => {
         expect(mirror!.mirrorTargetSnapIndex).toBe(expectedRight!.index);
       }
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 12 — findSnapCandidates: empty assembly returns []
+// ---------------------------------------------------------------------------
+
+describe('findSnapCandidates — edge cases', () => {
+  it('returns empty array when the assembly has no placed parts', () => {
+    const assembly = createRocketAssembly();
+    const candidates = findSnapCandidates(assembly, 'tank-small', 0, 0, 1.0);
+    expect(candidates).toHaveLength(0);
+  });
+
+  it('returns empty array when no target socket accepts the dragged part type', () => {
+    const assembly = createRocketAssembly();
+    // probe-core-mk1 has: top accepts [PARACHUTE], bottom accepts STACK_TYPES.
+    // SOLID_ROCKET_BOOSTER is not in STACK_TYPES or [PARACHUTE].
+    addPartToAssembly(assembly, 'probe-core-mk1', 0, 30);
+
+    // Place the SRB at the exact snap position — distance = 0.
+    // SRB top snap: offsetY = -40. dSnapRelY = +40. dSnapWY = dragY + 40.
+    // Probe bottom snap world Y = 30 - 5 = 25. Need dSnapWY = 25, so dragY = -15.
+    const candidates = findSnapCandidates(assembly, 'srb-small', 0, -15, 1.0);
+    expect(candidates).toHaveLength(0);
+  });
+
+  it('filters out occupied sockets', () => {
+    const assembly = createRocketAssembly();
+    const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 30);
+
+    // Occupy the probe's bottom snap (index 1) with a tank.
+    const tankId = addPartToAssembly(assembly, 'tank-small', 0, 5);
+    connectParts(assembly, probeId, 1, tankId, 0);
+
+    // Now try to snap another tank-small to the probe. The probe has:
+    //   index 0 (top) — accepts PARACHUTE only → FUEL_TANK rejected
+    //   index 1 (bottom) — accepts STACK_TYPES but occupied
+    // So no candidates should be returned.
+    const candidates = findSnapCandidates(assembly, 'tank-small', 0, 5, 1.0);
+
+    // Filter to only probe-targeted candidates (the tank itself has open snaps
+    // that might match, so we check the probe specifically).
+    const probeCandidates = candidates.filter(c => c.targetInstanceId === probeId);
+    expect(probeCandidates).toHaveLength(0);
+  });
+
+  it('returns candidates sorted nearest-first when multiple snaps are in range', () => {
+    const assembly = createRocketAssembly();
+    addPartToAssembly(assembly, 'tank-small', 0, 0);
+
+    // tank-small has 3 left-side snap points at offsetY = -12, 0, 12.
+    // World Y positions: 12, 0, -12.
+    // Drag a landing leg near the middle (worldY = 1) — it should be closest to
+    // left-mid (index 3, worldY = 0), then left-top (index 2, worldY = 12),
+    // then left-bottom (index 4, worldY = -12) — but only within SNAP_DISTANCE_PX.
+    // At zoom=1, SNAP_DISTANCE_PX=30 means world-distance ≤ 30.
+
+    // Landing leg 'right' snap: offsetX=5, offsetY=0.
+    // Target snap offsetX=-10. dragWorldX + 5 = -10 → dragWorldX = -15.
+    const candidates = findSnapCandidates(assembly, 'landing-legs-small', -15, 1, 1.0);
+
+    // All three left-side snaps should be within 30 px distance.
+    expect(candidates.length).toBeGreaterThanOrEqual(2);
+
+    // Verify sorted nearest-first.
+    for (let i = 1; i < candidates.length; i++) {
+      expect(candidates[i].screenDist).toBeGreaterThanOrEqual(candidates[i - 1].screenDist);
+    }
+  });
+
+  it('respects the zoom factor in screen distance calculation', () => {
+    const assembly = createRocketAssembly();
+    addPartToAssembly(assembly, 'probe-core-mk1', 0, 30);
+
+    // Probe bottom snap world Y = 30 - 5 = 25.
+    // Tank top snap: offsetY=-20, dSnapRelY=+20.
+    // At dragWorldY = 0: dSnapWY = 0 + 20 = 20.
+    // World distance = |25 - 20| = 5. Screen distance = 5 * zoom.
+    // At zoom=1: screenDist = 5 → within SNAP_DISTANCE_PX (30) → candidate found.
+    const candidatesNear = findSnapCandidates(assembly, 'tank-small', 0, 0, 1.0);
+    expect(candidatesNear.length).toBeGreaterThanOrEqual(1);
+
+    // At zoom=7: screenDist = 5*7 = 35 → exceeds SNAP_DISTANCE_PX (30) → no candidate.
+    const candidatesFar = findSnapCandidates(assembly, 'tank-small', 0, 0, 7.0);
+    expect(candidatesFar).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 13 — findMirrorCandidate: top/bottom snaps return null
+// ---------------------------------------------------------------------------
+
+describe('findMirrorCandidate — non-radial and edge cases', () => {
+  it('returns null for a top snap (only left/right get symmetry)', () => {
+    const assembly = createRocketAssembly();
+    const tankId = addPartToAssembly(assembly, 'tank-small', 0, 0);
+
+    // tank-small index 0 is the top snap.
+    const candidate: SnapCandidate = {
+      targetInstanceId: tankId,
+      targetSnapIndex:  0,
+      dragSnapIndex:    0,
+      snapWorldX:       0,
+      snapWorldY:       0,
+      targetSnapWorldX: 0,
+      targetSnapWorldY: 20,
+      screenDist:       0,
+    };
+
+    const mirror = findMirrorCandidate(assembly, candidate, 'tank-small');
+    expect(mirror).toBeNull();
+  });
+
+  it('returns null for a bottom snap (only left/right get symmetry)', () => {
+    const assembly = createRocketAssembly();
+    const tankId = addPartToAssembly(assembly, 'tank-small', 0, 0);
+
+    // tank-small index 1 is the bottom snap.
+    const candidate: SnapCandidate = {
+      targetInstanceId: tankId,
+      targetSnapIndex:  1,
+      dragSnapIndex:    0,
+      snapWorldX:       0,
+      snapWorldY:       0,
+      targetSnapWorldX: 0,
+      targetSnapWorldY: -20,
+      screenDist:       0,
+    };
+
+    const mirror = findMirrorCandidate(assembly, candidate, 'tank-small');
+    expect(mirror).toBeNull();
+  });
+
+  it('returns null when the parent part is not found in the assembly', () => {
+    const assembly = createRocketAssembly();
+
+    // Reference a non-existent instance ID.
+    const candidate: SnapCandidate = {
+      targetInstanceId: 'nonexistent',
+      targetSnapIndex:  3,
+      dragSnapIndex:    0,
+      snapWorldX:       0,
+      snapWorldY:       0,
+      targetSnapWorldX: -10,
+      targetSnapWorldY: 0,
+      screenDist:       0,
+    };
+
+    const mirror = findMirrorCandidate(assembly, candidate, 'landing-legs-small');
+    expect(mirror).toBeNull();
+  });
+
+  it('returns a valid mirror candidate for a left-side radial snap', () => {
+    const assembly = createRocketAssembly();
+    const tankId = addPartToAssembly(assembly, 'tank-small', 0, 0);
+
+    // tank-small index 3 is left-mid (-10, 0). Mirror is right-mid (index 6, +10, 0).
+    const candidate: SnapCandidate = {
+      targetInstanceId: tankId,
+      targetSnapIndex:  3,
+      dragSnapIndex:    0,
+      snapWorldX:       -15,
+      snapWorldY:       0,
+      targetSnapWorldX: -10,
+      targetSnapWorldY: 0,
+      screenDist:       0,
+    };
+
+    const mirror = findMirrorCandidate(assembly, candidate, 'landing-legs-small');
+    expect(mirror).not.toBeNull();
+    expect(mirror!.mirrorTargetSnapIndex).toBe(6);
+
+    // Verify mirror world position is mirrored across the rocket centreline.
+    // The parent is at x=0. Left snap at -10, right snap at +10.
+    // mirrorWorldX should be on the right side.
+    expect(mirror!.mirrorWorldX).toBeGreaterThan(0);
+  });
+
+  it('returns null when the occupied mirror socket blocks the mirror placement', () => {
+    const assembly = createRocketAssembly();
+    const tankId = addPartToAssembly(assembly, 'tank-small', 0, 0);
+
+    // Occupy right-mid (index 6) with a landing leg.
+    const legId = addPartToAssembly(assembly, 'landing-legs-small', 15, 0);
+    connectParts(assembly, tankId, 6, legId, 0);
+
+    // Try mirror from left-mid (index 3). Right-mid (6) is occupied → null.
+    const candidate: SnapCandidate = {
+      targetInstanceId: tankId,
+      targetSnapIndex:  3,
+      dragSnapIndex:    0,
+      snapWorldX:       -15,
+      snapWorldY:       0,
+      targetSnapWorldX: -10,
+      targetSnapWorldY: 0,
+      screenDist:       0,
+    };
+
+    const mirror = findMirrorCandidate(assembly, candidate, 'landing-legs-small');
+    expect(mirror).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 14 — Symmetry pair management
+// ---------------------------------------------------------------------------
+
+describe('Symmetry pair management — addSymmetryPair / getMirrorPartId', () => {
+  it('addSymmetryPair records the relationship', () => {
+    const assembly = createRocketAssembly();
+    const id1 = addPartToAssembly(assembly, 'landing-legs-small', -15, 0);
+    const id2 = addPartToAssembly(assembly, 'landing-legs-small',  15, 0);
+
+    addSymmetryPair(assembly, id1, id2);
+    expect(assembly.symmetryPairs).toHaveLength(1);
+    expect(assembly.symmetryPairs[0]).toEqual([id1, id2]);
+  });
+
+  it('getMirrorPartId returns the partner from either direction', () => {
+    const assembly = createRocketAssembly();
+    const id1 = addPartToAssembly(assembly, 'landing-legs-small', -15, 0);
+    const id2 = addPartToAssembly(assembly, 'landing-legs-small',  15, 0);
+
+    addSymmetryPair(assembly, id1, id2);
+
+    expect(getMirrorPartId(assembly, id1)).toBe(id2);
+    expect(getMirrorPartId(assembly, id2)).toBe(id1);
+  });
+
+  it('getMirrorPartId returns null for a part with no mirror', () => {
+    const assembly = createRocketAssembly();
+    const id1 = addPartToAssembly(assembly, 'landing-legs-small', -15, 0);
+
+    expect(getMirrorPartId(assembly, id1)).toBeNull();
+  });
+
+  it('getMirrorPartId returns null when symmetryPairs is missing', () => {
+    const assembly = createRocketAssembly();
+    // Force symmetryPairs to be undefined to test the guard clause.
+    (assembly as unknown as Record<string, unknown>).symmetryPairs = undefined;
+
+    expect(getMirrorPartId(assembly, 'nonexistent')).toBeNull();
+  });
+
+  it('removePartFromAssembly prunes associated symmetry pairs', () => {
+    const assembly = createRocketAssembly();
+    const id1 = addPartToAssembly(assembly, 'landing-legs-small', -15, 0);
+    const id2 = addPartToAssembly(assembly, 'landing-legs-small',  15, 0);
+    const id3 = addPartToAssembly(assembly, 'landing-legs-small', -15, -12);
+    const id4 = addPartToAssembly(assembly, 'landing-legs-small',  15, -12);
+
+    addSymmetryPair(assembly, id1, id2);
+    addSymmetryPair(assembly, id3, id4);
+    expect(assembly.symmetryPairs).toHaveLength(2);
+
+    // Remove id1 — should prune the [id1, id2] pair but keep [id3, id4].
+    removePartFromAssembly(assembly, id1);
+
+    expect(assembly.symmetryPairs).toHaveLength(1);
+    expect(assembly.symmetryPairs[0]).toEqual([id3, id4]);
+    expect(getMirrorPartId(assembly, id2)).toBeNull();
+    expect(getMirrorPartId(assembly, id3)).toBe(id4);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 15 — syncStagingWithAssembly: part removal prunes staging
+// ---------------------------------------------------------------------------
+
+describe('syncStagingWithAssembly — pruning and registration', () => {
+  it('prunes a removed part from staging stages', () => {
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    const probeId  = addPartToAssembly(assembly, 'probe-core-mk1', 0,  30);
+    const engineId = addPartToAssembly(assembly, 'engine-spark',   0,   0);
+    connectParts(assembly, probeId, 1, engineId, 0);
+
+    // Sync to register activatable parts, then stage the engine.
+    syncStagingWithAssembly(assembly, staging);
+    assignPartToStage(staging, engineId, 0);
+    expect(staging.stages[0].instanceIds).toContain(engineId);
+
+    // Remove the engine from the assembly.
+    removePartFromAssembly(assembly, engineId);
+
+    // Sync again — the removed engine should be pruned from staging.
+    syncStagingWithAssembly(assembly, staging);
+    expect(staging.stages[0].instanceIds).not.toContain(engineId);
+    expect(staging.unstaged).not.toContain(engineId);
+  });
+
+  it('prunes a removed part from the unstaged pool', () => {
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    const probeId  = addPartToAssembly(assembly, 'probe-core-mk1', 0,  30);
+    const engineId = addPartToAssembly(assembly, 'engine-spark',   0,   0);
+    connectParts(assembly, probeId, 1, engineId, 0);
+
+    syncStagingWithAssembly(assembly, staging);
+    // Engine should be in unstaged (not yet assigned to any stage).
+    expect(staging.unstaged).toContain(engineId);
+
+    removePartFromAssembly(assembly, engineId);
+    syncStagingWithAssembly(assembly, staging);
+    expect(staging.unstaged).not.toContain(engineId);
+  });
+
+  it('registers science module instrument keys as separate stageable entities', () => {
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    // Add a science module with instruments loaded.
+    const sciId = addPartToAssembly(assembly, 'science-module-mk1', 0, 0);
+    const placed = assembly.parts.get(sciId)!;
+    placed.instruments = ['thermo-1', 'baro-1'];
+
+    syncStagingWithAssembly(assembly, staging);
+
+    // The science module itself should NOT be in unstaged (it uses instrument keys).
+    // Instead, two instrument keys should appear.
+    const instrKey0 = `${sciId}:instr:0`;
+    const instrKey1 = `${sciId}:instr:1`;
+
+    expect(staging.unstaged).toContain(instrKey0);
+    expect(staging.unstaged).toContain(instrKey1);
+  });
+
+  it('prunes stale instrument keys when the science module is removed', () => {
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    const sciId = addPartToAssembly(assembly, 'science-module-mk1', 0, 0);
+    const placed = assembly.parts.get(sciId)!;
+    placed.instruments = ['thermo-1'];
+
+    syncStagingWithAssembly(assembly, staging);
+    const instrKey = `${sciId}:instr:0`;
+    expect(staging.unstaged).toContain(instrKey);
+
+    // Remove the science module and sync — instrument key should be pruned.
+    removePartFromAssembly(assembly, sciId);
+    syncStagingWithAssembly(assembly, staging);
+    expect(staging.unstaged).not.toContain(instrKey);
+  });
+
+  it('newly added activatable parts appear in unstaged after sync', () => {
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    // Start with empty assembly + empty staging.
+    syncStagingWithAssembly(assembly, staging);
+    expect(staging.unstaged).toHaveLength(0);
+
+    // Add an engine — it is activatable.
+    const engineId = addPartToAssembly(assembly, 'engine-spark', 0, 0);
+    syncStagingWithAssembly(assembly, staging);
+    expect(staging.unstaged).toContain(engineId);
+  });
+
+  it('non-activatable parts do not appear in unstaged', () => {
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    // Fuel tank is not activatable — should not appear in staging at all.
+    const tankId = addPartToAssembly(assembly, 'tank-small', 0, 0);
+    syncStagingWithAssembly(assembly, staging);
+    expect(staging.unstaged).not.toContain(tankId);
+
+    // Also not in any stage.
+    const allStaged = staging.stages.flatMap(s => s.instanceIds);
+    expect(allStaged).not.toContain(tankId);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test 16 — validateStagingConfig edge cases
+// ---------------------------------------------------------------------------
+
+describe('validateStagingConfig — edge cases', () => {
+  it('returns no warnings when the assembly has no activatable parts', () => {
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    // Only non-activatable parts: probe-core-mk1 (activatable=false) and tank.
+    addPartToAssembly(assembly, 'tank-small', 0, 0);
+
+    const warnings = validateStagingConfig(assembly, staging);
+    expect(warnings).toHaveLength(0);
+  });
+
+  it('returns no warnings when the assembly is completely empty', () => {
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    const warnings = validateStagingConfig(assembly, staging);
+    expect(warnings).toHaveLength(0);
+  });
+
+  it('warns when Stage 1 has activatable parts but no IGNITE part', () => {
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    // Add an engine (activatable with IGNITE behaviour) to the assembly,
+    // but assign a parachute (DEPLOY behaviour) to Stage 1 instead.
+    const probeId  = addPartToAssembly(assembly, 'probe-core-mk1', 0,  30);
+    const engineId = addPartToAssembly(assembly, 'engine-spark',   0,   0);
+    connectParts(assembly, probeId, 1, engineId, 0);
+
+    syncStagingWithAssembly(assembly, staging);
+    // Engine stays in unstaged — Stage 1 is empty.
+
+    const warnings = validateStagingConfig(assembly, staging);
+    expect(warnings.length).toBeGreaterThan(0);
+    expect(warnings[0]).toMatch(/no engine/i);
+  });
+
+  it('returns no warnings when Stage 1 contains an engine with IGNITE behaviour', () => {
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    const probeId  = addPartToAssembly(assembly, 'probe-core-mk1', 0,  30);
+    const engineId = addPartToAssembly(assembly, 'engine-spark',   0,   0);
+    connectParts(assembly, probeId, 1, engineId, 0);
+
+    syncStagingWithAssembly(assembly, staging);
+    assignPartToStage(staging, engineId, 0);
+
+    const warnings = validateStagingConfig(assembly, staging);
+    expect(warnings).toHaveLength(0);
+  });
+
+  it('returns no warnings when Stage 1 contains an SRB (IGNITE behaviour)', () => {
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    const tankId = addPartToAssembly(assembly, 'tank-small', 0, 0);
+    const srbId  = addPartToAssembly(assembly, 'srb-small', -20, 0);
+    connectParts(assembly, tankId, 3, srbId, 1); // left-mid → srb right snap
+
+    syncStagingWithAssembly(assembly, staging);
+    assignPartToStage(staging, srbId, 0);
+
+    const warnings = validateStagingConfig(assembly, staging);
+    expect(warnings).toHaveLength(0);
+  });
+
+  it('warns correctly when Stage 1 has a DEPLOY part but no IGNITE part', () => {
+    const assembly = createRocketAssembly();
+    const staging  = createStagingConfig();
+
+    // cmd-mk1 is activatable with EJECT behaviour — present in the assembly
+    // to ensure hasActivatable is true.
+    const cmdId    = addPartToAssembly(assembly, 'cmd-mk1',            0,  60);
+    const tankId   = addPartToAssembly(assembly, 'tank-small',         0,   0);
+    const legsId   = addPartToAssembly(assembly, 'landing-legs-small', -15, 0);
+
+    connectParts(assembly, cmdId, 1, tankId, 0);
+    connectParts(assembly, tankId, 3, legsId, 0); // left-mid → legs right snap
+
+    syncStagingWithAssembly(assembly, staging);
+    // Assign only the landing legs (DEPLOY) to Stage 1 — no ignition source.
+    assignPartToStage(staging, legsId, 0);
+
+    const warnings = validateStagingConfig(assembly, staging);
+    expect(warnings.length).toBeGreaterThan(0);
+    expect(warnings[0]).toMatch(/no engine/i);
   });
 });

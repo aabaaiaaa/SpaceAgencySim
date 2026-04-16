@@ -1841,3 +1841,280 @@ describe('Mission chain: dependency fixes', () => {
     expect(unlocked.map((m) => m.id)).toContain('mission-018');
   });
 });
+
+// ---------------------------------------------------------------------------
+// Branch coverage: acceptMission with awardsFacilityOnAccept
+// ---------------------------------------------------------------------------
+
+describe('acceptMission() — awardsFacilityOnAccept branch', () => {
+  let state: GameState;
+  let cleanup: (() => void) | null;
+
+  beforeEach(() => {
+    state = freshState();
+  });
+
+  afterEach(() => {
+    if (cleanup) { cleanup(); cleanup = null; }
+  });
+
+  it('awards the facility on acceptance when awardsFacilityOnAccept is set', () => {
+    cleanup = withMissions(makeMissionDef({
+      id: 'facility-accept-test',
+      unlocksAfter: [],
+      awardsFacilityOnAccept: 'crew-admin',
+    }));
+    initializeMissions(state);
+
+    // Ensure the facility is not built yet.
+    const hub = state.hubs[0];
+    delete hub.facilities['crew-admin'];
+
+    const result = acceptMission(state, 'facility-accept-test');
+    expect(result.success).toBe(true);
+    expect(result.awardedFacility).toBe('crew-admin');
+    expect(hub.facilities['crew-admin']).toEqual({ built: true, tier: 1 });
+  });
+
+  it('does not award facility when awardsFacilityOnAccept is not set', () => {
+    cleanup = withMissions(makeMissionDef({
+      id: 'no-facility-test',
+      unlocksAfter: [],
+    }));
+    initializeMissions(state);
+
+    const result = acceptMission(state, 'no-facility-test');
+    expect(result.success).toBe(true);
+    expect(result.awardedFacility).toBeNull();
+  });
+
+  it('returns null awardedFacility when facility is already built', () => {
+    cleanup = withMissions(makeMissionDef({
+      id: 'dup-facility-test',
+      unlocksAfter: [],
+      awardsFacilityOnAccept: 'crew-admin',
+    }));
+    initializeMissions(state);
+
+    // Pre-build the facility.
+    const hub = state.hubs[0];
+    hub.facilities['crew-admin'] = { built: true, tier: 1 };
+
+    const result = acceptMission(state, 'dup-facility-test');
+    expect(result.success).toBe(true);
+    // awardFacility returns { success: false } when already built, so awardedFacility stays null.
+    expect(result.awardedFacility).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Branch coverage: completeMission with unlocksFacility
+// ---------------------------------------------------------------------------
+
+describe('completeMission() — unlocksFacility branch', () => {
+  let state: GameState;
+  let cleanup: (() => void) | null;
+
+  beforeEach(() => {
+    state = freshState();
+  });
+
+  afterEach(() => {
+    if (cleanup) { cleanup(); cleanup = null; }
+  });
+
+  it('awards the facility on completion when unlocksFacility is set', () => {
+    const def = makeMissionDef({
+      id: 'facility-complete-test',
+      unlocksFacility: 'rd-lab',
+    });
+    cleanup = withMissions(def);
+    seedAcceptedMission(state, def);
+
+    // Ensure the facility is not built yet.
+    const hub = state.hubs[0];
+    delete hub.facilities['rd-lab'];
+
+    const result = completeMission(state, 'facility-complete-test');
+    expect(result.success).toBe(true);
+    expect(result.awardedFacility).toBe('rd-lab');
+    expect(hub.facilities['rd-lab']).toEqual({ built: true, tier: 1 });
+  });
+
+  it('returns null awardedFacility when unlocksFacility is not set', () => {
+    const def = makeMissionDef({ id: 'no-unlock-facility' });
+    cleanup = withMissions(def);
+    seedAcceptedMission(state, def);
+
+    const result = completeMission(state, 'no-unlock-facility');
+    expect(result.success).toBe(true);
+    expect(result.awardedFacility).toBeNull();
+  });
+
+  it('returns null awardedFacility when facility is already built on completion', () => {
+    const def = makeMissionDef({
+      id: 'already-built-facility',
+      unlocksFacility: 'tracking-station',
+    });
+    cleanup = withMissions(def);
+    seedAcceptedMission(state, def);
+
+    // Pre-build the facility.
+    const hub = state.hubs[0];
+    hub.facilities['tracking-station'] = { built: true, tier: 1 };
+
+    const result = completeMission(state, 'already-built-facility');
+    expect(result.success).toBe(true);
+    expect(result.awardedFacility).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Branch coverage: completeMission with bonus objective rewards
+// ---------------------------------------------------------------------------
+
+describe('completeMission() — bonus reward calculation', () => {
+  let state: GameState;
+  let cleanup: (() => void) | null;
+
+  beforeEach(() => {
+    state = freshState();
+  });
+
+  afterEach(() => {
+    if (cleanup) { cleanup(); cleanup = null; }
+  });
+
+  it('adds bonusReward from completed optional objectives to total reward', () => {
+    const def = makeMissionDef({
+      id: 'bonus-test',
+      reward: 10_000,
+      objectives: [
+        { id: 'req', type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 100 }, completed: true, description: 'required' },
+        { id: 'bonus1', type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 500 }, completed: true, description: 'bonus 1', optional: true, bonusReward: 5_000 },
+        { id: 'bonus2', type: ObjectiveType.REACH_SPEED, target: { speed: 200 }, completed: true, description: 'bonus 2', optional: true, bonusReward: 3_000 },
+      ],
+    });
+    cleanup = withMissions(def);
+    seedAcceptedMission(state, def);
+
+    const moneyBefore = state.money;
+    const result = completeMission(state, 'bonus-test');
+    expect(result.success).toBe(true);
+    expect(result.reward).toBe(10_000 + 5_000 + 3_000);
+    expect(state.money).toBe(moneyBefore + 18_000);
+  });
+
+  it('does not add bonusReward from incomplete optional objectives', () => {
+    const def = makeMissionDef({
+      id: 'partial-bonus-test',
+      reward: 10_000,
+      objectives: [
+        { id: 'req', type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 100 }, completed: true, description: 'required' },
+        { id: 'bonus-done', type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 500 }, completed: true, description: 'done bonus', optional: true, bonusReward: 5_000 },
+        { id: 'bonus-missed', type: ObjectiveType.REACH_SPEED, target: { speed: 999 }, completed: false, description: 'missed bonus', optional: true, bonusReward: 7_000 },
+      ],
+    });
+    cleanup = withMissions(def);
+    seedAcceptedMission(state, def);
+
+    const result = completeMission(state, 'partial-bonus-test');
+    expect(result.reward).toBe(10_000 + 5_000); // only the completed bonus counted
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Branch coverage: checkObjectiveCompletion — MINIMUM_CREW
+// ---------------------------------------------------------------------------
+
+describe('checkObjectiveCompletion() — MINIMUM_CREW', () => {
+  let state: GameState;
+
+  beforeEach(() => {
+    state = freshState();
+    const def = makeMissionDef({
+      id: 'm1',
+      objectives: [
+        { id: 'o1', type: ObjectiveType.MINIMUM_CREW, target: { minCrew: 2 }, completed: false, description: 'fly with 2+ crew' },
+      ],
+    });
+    seedAcceptedMission(state, def);
+  });
+
+  it('marks completed when crewCount meets threshold', () => {
+    checkObjectiveCompletion(state, makeFlightState('m1', { crewCount: 2 }));
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
+  });
+
+  it('marks completed when crewCount exceeds threshold', () => {
+    checkObjectiveCompletion(state, makeFlightState('m1', { crewCount: 3 }));
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
+  });
+
+  it('does not complete when crewCount is below threshold', () => {
+    checkObjectiveCompletion(state, makeFlightState('m1', { crewCount: 1 }));
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Branch coverage: checkObjectiveCompletion — MULTI_SATELLITE
+// ---------------------------------------------------------------------------
+
+describe('checkObjectiveCompletion() — MULTI_SATELLITE', () => {
+  let state: GameState;
+
+  beforeEach(() => {
+    state = freshState();
+    const def = makeMissionDef({
+      id: 'm1',
+      objectives: [
+        { id: 'o1', type: ObjectiveType.MULTI_SATELLITE, target: { count: 2, minAltitude: 80_000 }, completed: false, description: 'deploy 2 satellites above 80km' },
+      ],
+    });
+    seedAcceptedMission(state, def);
+  });
+
+  it('marks completed when enough SATELLITE_RELEASED events above minAltitude', () => {
+    const fs = makeFlightState('m1', {
+      events: [
+        { type: 'SATELLITE_RELEASED', time: 100, altitude: 85_000, description: 'sat 1' },
+        { type: 'SATELLITE_RELEASED', time: 200, altitude: 90_000, description: 'sat 2' },
+      ],
+    });
+    checkObjectiveCompletion(state, fs);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
+  });
+
+  it('does not complete when fewer valid releases than required count', () => {
+    const fs = makeFlightState('m1', {
+      events: [
+        { type: 'SATELLITE_RELEASED', time: 100, altitude: 85_000, description: 'sat 1' },
+      ],
+    });
+    checkObjectiveCompletion(state, fs);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
+  });
+
+  it('does not count releases below minAltitude', () => {
+    const fs = makeFlightState('m1', {
+      events: [
+        { type: 'SATELLITE_RELEASED', time: 100, altitude: 85_000, description: 'high' },
+        { type: 'SATELLITE_RELEASED', time: 200, altitude: 70_000, description: 'too low' },
+      ],
+    });
+    checkObjectiveCompletion(state, fs);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(false);
+  });
+
+  it('completes when count is exactly met', () => {
+    const fs = makeFlightState('m1', {
+      events: [
+        { type: 'SATELLITE_RELEASED', time: 100, altitude: 80_000, description: 'at boundary' },
+        { type: 'SATELLITE_RELEASED', time: 200, altitude: 80_000, description: 'at boundary' },
+      ],
+    });
+    checkObjectiveCompletion(state, fs);
+    expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
+  });
+});

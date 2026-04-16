@@ -672,6 +672,15 @@
       ],
       "e2e": []
     },
+    "core/transferObjects": {
+      "sources": [
+        "src/core/transferObjects.ts"
+      ],
+      "unit": [
+        "src/tests/transferObjects.test.ts"
+      ],
+      "e2e": []
+    },
     "core/undoRedo": {
       "sources": [
         "src/core/undoRedo.ts"
@@ -1227,10 +1236,12 @@
     "ui/logistics": {
       "sources": [
         "src/ui/logistics/index.ts",
-        "src/ui/logistics/_schematicLayout.ts"
+        "src/ui/logistics/_schematicLayout.ts",
+        "src/ui/logistics/_state.ts"
       ],
       "unit": [
-        "src/tests/logistics-layout.test.ts"
+        "src/tests/logistics-layout.test.ts",
+        "src/tests/logistics-state.test.ts"
       ],
       "e2e": [
         "e2e/logistics.spec.ts",

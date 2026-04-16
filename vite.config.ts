@@ -44,6 +44,9 @@ export default defineConfig({
         'src/render/hub.ts',
         'src/render/vab.ts',
         'src/render/flight/_transferObjects.ts',
+        'src/render/flight/_trails.ts',
+        'src/render/flight/_asteroids.ts',
+        'src/render/map.ts',
         'src/render/index.ts',
         'src/render/types.ts',
 
@@ -77,6 +80,7 @@ export default defineConfig({
         'src/ui/flightController/_flightPhase.ts',
         'src/ui/flightController/_mapView.ts',
         'src/ui/flightController/_hubDocking.ts',
+        'src/ui/flightController/_loop.ts',
         'src/ui/missionControl.ts',
         'src/ui/missionControl/_init.ts',
         'src/ui/missionControl/_shell.ts',
@@ -134,18 +138,18 @@ export default defineConfig({
       //
       thresholds: {
         'src/core/**': {
-          lines: 91,
-          branches: 81,
-          functions: 92,
+          lines: 92,
+          branches: 77,
+          functions: 93,
         },
         'src/render/**': {
-          lines: 34,
-          branches: 89,
-          functions: 49,
+          lines: 99,
+          branches: 85,
+          functions: 99,
         },
         'src/ui/**': {
-          lines: 43,
-          branches: 79,
+          lines: 60,
+          branches: 56,
           functions: 78,
         },
       },

@@ -11,11 +11,42 @@
  *   - getPhaseLabel()     — human-readable labels
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { createFlightState } from '../core/gameState.ts';
 import type { FlightState, OrbitalElements } from '../core/gameState.ts';
 import { FlightPhase } from '../core/constants.ts';
 import type { PhysicsState } from '../core/physics.ts';
+
+// ---------------------------------------------------------------------------
+// Mock manoeuvre.ts — defaults return falsy values so existing tests are
+// unaffected.  Individual tests override via vi.mocked(fn).mockReturnValue().
+// ---------------------------------------------------------------------------
+vi.mock('../core/manoeuvre.ts', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../core/manoeuvre.ts')>();
+  return {
+    ...original,
+    shouldEnterManoeuvre: vi.fn().mockReturnValue(false),
+    shouldExitManoeuvre: vi.fn().mockReturnValue(false),
+    shouldEnterTransfer: vi.fn().mockReturnValue(false),
+    isEscapeTrajectory: vi.fn().mockReturnValue(false),
+    checkSOITransition: vi.fn().mockReturnValue({ transition: false, newBodyId: null, reason: '' }),
+    getTransferTargets: vi.fn().mockReturnValue([]),
+    computeTransferDeltaV: vi.fn().mockReturnValue(null),
+  };
+});
+
+// ---------------------------------------------------------------------------
+// Mock orbit.ts — only getAltitudeBand and computeOrbitalElements need stubs.
+// ---------------------------------------------------------------------------
+vi.mock('../core/orbit.ts', async (importOriginal) => {
+  const original = await importOriginal<typeof import('../core/orbit.ts')>();
+  return {
+    ...original,
+    getAltitudeBand: vi.fn().mockReturnValue(null),
+    computeOrbitalElements: vi.fn().mockReturnValue(null),
+  };
+});
+
 import {
   isValidTransition,
   transitionPhase,
@@ -24,7 +55,22 @@ import {
   isPlayerLocked,
   getPhaseLabel,
   getDeorbitWarningMessage,
+  isInUnsafeBeltOrbit,
 } from '../core/flightPhase.ts';
+
+import {
+  shouldExitManoeuvre,
+  shouldEnterTransfer,
+  isEscapeTrajectory,
+  checkSOITransition,
+  getTransferTargets,
+  computeTransferDeltaV,
+} from '../core/manoeuvre.ts';
+
+import {
+  getAltitudeBand,
+  computeOrbitalElements,
+} from '../core/orbit.ts';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -665,5 +711,310 @@ describe('FlightState bodyId', () => {
   it('includes orbitBandId initialized to null', () => {
     const fs = freshFlightState();
     expect(fs.orbitBandId).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// evaluateAutoTransitions — MANOEUVRE escape → TRANSFER (branch coverage)
+// ---------------------------------------------------------------------------
+
+describe('evaluateAutoTransitions MANOEUVRE → TRANSFER (escape trajectory)', () => {
+  let fs: FlightState;
+
+  beforeEach(() => {
+    fs = freshFlightState();
+    fs.phase = FlightPhase.MANOEUVRE;
+    fs.bodyId = 'EARTH';
+    // Reset mocks to defaults before each test.
+    vi.mocked(shouldEnterTransfer).mockReturnValue(false);
+    vi.mocked(shouldExitManoeuvre).mockReturnValue(false);
+    vi.mocked(getTransferTargets).mockReturnValue([]);
+    vi.mocked(computeTransferDeltaV).mockReturnValue(null);
+    vi.mocked(computeOrbitalElements).mockReturnValue(null);
+  });
+
+  it('transitions MANOEUVRE → ORBIT → TRANSFER when escape trajectory detected', () => {
+    vi.mocked(shouldEnterTransfer).mockReturnValue(true);
+    vi.mocked(getTransferTargets).mockReturnValue([
+      { bodyId: 'MOON', name: 'Moon', departureDV: 800, captureDV: 600, totalDV: 1400, transferTime: 259200 },
+    ]);
+    vi.mocked(computeTransferDeltaV).mockReturnValue({
+      departureDV: 800, captureDV: 600, transferTime: 259200, totalDV: 1400,
+    });
+
+    const ps = stubPs({ posY: 200_000, velX: 500, velY: 8000 });
+    const transition = evaluateAutoTransitions(fs, ps, null);
+
+    expect(transition).not.toBeNull();
+    expect(transition!.to).toBe(FlightPhase.TRANSFER);
+    expect(fs.phase).toBe(FlightPhase.TRANSFER);
+    expect(fs.inOrbit).toBe(false);
+    // Should have two log entries: MANOEUVRE→ORBIT, ORBIT→TRANSFER.
+    expect(fs.phaseLog).toHaveLength(2);
+    expect(fs.phaseLog[0].to).toBe(FlightPhase.ORBIT);
+    expect(fs.phaseLog[1].to).toBe(FlightPhase.TRANSFER);
+  });
+
+  it('populates transferState when transfer targets exist', () => {
+    vi.mocked(shouldEnterTransfer).mockReturnValue(true);
+    vi.mocked(getTransferTargets).mockReturnValue([
+      { bodyId: 'MOON', name: 'Moon', departureDV: 800, captureDV: 600, totalDV: 1400, transferTime: 259200 },
+    ]);
+    vi.mocked(computeTransferDeltaV).mockReturnValue({
+      departureDV: 800, captureDV: 600, transferTime: 259200, totalDV: 1400,
+    });
+
+    const ps = stubPs({ posY: 200_000, velX: 500, velY: 8000 });
+    evaluateAutoTransitions(fs, ps, null);
+
+    expect(fs.transferState).not.toBeNull();
+    expect(fs.transferState!.originBodyId).toBe('EARTH');
+    expect(fs.transferState!.destinationBodyId).toBe('MOON');
+    expect(fs.transferState!.departureDV).toBe(800);
+    expect(fs.transferState!.captureDV).toBe(600);
+  });
+
+  it('transitions to TRANSFER without transferState when no targets', () => {
+    vi.mocked(shouldEnterTransfer).mockReturnValue(true);
+    vi.mocked(getTransferTargets).mockReturnValue([]);
+
+    const ps = stubPs({ posY: 200_000, velX: 500, velY: 8000 });
+    evaluateAutoTransitions(fs, ps, null);
+
+    expect(fs.phase).toBe(FlightPhase.TRANSFER);
+    expect(fs.transferState).toBeNull();
+  });
+
+  it('falls through to shouldExitManoeuvre when not an escape trajectory', () => {
+    vi.mocked(shouldEnterTransfer).mockReturnValue(false);
+    vi.mocked(shouldExitManoeuvre).mockReturnValue(true);
+    const mockElements = stubElements({ semiMajorAxis: 6_800_000, eccentricity: 0.02 });
+    vi.mocked(computeOrbitalElements).mockReturnValue(mockElements);
+
+    const ps = stubPs({ posX: 100, posY: 200_000, velX: 100, velY: 7800 });
+    const transition = evaluateAutoTransitions(fs, ps, null);
+
+    expect(transition).not.toBeNull();
+    expect(transition!.to).toBe(FlightPhase.ORBIT);
+    expect(fs.phase).toBe(FlightPhase.ORBIT);
+    expect(fs.orbitalElements).toEqual(mockElements);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// evaluateAutoTransitions — TRANSFER → CAPTURE (SOI transition)
+// ---------------------------------------------------------------------------
+
+describe('evaluateAutoTransitions TRANSFER → CAPTURE (SOI transition)', () => {
+  let fs: FlightState;
+
+  beforeEach(() => {
+    fs = freshFlightState();
+    fs.phase = FlightPhase.TRANSFER;
+    fs.bodyId = 'EARTH';
+    vi.mocked(checkSOITransition).mockReturnValue({ transition: false, newBodyId: null, reason: '' });
+  });
+
+  it('transitions TRANSFER → CAPTURE on SOI entry', () => {
+    vi.mocked(checkSOITransition).mockReturnValue({
+      transition: true,
+      newBodyId: 'MOON',
+      reason: 'Entering Moon SOI',
+    });
+
+    const ps = stubPs({ posY: 380_000_000, velX: 200, velY: 800 });
+    const transition = evaluateAutoTransitions(fs, ps, null);
+
+    expect(transition).not.toBeNull();
+    expect(transition!.to).toBe(FlightPhase.CAPTURE);
+    expect(transition!.reason).toBe('Entering Moon SOI');
+    expect(fs.phase).toBe(FlightPhase.CAPTURE);
+    expect(fs.bodyId).toBe('MOON');
+  });
+
+  it('stays in TRANSFER when no SOI transition', () => {
+    vi.mocked(checkSOITransition).mockReturnValue({ transition: false, newBodyId: null, reason: '' });
+
+    const ps = stubPs({ posY: 300_000_000, velX: 200, velY: 800 });
+    const transition = evaluateAutoTransitions(fs, ps, null);
+
+    expect(transition).toBeNull();
+    expect(fs.phase).toBe(FlightPhase.TRANSFER);
+    expect(fs.bodyId).toBe('EARTH');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// evaluateAutoTransitions — CAPTURE → TRANSFER (fly-by)
+// ---------------------------------------------------------------------------
+
+describe('evaluateAutoTransitions CAPTURE fly-by path', () => {
+  let fs: FlightState;
+
+  beforeEach(() => {
+    fs = freshFlightState();
+    fs.phase = FlightPhase.CAPTURE;
+    fs.bodyId = 'MOON';
+    vi.mocked(isEscapeTrajectory).mockReturnValue(false);
+  });
+
+  it('enters fly-by branch when escape trajectory detected without valid orbit', () => {
+    // NOTE: CAPTURE → TRANSFER is not in the VALID_TRANSITIONS map, so
+    // transitionPhase rejects it.  This test verifies the branch is entered
+    // (isEscapeTrajectory checked, parent looked up) even though the
+    // transition ultimately fails.
+    vi.mocked(isEscapeTrajectory).mockReturnValue(true);
+
+    const ps = stubPs({ posY: 100_000, velX: 300, velY: 2000 });
+    // No valid orbit, so the CAPTURE→ORBIT path is skipped.
+    const transition = evaluateAutoTransitions(fs, ps, null);
+
+    // Transition is blocked by the valid-transition map (CAPTURE→TRANSFER not allowed).
+    expect(transition).toBeNull();
+    expect(fs.phase).toBe(FlightPhase.CAPTURE);
+    // isEscapeTrajectory was called with the correct body.
+    expect(isEscapeTrajectory).toHaveBeenCalledWith(ps, 'MOON');
+  });
+
+  it('CAPTURE → ORBIT takes priority over fly-by when orbit is valid', () => {
+    vi.mocked(isEscapeTrajectory).mockReturnValue(true);
+
+    const orbitStatus = {
+      valid: true,
+      elements: stubElements({ semiMajorAxis: 2_000_000, eccentricity: 0.1 }),
+      periapsisAlt: 50_000,
+      apoapsisAlt: 150_000,
+      altitudeBand: { id: 'LLO', name: 'Low Lunar Orbit' },
+    };
+    const ps = stubPs({ posY: 50_000 });
+    const transition = evaluateAutoTransitions(fs, ps, orbitStatus);
+
+    expect(transition).not.toBeNull();
+    expect(transition!.to).toBe(FlightPhase.ORBIT);
+    expect(fs.phase).toBe(FlightPhase.ORBIT);
+    expect(fs.inOrbit).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isInUnsafeBeltOrbit
+// ---------------------------------------------------------------------------
+
+describe('isInUnsafeBeltOrbit', () => {
+  beforeEach(() => {
+    vi.mocked(getAltitudeBand).mockReturnValue(null);
+  });
+
+  it('returns true when altitude band is marked unsafe', () => {
+    vi.mocked(getAltitudeBand).mockReturnValue({
+      id: 'DENSE_BELT',
+      name: 'Dense Asteroid Belt',
+      min: 300_000_000_000,
+      max: 500_000_000_000,
+      unsafe: true,
+    });
+
+    expect(isInUnsafeBeltOrbit(400_000_000_000, 'SUN')).toBe(true);
+  });
+
+  it('returns false when altitude band is not unsafe', () => {
+    vi.mocked(getAltitudeBand).mockReturnValue({
+      id: 'OUTER_BELT',
+      name: 'Outer Belt',
+      min: 500_000_000_000,
+      max: 700_000_000_000,
+    });
+
+    expect(isInUnsafeBeltOrbit(600_000_000_000, 'SUN')).toBe(false);
+  });
+
+  it('returns false when no altitude band is found', () => {
+    vi.mocked(getAltitudeBand).mockReturnValue(null);
+
+    expect(isInUnsafeBeltOrbit(100_000, 'EARTH')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getDeorbitWarningMessage — branch coverage
+// ---------------------------------------------------------------------------
+
+describe('getDeorbitWarningMessage branch coverage', () => {
+  it('returns Moon-specific warning for MOON body', () => {
+    const msg = getDeorbitWarningMessage('MOON');
+    expect(msg).toContain('lunar orbital model');
+    expect(msg).toContain('no longer be visible');
+  });
+
+  it('returns default warning for non-MOON bodies', () => {
+    const msg = getDeorbitWarningMessage('MARS');
+    expect(msg).toContain('orbital model');
+    expect(msg).not.toContain('lunar');
+  });
+
+  it('returns default warning for EARTH', () => {
+    const msg = getDeorbitWarningMessage('EARTH');
+    expect(msg).toContain('orbital model');
+    expect(msg).not.toContain('lunar');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// canReturnToAgency — branch coverage for TRANSFER, CAPTURE, and belt orbit
+// ---------------------------------------------------------------------------
+
+describe('canReturnToAgency branch coverage', () => {
+  beforeEach(() => {
+    vi.mocked(getAltitudeBand).mockReturnValue(null);
+  });
+
+  it('returns false during TRANSFER phase (not landed/crashed)', () => {
+    const ps = stubPs({ landed: false, crashed: false });
+    expect(canReturnToAgency(FlightPhase.TRANSFER, ps, 'EARTH')).toBe(false);
+  });
+
+  it('returns false during CAPTURE phase (not landed/crashed)', () => {
+    const ps = stubPs({ landed: false, crashed: false });
+    expect(canReturnToAgency(FlightPhase.CAPTURE, ps, 'MOON')).toBe(false);
+  });
+
+  it('returns false in ORBIT when in unsafe belt zone', () => {
+    vi.mocked(getAltitudeBand).mockReturnValue({
+      id: 'DENSE_BELT',
+      name: 'Dense Asteroid Belt',
+      min: 300_000_000_000,
+      max: 500_000_000_000,
+      unsafe: true,
+    });
+
+    const ps = stubPs({ landed: false, crashed: false, posY: 400_000_000_000 });
+    expect(canReturnToAgency(FlightPhase.ORBIT, ps, 'SUN')).toBe(false);
+  });
+
+  it('returns true in ORBIT when in safe zone', () => {
+    vi.mocked(getAltitudeBand).mockReturnValue({
+      id: 'LEO',
+      name: 'Low Earth Orbit',
+      min: 80_000,
+      max: 200_000,
+    });
+
+    const ps = stubPs({ landed: false, crashed: false, posY: 100_000 });
+    expect(canReturnToAgency(FlightPhase.ORBIT, ps, 'EARTH')).toBe(true);
+  });
+
+  it('returns true in ORBIT when no bodyId provided', () => {
+    const ps = stubPs({ landed: false, crashed: false, posY: 100_000 });
+    expect(canReturnToAgency(FlightPhase.ORBIT, ps)).toBe(true);
+  });
+
+  it('allows return during TRANSFER if landed', () => {
+    const ps = stubPs({ landed: true, crashed: false });
+    expect(canReturnToAgency(FlightPhase.TRANSFER, ps, 'MOON')).toBe(true);
+  });
+
+  it('allows return during CAPTURE if crashed', () => {
+    const ps = stubPs({ landed: false, crashed: true });
+    expect(canReturnToAgency(FlightPhase.CAPTURE, ps, 'MOON')).toBe(true);
   });
 });
