@@ -61,7 +61,7 @@
 - **Verification**: `npx vitest run src/tests/` existing VAB tests pass; manual grep confirms only canvas-element-scoped listeners (not window/document) remain outside the tracker.
 
 ### TASK-011: Add VAB listener-cleanup unit test
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-009, TASK-010
 - **Description**: Add a unit test in `src/tests/vab.test.ts` (or a new `vabLifecycle.test.ts`) that spies on `window.addEventListener` and `window.removeEventListener` (or uses a listener-introspection approach), initializes VAB, verifies listeners are added, then destroys VAB and verifies all are removed. See requirements §2.4.
 - **Verification**: `npx vitest run src/tests/vab*.test.ts` passes with the new test included.
