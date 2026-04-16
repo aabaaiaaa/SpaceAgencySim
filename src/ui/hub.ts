@@ -19,7 +19,7 @@
  * @module hub
  */
 
-import { showHubScene, hideHubScene, setHubWeather, setBuiltFacilities, setHubBodyVisuals } from '../render/hub.ts';
+import { showHubScene, hideHubScene, setHubWeather, setBuiltFacilities, setHubBodyVisuals, destroyHubRenderer } from '../render/hub.ts';
 import { FACILITY_DEFINITIONS, getFacilityUpgradeDef, getReputationTier, GameMode, EARTH_HUB_ID } from '../core/constants.ts';
 import { openSettingsPanel } from './settings.ts';
 import { openDebugSavePanel } from './debugSaves.ts';
@@ -304,6 +304,9 @@ export function destroyHubUI(): void {
   }
   _state = null;
   hideHubScene();
+  // Destroy the PixiJS scene root so its Graphics objects and the
+  // RendererPool don't leak across hub ↔ VAB ↔ flight swaps.
+  destroyHubRenderer();
 }
 
 /**

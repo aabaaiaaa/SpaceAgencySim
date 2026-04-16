@@ -181,7 +181,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/ui-vab*.test.ts` passes. Manual review confirms a destroy call exists on teardown.
 
 ### TASK-027: Audit src/render/hub.ts for scene-root destroy
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §5.2. Same treatment applied to `src/render/hub.ts`. Identify scene root, add `destroy({ children: true })` on teardown from the hub UI layer.
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/hub*.test.ts` passes.

@@ -24,6 +24,7 @@ vi.mock('../render/hub.ts', () => ({
   setHubWeather: vi.fn(),
   setBuiltFacilities: vi.fn(),
   setHubBodyVisuals: vi.fn(),
+  destroyHubRenderer: vi.fn(),
 }));
 
 import { showWelcomeModal } from '../ui/hub.ts';

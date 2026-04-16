@@ -134,6 +134,9 @@ let _weatherExtreme = false;
 let _builtFacilities: Set<string> | null = null;
 const _pool = new RendererPool();
 
+/** Window resize handler reference — tracked so destroyHubRenderer can remove it. */
+let _resizeHandler: (() => void) | null = null;
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -146,12 +149,42 @@ export function initHubRenderer(): void {
 
   app.stage.addChildAt(_hubRoot, 0);
 
-  window.addEventListener('resize', () => {
+  _resizeHandler = (): void => {
     if (_hubRoot && _hubRoot.visible) {
       _drawScene();
     }
-  });
+  };
+  window.addEventListener('resize', _resizeHandler);
 
+}
+
+/**
+ * Tear down the hub PixiJS scene: destroy the scene-root container and all
+ * its children, drain the RendererPool, and remove the resize listener.
+ * Called from `destroyHubUI()` on the navigation-away path so that GPU
+ * textures and Graphics geometry don't accumulate across hub ↔ VAB ↔ flight
+ * swaps. Safe to call when the scene was never initialised (no-op).
+ * `showHubScene()` lazily re-initialises the scene on next entry.
+ */
+export function destroyHubRenderer(): void {
+  if (_resizeHandler) {
+    window.removeEventListener('resize', _resizeHandler);
+    _resizeHandler = null;
+  }
+
+  if (_hubRoot) {
+    const app = getApp();
+    if (_hubRoot.parent) app.stage.removeChild(_hubRoot);
+    _hubRoot.destroy({ children: true });
+    _hubRoot = null;
+  }
+
+  _builtFacilities = null;
+  _weatherVisibility = 0;
+  _weatherExtreme = false;
+
+  // Drop the pool — its Graphics were just destroyed by the children:true above.
+  _pool.drain();
 }
 
 export function setHubWeather(visibility: number, extreme: boolean): void {
@@ -204,6 +237,10 @@ export function setHubBodyVisuals(bodyId: string, hubType: 'surface' | 'orbital'
 }
 
 export function showHubScene(): void {
+  // Lazily re-initialise if a previous destroyHubRenderer() tore down the scene.
+  if (!_hubRoot) {
+    initHubRenderer();
+  }
   if (!_hubRoot) return;
   const app = getApp();
   if (!_hubRoot.parent) {

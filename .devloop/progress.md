@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 26
-- **Remaining**: 78
-- **Last Updated**: 2026-04-16T23:30:52.525Z
+- **Completed**: 27
+- **Remaining**: 77
+- **Last Updated**: 2026-04-16T23:33:22.270Z
 
 ## Iteration Log
 
@@ -241,4 +241,13 @@
 - **Exit Status**: success
 - **Tokens**: 1,791,617 total (26 in, 8,728 out, 83,261 cache-create, 1,699,602 cache-read)
 - **Cost**: $1.5885
+
+### Iteration 27 - 2026-04-16T23:33:22.266Z
+- **Task Attempted**: TASK-027
+- **Task Completed**: TASK-027
+- **Summary**: Completed Audit src/render/hub.ts for scene-root destroy
+- **Duration**: 2m 28s
+- **Exit Status**: success
+- **Tokens**: 1,195,905 total (1,382 in, 6,876 out, 51,317 cache-create, 1,136,330 cache-read)
+- **Cost**: $1.0677
 
