@@ -67,7 +67,7 @@
 - **Verification**: `npm run typecheck` passes. `npm run build` succeeds. The canvas rendering in `rocketCardUtil.ts` still works (uses the extracted function).
 
 ### TASK-012: Add unit tests for previewLayout.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-011
 - **Description**: Create `src/tests/previewLayout.test.ts` with unit tests for the extracted scaling function. Test cases: (1) normal case with multiple parts — verify scale fits within preview bounds; (2) single part — verify it centres correctly; (3) parts in a vertical line (rocketW ≈ 0) — verify no division by zero, scale is finite; (4) parts in a horizontal line (rocketH ≈ 0) — same check. See requirements Section 6.
 - **Verification**: `npx vitest run src/tests/previewLayout.test.ts` passes with all 4+ tests green.
