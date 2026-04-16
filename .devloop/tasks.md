@@ -61,7 +61,7 @@
 - **Verification**: `node scripts/run-affected.mjs --dry-run` runs without errors. Inspect `test-map.json` — all four source modules map to their test files.
 
 ### TASK-011: Extract preview scaling math from rocketCardUtil.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Extract the pure bounding-box and scale computation from `src/ui/rocketCardUtil.ts` (lines 95-121) into a new file `src/core/previewLayout.ts`. The function should take an array of part positions/sizes (e.g., `{ x, y, width, height }[]`) and preview dimensions (`{ width, height, padding }`), and return `{ scale: number, offsetX: number, offsetY: number }`. The UI function `renderRocketPreview()` should import and use this instead of inlining the math. See requirements Section 6.
 - **Verification**: `npm run typecheck` passes. `npm run build` succeeds. The canvas rendering in `rocketCardUtil.ts` still works (uses the extracted function).

@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 9,
+  "lastIteration": 10,
   "startedAt": "2026-04-16T13:35:03.728Z",
   "iteration": 17,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-010",
-    "taskTitle": "Update test-map.json for new smoke coverage",
-    "iterationNumber": 10,
-    "startedAt": "2026-04-16T14:03:07.949Z"
+    "taskId": "TASK-011",
+    "taskTitle": "Extract preview scaling math from rocketCardUtil.ts",
+    "iterationNumber": 11,
+    "startedAt": "2026-04-16T14:05:57.499Z"
   }
 }

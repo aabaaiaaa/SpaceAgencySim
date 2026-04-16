@@ -9,6 +9,8 @@
 
 import { getPartById } from '../data/parts.ts';
 import { PartType } from '../core/constants.ts';
+import { computePreviewLayout } from '../core/previewLayout.ts';
+import type { PartRect } from '../core/previewLayout.ts';
 import './rocketCardUtil.css';
 import type { RocketDesign } from '../core/gameState.ts';
 import type { PartDef } from '../data/parts.ts';
@@ -88,8 +90,7 @@ export function renderRocketPreview(canvas: HTMLCanvasElement, design: RocketDes
   if (!ctx || !design.parts || design.parts.length === 0) return;
 
   const resolved: ResolvedPart[] = [];
-  let minX = Infinity, maxX = -Infinity;
-  let minY = Infinity, maxY = -Infinity;
+  const rects: PartRect[] = [];
 
   for (const p of design.parts) {
     const def = getPartById(p.partId);
@@ -98,30 +99,20 @@ export function renderRocketPreview(canvas: HTMLCanvasElement, design: RocketDes
     const hh = (def.height ?? 20) / 2;
     const px = p.position.x;
     const py = p.position.y;
-    minX = Math.min(minX, px - hw);
-    maxX = Math.max(maxX, px + hw);
-    minY = Math.min(minY, py - hh);
-    maxY = Math.max(maxY, py + hh);
+    rects.push({ x: px, y: py, width: hw * 2, height: hh * 2 });
     resolved.push({ px, py, hw, hh, def });
   }
 
-  if (resolved.length === 0) return;
+  const layout = computePreviewLayout(rects, {
+    width: PREVIEW_W, height: PREVIEW_H, padding: PREVIEW_PAD,
+  });
+  if (!layout) return;
 
-  const rocketW = maxX - minX;
-  const rocketH = maxY - minY;
-
-  const drawW = PREVIEW_W - PREVIEW_PAD * 2;
-  const drawH = PREVIEW_H - PREVIEW_PAD * 2;
-  const scale = Math.min(drawW / Math.max(rocketW, 1), drawH / Math.max(rocketH, 1));
-
-  const cx = PREVIEW_W  / 2;
-  const cy = PREVIEW_H / 2;
-  const midX = (minX + maxX) / 2;
-  const midY = (minY + maxY) / 2;
+  const { scale, offsetX, offsetY, midX, midY } = layout;
 
   for (const { px, py, hw, hh, def } of resolved) {
-    const sx = cx + (px - midX) * scale;
-    const sy = cy - (py - midY) * scale;
+    const sx = offsetX + (px - midX) * scale;
+    const sy = offsetY - (py - midY) * scale;
     const sw = hw * 2 * scale;
     const sh = hh * 2 * scale;
 
