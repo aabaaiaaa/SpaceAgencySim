@@ -145,6 +145,9 @@ let _lastGhostFrameTime: number | null = null;
 /** RAF-based leg animation ticker state. */
 let _legAnimRAF: number | null = null;
 
+/** Window resize handler reference — tracked so destroyVabRenderer can remove it. */
+let _resizeHandler: (() => void) | null = null;
+
 /** Selected-part leg animation state. */
 let _selLegInstanceId: string | null = null;
 let _selLegDef: PartDef | null = null;
@@ -718,13 +721,63 @@ export function initVabRenderer(): void {
 
   vabRedrawGrid();
 
-  window.addEventListener('resize', () => {
+  _resizeHandler = (): void => {
     vabRedrawGrid();
     _renderPartsLayer();
     _renderSnapLayer();
     _renderGhostLayer();
-  });
+  };
+  window.addEventListener('resize', _resizeHandler);
 
+}
+
+/**
+ * Tear down the VAB PixiJS scene: destroy the scene-root container and all
+ * its children, drain the RendererPool, and remove the resize listener.
+ * Called from `destroyVabUI()` on the back-to-hub navigation path so that
+ * GPU textures and Graphics geometry don't accumulate across hub ↔ VAB swaps.
+ * Safe to call when the scene was never initialised (no-op).
+ * `showVabScene()` lazily re-initialises the scene on next entry.
+ */
+export function destroyVabRenderer(): void {
+  if (_legAnimRAF !== null) {
+    cancelAnimationFrame(_legAnimRAF);
+    _legAnimRAF = null;
+  }
+  if (_resizeHandler) {
+    window.removeEventListener('resize', _resizeHandler);
+    _resizeHandler = null;
+  }
+
+  if (_vabRoot) {
+    const app = getApp();
+    if (_vabRoot.parent) app.stage.removeChild(_vabRoot);
+    _vabRoot.destroy({ children: true });
+    _vabRoot = null;
+  }
+
+  _grid           = null;
+  _partsContainer = null;
+  _ghostContainer = null;
+  _snapContainer  = null;
+
+  _assembly         = null;
+  _ghostPartId      = null;
+  _snapCandidates   = [];
+  _mirrorGhostPartId = null;
+  _selLegInstanceId = null;
+  _selLegDef        = null;
+  _lastGhostFrameTime = null;
+  _selLegLastTime   = null;
+
+  // Drop the pool — its Graphics/Text were just destroyed by the children:true above.
+  _pool.drain();
+
+  // Clear test-only globals so tests don't hold references to destroyed PIXI objects.
+  if (typeof window !== 'undefined') {
+    window.__vabPartsContainer = undefined;
+    window.__vabWorldToScreen  = undefined;
+  }
 }
 
 /**
@@ -732,6 +785,10 @@ export function initVabRenderer(): void {
  * Call this when the player navigates to the Vehicle Assembly Building.
  */
 export function showVabScene(): void {
+  // Lazily re-initialise if a previous destroyVabRenderer() tore down the scene.
+  if (!_vabRoot) {
+    initVabRenderer();
+  }
   if (!_vabRoot) return;
   const app = getApp();
   // Re-attach if the container was orphaned by a flight renderer teardown.

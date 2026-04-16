@@ -175,7 +175,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 ## Section 5 — Render Scene Teardown
 
 ### TASK-026: Audit src/render/vab.ts for scene-root destroy
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §5.1. Read `src/render/vab.ts`. Identify the top-level scene container (the one that owns all VAB sprites/graphics). On the VAB teardown path (called when switching away from VAB — find the caller in `src/ui/vab/*.ts`), call `<container>.destroy({ children: true })` and drain the `RendererPool` if one is in use here. Do not break existing `__vabPartsContainer` / `__vabWorldToScreen` test-only globals.
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/ui-vab*.test.ts` passes. Manual review confirms a destroy call exists on teardown.

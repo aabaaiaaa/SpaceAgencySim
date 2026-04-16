@@ -16,6 +16,7 @@ import {
   VAB_TOOLBAR_HEIGHT,
   vabSetAssembly,
   vabRenderParts,
+  destroyVabRenderer,
 } from '../../render/vab.ts';
 
 import type { GameState, InventoryPart } from '../../core/gameState.ts';
@@ -404,6 +405,9 @@ export function destroyVabUI(): void {
   destroyVabListenerTracker();
   const root = document.getElementById('vab-root');
   if (root) root.remove();
+  // Destroy the PixiJS scene root so its Graphics/Text objects and the
+  // RendererPool don't leak across hub ↔ VAB swaps.
+  destroyVabRenderer();
 }
 
 /**
