@@ -67,7 +67,7 @@
 - **Verification**: `node scripts/generate-test-map.mjs --dry-run 2>&1 | grep -E "(app/main|core/previewLayout|ui/notification|ui/fatalError)" | head -10`
 
 ### TASK-012: Final typecheck, lint, build, and smoke test verification
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-003, TASK-004, TASK-005, TASK-006, TASK-008, TASK-009, TASK-011
 - **Description**: Run the full verification suite to confirm all changes integrate cleanly: (1) `npm run typecheck` — zero errors. (2) `npm run lint` — zero errors. (3) `npm run build` — succeeds with no errors or warnings. (4) `npm run test:unit` — all tests pass. (5) `npm run test:smoke:unit` — includes the new @smoke-tagged tests in mainStartup.test.ts and previewLayout.test.ts. Fix any failures found.
 - **Verification**: All five commands above pass with zero errors.
