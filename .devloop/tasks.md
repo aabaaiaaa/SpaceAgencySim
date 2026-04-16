@@ -61,7 +61,7 @@
 - **Verification**: `node scripts/generate-test-map.mjs --dry-run 2>&1 | grep -c "app/main"` should output 1
 
 ### TASK-011: Regenerate test-map.json
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-010
 - **Description**: Run `node scripts/generate-test-map.mjs` to regenerate `test-map.json`. Then verify the output contains the expected new areas: (1) `app/main` area with `src/main.ts` in sources and `src/tests/mainStartup.test.ts` in unit. (2) `core/previewLayout` area with `src/core/previewLayout.ts` in sources and `src/tests/previewLayout.test.ts` in unit. (3) `ui/notification` area with `src/ui/notification.ts` in sources and `src/tests/notification.test.ts` in unit. (4) `ui/fatalError` area with `src/ui/fatalError.ts` in sources. If any expected area is missing, investigate and fix the generator script.
 - **Verification**: `node scripts/generate-test-map.mjs --dry-run 2>&1 | grep -E "(app/main|core/previewLayout|ui/notification|ui/fatalError)" | head -10`

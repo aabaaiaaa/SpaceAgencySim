@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 9,
+  "lastIteration": 10,
   "startedAt": "2026-04-16T15:21:22.622Z",
   "iteration": 18,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-010",
-    "taskTitle": "Add src/main.ts to generate-test-map.mjs SOURCE_GROUPS",
-    "iterationNumber": 10,
-    "startedAt": "2026-04-16T15:41:01.118Z"
+    "taskId": "TASK-011",
+    "taskTitle": "Regenerate test-map.json",
+    "iterationNumber": 11,
+    "startedAt": "2026-04-16T15:42:21.033Z"
   }
 }

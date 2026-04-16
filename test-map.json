@@ -90,6 +90,7 @@
       ],
       "unit": [
         "src/tests/construction.test.ts",
+        "src/tests/hubs.test.ts",
         "src/tests/sandbox.test.ts",
         "src/tests/techtree.test.ts"
       ],
@@ -126,7 +127,8 @@
       ],
       "unit": [
         "src/tests/crc32.test.ts",
-        "src/tests/saveload.test.ts"
+        "src/tests/saveload.test.ts",
+        "src/tests/storageErrors.test.ts"
       ],
       "e2e": []
     },
@@ -144,60 +146,12 @@
         "e2e/crew.spec.ts"
       ]
     },
-    "core/hubCrew": {
-      "sources": [
-        "src/core/hubCrew.ts"
-      ],
-      "unit": [
-        "src/tests/hubs-crew.test.ts"
-      ],
-      "e2e": [
-        "e2e/hub-economy.spec.ts"
-      ]
-    },
-    "core/hubTourists": {
-      "sources": [
-        "src/core/hubTourists.ts"
-      ],
-      "unit": [
-        "src/tests/hubs-tourists.test.ts"
-      ],
-      "e2e": [
-        "e2e/hub-economy.spec.ts"
-      ]
-    },
-    "core/hubTypes": {
-      "sources": [
-        "src/core/hubTypes.ts"
-      ],
-      "unit": [
-        "src/tests/hubs.test.ts"
-      ],
-      "e2e": []
-    },
-    "core/hubs": {
-      "sources": [
-        "src/core/hubs.ts"
-      ],
-      "unit": [
-        "src/tests/hubs.test.ts",
-        "src/tests/hubs-construction.test.ts",
-        "src/tests/hubs-integration.test.ts"
-      ],
-      "e2e": [
-        "e2e/hubs-establishment.spec.ts",
-        "e2e/hub-deployment.spec.ts",
-        "e2e/hub-economy.spec.ts"
-      ]
-    },
     "core/designLibrary": {
       "sources": [
-        "src/core/designLibrary.ts",
-        "src/core/idbStorage.ts"
+        "src/core/designLibrary.ts"
       ],
       "unit": [
         "src/tests/designLibrary.test.ts",
-        "src/tests/saveload.test.ts",
         "src/tests/storageErrors.test.ts"
       ],
       "e2e": [
@@ -227,7 +181,9 @@
         "src/tests/bankruptcy.test.ts",
         "src/tests/finance.test.ts",
         "src/tests/lifeSupport.test.ts",
+        "src/tests/mining.test.ts",
         "src/tests/period.test.ts",
+        "src/tests/routes.test.ts",
         "src/tests/satellites.test.ts"
       ],
       "e2e": [
@@ -309,15 +265,24 @@
         "src/tests/fuelsystem.test.ts",
         "src/tests/gameState.test.ts",
         "src/tests/grabbing.test.ts",
+        "src/tests/hubs-construction.test.ts",
+        "src/tests/hubs-crew.test.ts",
+        "src/tests/hubs-economy.test.ts",
+        "src/tests/hubs-integration.test.ts",
+        "src/tests/hubs-outpost-core.test.ts",
+        "src/tests/hubs-tourists.test.ts",
+        "src/tests/hubs.test.ts",
         "src/tests/idbStorage.test.ts",
         "src/tests/instruments.test.ts",
         "src/tests/launchPadTiers.test.ts",
         "src/tests/legs.test.ts",
         "src/tests/lifeSupport.test.ts",
+        "src/tests/logistics-layout.test.ts",
         "src/tests/malfunction.test.ts",
         "src/tests/manoeuvre.test.ts",
         "src/tests/mapView.test.ts",
         "src/tests/mccTiers.test.ts",
+        "src/tests/mining.test.ts",
         "src/tests/missions.test.ts",
         "src/tests/multiBodyLanding.test.ts",
         "src/tests/orbit.test.ts",
@@ -327,13 +292,16 @@
         "src/tests/period.test.ts",
         "src/tests/physics.test.ts",
         "src/tests/power.test.ts",
+        "src/tests/refinery.test.ts",
         "src/tests/render-camera.test.ts",
         "src/tests/render-constants.test.ts",
         "src/tests/render-ground.test.ts",
         "src/tests/render-map-state.test.ts",
         "src/tests/reputation.test.ts",
+        "src/tests/resources.test.ts",
         "src/tests/rocketbuilder.test.ts",
         "src/tests/rocketvalidator.test.ts",
+        "src/tests/routes.test.ts",
         "src/tests/sandbox.test.ts",
         "src/tests/satellites.test.ts",
         "src/tests/saveload.test.ts",
@@ -352,13 +320,56 @@
         "e2e/saveload.spec.ts"
       ]
     },
+    "core/hubCrew": {
+      "sources": [
+        "src/core/hubCrew.ts"
+      ],
+      "unit": [
+        "src/tests/hubs-crew.test.ts",
+        "src/tests/hubs-integration.test.ts",
+        "src/tests/hubs.test.ts"
+      ],
+      "e2e": []
+    },
+    "core/hubs": {
+      "sources": [
+        "src/core/hubs.ts"
+      ],
+      "unit": [
+        "src/tests/hubs-construction.test.ts",
+        "src/tests/hubs-crew.test.ts",
+        "src/tests/hubs-economy.test.ts",
+        "src/tests/hubs-integration.test.ts",
+        "src/tests/hubs-outpost-core.test.ts",
+        "src/tests/hubs-vab.test.ts",
+        "src/tests/hubs.test.ts",
+        "src/tests/routes.test.ts",
+        "src/tests/sandbox.test.ts",
+        "src/tests/techtree.test.ts"
+      ],
+      "e2e": []
+    },
+    "core/hubTourists": {
+      "sources": [
+        "src/core/hubTourists.ts"
+      ],
+      "unit": [
+        "src/tests/hubs-integration.test.ts",
+        "src/tests/hubs-tourists.test.ts"
+      ],
+      "e2e": []
+    },
     "core/logger": {
       "sources": [
         "src/core/logger.ts"
       ],
       "unit": [
+        "src/tests/autoSave.test.ts",
         "src/tests/branchCoverage.test.ts",
+        "src/tests/debugMode.test.ts",
         "src/tests/logger.test.ts",
+        "src/tests/saveload.test.ts",
+        "src/tests/storageErrors.test.ts",
         "src/tests/undoRedo.test.ts"
       ],
       "e2e": []
@@ -378,6 +389,17 @@
         "e2e/reliability-risk.spec.ts"
       ]
     },
+    "core/mapGeometry": {
+      "sources": [
+        "src/core/mapGeometry.ts"
+      ],
+      "unit": [
+        "src/tests/logistics.test.ts",
+        "src/tests/mapGeometry.test.ts",
+        "src/tests/ui-helpers.test.ts"
+      ],
+      "e2e": []
+    },
     "core/mapView": {
       "sources": [
         "src/core/mapView.ts"
@@ -393,6 +415,18 @@
       "e2e": [
         "e2e/core-mechanics.spec.ts"
       ]
+    },
+    "core/mining": {
+      "sources": [
+        "src/core/mining.ts"
+      ],
+      "unit": [
+        "src/tests/logistics-layout.test.ts",
+        "src/tests/mining.test.ts",
+        "src/tests/refinery.test.ts",
+        "src/tests/routes.test.ts"
+      ],
+      "e2e": []
     },
     "core/missions": {
       "sources": [
@@ -416,6 +450,7 @@
       ],
       "unit": [
         "src/tests/bodies.test.ts",
+        "src/tests/flightPhase.test.ts",
         "src/tests/manoeuvre.test.ts",
         "src/tests/mapView.test.ts",
         "src/tests/orbit.test.ts",
@@ -480,6 +515,7 @@
         "src/tests/controlMode.test.ts",
         "src/tests/ejector.test.ts",
         "src/tests/fuelsystem.test.ts",
+        "src/tests/hubs.test.ts",
         "src/tests/instruments.test.ts",
         "src/tests/launchPadTiers.test.ts",
         "src/tests/malfunction.test.ts",
@@ -529,6 +565,25 @@
         "e2e/orbital-operations.spec.ts"
       ]
     },
+    "core/previewLayout": {
+      "sources": [
+        "src/core/previewLayout.ts"
+      ],
+      "unit": [
+        "src/tests/previewLayout.test.ts"
+      ],
+      "e2e": []
+    },
+    "core/refinery": {
+      "sources": [
+        "src/core/refinery.ts"
+      ],
+      "unit": [
+        "src/tests/mining.test.ts",
+        "src/tests/refinery.test.ts"
+      ],
+      "e2e": []
+    },
     "core/reputation": {
       "sources": [
         "src/core/reputation.ts"
@@ -574,6 +629,15 @@
         "e2e/rocketbuilder.spec.ts"
       ]
     },
+    "core/routes": {
+      "sources": [
+        "src/core/routes.ts"
+      ],
+      "unit": [
+        "src/tests/routes.test.ts"
+      ],
+      "e2e": []
+    },
     "core/satellites": {
       "sources": [
         "src/core/comms.ts",
@@ -597,6 +661,7 @@
       "unit": [
         "src/tests/autoSave.test.ts",
         "src/tests/debugMode.test.ts",
+        "src/tests/designLibrary.test.ts",
         "src/tests/e2e-infrastructure.test.ts",
         "src/tests/idbStorage.test.ts",
         "src/tests/saveload.test.ts",
@@ -619,10 +684,11 @@
     },
     "core/settingsStore": {
       "sources": [
-        "src/core/idbStorage.ts",
         "src/core/settingsStore.ts"
       ],
       "unit": [
+        "src/tests/debugMode.test.ts",
+        "src/tests/saveload.test.ts",
         "src/tests/settingsStore.test.ts"
       ],
       "e2e": []
@@ -674,15 +740,6 @@
       ],
       "e2e": []
     },
-    "core/transferObjects": {
-      "sources": [
-        "src/core/transferObjects.ts"
-      ],
-      "unit": [
-        "src/tests/transferObjects.test.ts"
-      ],
-      "e2e": []
-    },
     "core/undoRedo": {
       "sources": [
         "src/core/undoRedo.ts"
@@ -713,7 +770,9 @@
       ],
       "unit": [
         "src/tests/bodies.test.ts",
-        "src/tests/multiBodyLanding.test.ts"
+        "src/tests/hubs.test.ts",
+        "src/tests/multiBodyLanding.test.ts",
+        "src/tests/resources.test.ts"
       ],
       "e2e": [
         "e2e/destinations.spec.ts"
@@ -748,12 +807,13 @@
         "src/data/hubFacilities.ts"
       ],
       "unit": [
-        "src/tests/hubs.test.ts",
-        "src/tests/hubs-construction.test.ts"
+        "src/tests/hubs-construction.test.ts",
+        "src/tests/hubs-economy.test.ts",
+        "src/tests/hubs-integration.test.ts",
+        "src/tests/hubs-vab.test.ts",
+        "src/tests/hubs.test.ts"
       ],
-      "e2e": [
-        "e2e/hubs-establishment.spec.ts"
-      ]
+      "e2e": []
     },
     "data/hubNames": {
       "sources": [
@@ -804,15 +864,19 @@
         "src/tests/atmosphere.test.ts",
         "src/tests/fuelsystem.test.ts",
         "src/tests/grabbing.test.ts",
+        "src/tests/hubs-outpost-core.test.ts",
+        "src/tests/hubs-vab.test.ts",
         "src/tests/instruments.test.ts",
         "src/tests/launchPadTiers.test.ts",
         "src/tests/malfunction.test.ts",
+        "src/tests/mining.test.ts",
         "src/tests/parachute-descent.test.ts",
         "src/tests/partInventory.test.ts",
         "src/tests/parts.test.ts",
         "src/tests/physics.test.ts",
         "src/tests/power.test.ts",
         "src/tests/render-camera.test.ts",
+        "src/tests/resources.test.ts",
         "src/tests/rocketbounds.test.ts",
         "src/tests/rocketbuilder.test.ts",
         "src/tests/sandbox.test.ts"
@@ -822,6 +886,16 @@
         "e2e/flight.spec.ts",
         "e2e/rocketbuilder.spec.ts"
       ]
+    },
+    "data/resources": {
+      "sources": [
+        "src/data/resources.ts"
+      ],
+      "unit": [
+        "src/tests/resources.test.ts",
+        "src/tests/routes.test.ts"
+      ],
+      "e2e": []
     },
     "data/techtree": {
       "sources": [
@@ -846,11 +920,21 @@
         "e2e/crew.spec.ts"
       ]
     },
+    "ui/fatalError": {
+      "sources": [
+        "src/ui/fatalError.ts"
+      ],
+      "unit": [
+        "src/tests/mainStartup.test.ts"
+      ],
+      "e2e": []
+    },
     "ui/flightController": {
       "sources": [
         "src/ui/flightController.ts",
         "src/ui/flightController/_docking.ts",
         "src/ui/flightController/_flightPhase.ts",
+        "src/ui/flightController/_hubDocking.ts",
         "src/ui/flightController/_init.ts",
         "src/ui/flightController/_keyboard.ts",
         "src/ui/flightController/_loop.ts",
@@ -938,28 +1022,8 @@
       ],
       "unit": [],
       "e2e": [
-        "e2e/hub-management.spec.ts",
         "e2e/hub-navigation.spec.ts",
         "e2e/newgame.spec.ts"
-      ]
-    },
-    "ui/hubManagement": {
-      "sources": [
-        "src/ui/hubManagement.ts"
-      ],
-      "unit": [],
-      "e2e": [
-        "e2e/hub-management.spec.ts"
-      ]
-    },
-    "ui/hubSwitcher": {
-      "sources": [
-        "src/ui/hubSwitcher.ts"
-      ],
-      "unit": [],
-      "e2e": [
-        "e2e/hubs-switcher.spec.ts",
-        "e2e/hub-navigation.spec.ts"
       ]
     },
     "ui/launchPad": {
@@ -977,10 +1041,24 @@
       "sources": [
         "src/ui/loadingIndicator.ts"
       ],
-      "unit": [],
-      "e2e": [
-        "e2e/navigation.spec.ts"
-      ]
+      "unit": [
+        "src/tests/ui-helpers.test.ts"
+      ],
+      "e2e": []
+    },
+    "ui/logistics": {
+      "sources": [
+        "src/ui/logistics/_routeMap.ts",
+        "src/ui/logistics/_schematicLayout.ts",
+        "src/ui/logistics/_state.ts"
+      ],
+      "unit": [
+        "src/tests/logistics-layout.test.ts",
+        "src/tests/logistics-state.test.ts",
+        "src/tests/logistics.test.ts",
+        "src/tests/ui-helpers.test.ts"
+      ],
+      "e2e": []
     },
     "ui/mainmenu": {
       "sources": [
@@ -1010,6 +1088,15 @@
         "e2e/missions.spec.ts"
       ]
     },
+    "ui/notification": {
+      "sources": [
+        "src/ui/notification.ts"
+      ],
+      "unit": [
+        "src/tests/notification.test.ts"
+      ],
+      "e2e": []
+    },
     "ui/rdLab": {
       "sources": [
         "src/ui/rdLab.ts"
@@ -1033,6 +1120,7 @@
         "src/ui/fpsMonitor.ts"
       ],
       "unit": [
+        "src/tests/fpsMonitor.test.ts",
         "src/tests/ui-fpsMonitor.test.ts"
       ],
       "e2e": [
@@ -1095,7 +1183,8 @@
       "unit": [
         "src/tests/ui-vabStaging.test.ts",
         "src/tests/ui-vabState.test.ts",
-        "src/tests/ui-vabUndoActions.test.ts"
+        "src/tests/ui-vabUndoActions.test.ts",
+        "src/tests/undoActions.test.ts"
       ],
       "e2e": [
         "e2e/part-reconnection.spec.ts",
@@ -1126,6 +1215,7 @@
         "src/tests/render-constants.test.ts",
         "src/tests/render-flight-pool.test.ts",
         "src/tests/render-ground.test.ts",
+        "src/tests/render-helpers.test.ts",
         "src/tests/render-input.test.ts",
         "src/tests/render-sky.test.ts",
         "src/tests/render-state.test.ts",
@@ -1190,76 +1280,14 @@
         "e2e/**/*.spec.ts"
       ]
     },
-    "core/mining": {
+    "app/main": {
       "sources": [
-        "src/core/mining.ts"
+        "src/main.ts"
       ],
       "unit": [
-        "src/tests/mining.test.ts"
+        "src/tests/mainStartup.test.ts"
       ],
-      "e2e": [
-        "e2e/mining.spec.ts"
-      ]
-    },
-    "core/refinery": {
-      "sources": [
-        "src/core/refinery.ts"
-      ],
-      "unit": [
-        "src/tests/refinery.test.ts"
-      ],
-      "e2e": [
-        "e2e/mining.spec.ts"
-      ]
-    },
-    "core/routes": {
-      "sources": [
-        "src/core/routes.ts"
-      ],
-      "unit": [
-        "src/tests/routes.test.ts"
-      ],
-      "e2e": [
-        "e2e/mining.spec.ts",
-        "e2e/route-interactions.spec.ts"
-      ]
-    },
-    "data/resources": {
-      "sources": [
-        "src/data/resources.ts"
-      ],
-      "unit": [
-        "src/tests/resources.test.ts"
-      ],
-      "e2e": [
-        "e2e/mining.spec.ts"
-      ]
-    },
-    "ui/logistics": {
-      "sources": [
-        "src/ui/logistics/index.ts",
-        "src/ui/logistics/_schematicLayout.ts",
-        "src/ui/logistics/_state.ts"
-      ],
-      "unit": [
-        "src/tests/logistics-layout.test.ts",
-        "src/tests/logistics-state.test.ts"
-      ],
-      "e2e": [
-        "e2e/logistics.spec.ts",
-        "e2e/mining.spec.ts"
-      ]
-    },
-    "ui/logistics/schematicLayout": {
-      "sources": [
-        "src/ui/logistics/_schematicLayout.ts"
-      ],
-      "unit": [
-        "src/tests/logistics-layout.test.ts"
-      ],
-      "e2e": [
-        "e2e/logistics.spec.ts"
-      ]
+      "e2e": []
     },
     "tests/_factories": {
       "sources": [
@@ -1275,11 +1303,18 @@
         "src/tests/crew.test.ts",
         "src/tests/flightReturn.test.ts",
         "src/tests/fuelsystem.test.ts",
+        "src/tests/hubs-construction.test.ts",
+        "src/tests/hubs-economy.test.ts",
+        "src/tests/hubs-integration.test.ts",
+        "src/tests/hubs-tourists.test.ts",
+        "src/tests/hubs.test.ts",
         "src/tests/instruments.test.ts",
         "src/tests/loopErrorHandling.test.ts",
+        "src/tests/mapView.test.ts",
         "src/tests/mccTiers.test.ts",
         "src/tests/satellites.test.ts",
         "src/tests/saveload.test.ts",
+        "src/tests/sciencemodule.test.ts",
         "src/tests/ui-mapView.test.ts",
         "src/tests/ui-timeWarp.test.ts",
         "src/tests/ui-vabUndoActions.test.ts",
