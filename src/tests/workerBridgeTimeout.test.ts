@@ -95,6 +95,7 @@ function restoreWorkerStub(): void {
 
 describe('workerBridge — public API', () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.useFakeTimers();
     installWorkerStub();
   });
@@ -420,6 +421,7 @@ describe('workerBridge — public API', () => {
 
 describe('workerBridge — ready timeout', () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.useFakeTimers();
     installWorkerStub();
   });

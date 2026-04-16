@@ -1,7 +1,7 @@
 # Iteration 17 — Tasks
 
 ### TASK-001: Fix flaky workerBridgeTimeout test with module isolation
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/tests/workerBridgeTimeout.test.ts`, add `vi.resetModules()` in `beforeEach` to force a fresh module instance per test, preventing shared state leaks across Vitest's parallel worker pool. The test `consumeMainThreadSnapshot returns null when no snapshot available` (line 110) times out intermittently in the full suite due to module-level state contention from the dynamic `import()` of `_workerBridge.ts`. After adding the reset, verify the dynamic import in each test gets a clean module. See requirements Section 1.
 - **Verification**: `npx vitest run src/tests/workerBridgeTimeout.test.ts` passes in under 5 seconds, then `npx vitest run src/tests/workerBridgeTimeout.test.ts src/tests/physics.test.ts src/tests/saveload.test.ts` passes (simulates parallel contention).

@@ -1,8 +1,14 @@
 {
-  "phase": "init",
+  "phase": "run",
   "sessionId": null,
   "lastIteration": 0,
-  "startedAt": "2026-04-16T13:01:19.035Z",
+  "startedAt": "2026-04-16T13:35:03.728Z",
   "iteration": 17,
-  "devloopVersion": "4.1.0"
+  "devloopVersion": "4.1.0",
+  "activeTask": {
+    "taskId": "TASK-001",
+    "taskTitle": "Fix flaky workerBridgeTimeout test with module isolation",
+    "iterationNumber": 1,
+    "startedAt": "2026-04-16T13:35:03.749Z"
+  }
 }
