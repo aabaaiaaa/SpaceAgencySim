@@ -79,7 +79,7 @@
 - **Verification**: `npx vitest run src/tests/staging.test.ts` passes with a new test that passes `{ angularVelocity: NaN }` through the debris creation path and asserts the resulting debris has a finite `angularVelocity`.
 
 ### TASK-014: Add resetDebrisIdCounter and consolidate flight-state resets
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/core/staging.ts`, add and export `resetDebrisIdCounter()` which sets `_debrisNextId = 1`. Either (a) consolidate with `resetAsteroidCollisionCooldowns` (from `collision.ts`) into a single exported `resetFlightState()` in a new or existing core module, OR (b) ensure both are called together at every flight-start and flight-abort site. Identify flight-lifecycle sites in `src/ui/flightController/` and `src/ui/launchPad.ts`. See requirements §3.3.
 - **Verification**: `npx vitest run src/tests/staging.test.ts src/tests/collision.test.ts` passes, including a new test that simulates two sequential flights and asserts both counters/cooldowns are reset between them.

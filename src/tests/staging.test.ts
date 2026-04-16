@@ -16,7 +16,14 @@ import {
   activatePartDirect,
   recomputeActiveGraph,
   tickDebris,
+  resetDebrisIdCounter,
+  resetFlightState,
 } from '../core/staging.ts';
+import {
+  checkAsteroidCollisions,
+  resetAsteroidCollisionCooldowns,
+} from '../core/collision.ts';
+import type { Asteroid } from '../core/asteroidBelt.ts';
 import {
   createPhysicsState,
   tick,
@@ -1493,5 +1500,93 @@ describe('debris angularVelocity — NaN guard', () => {
     for (const d of debris) {
       expect(Number.isFinite(d.angularVelocity)).toBe(true);
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Flight-lifecycle state reset — resetDebrisIdCounter, resetFlightState
+// ---------------------------------------------------------------------------
+
+describe('resetFlightState() — consolidated flight-lifecycle reset', () => {
+  function runFlightProducingDebris(): string[] {
+    // Simulate a flight: ignite stage 1, decouple stage 2. Returns the debris
+    // IDs produced by the decoupling in order.
+    const { assembly, staging } = makeTwoStageRocket();
+    const ps = makePhysicsState(assembly);
+    const fs = makeFlightState();
+
+    activateCurrentStage(ps, assembly, staging, fs); // stage 1: ignite engine
+    const debris = activateCurrentStage(ps, assembly, staging, fs); // stage 2: decouple
+    return debris.map(d => d.id);
+  }
+
+  function makeAsteroid(name: string): Asteroid {
+    return {
+      id: `ast-${name}`,
+      type: 'asteroid' as const,
+      name,
+      posX: 0, posY: 0,
+      velX: 0, velY: 0,
+      radius: 100,
+      mass: 1000,
+      shapeSeed: 42,
+    };
+  }
+
+  it('resetDebrisIdCounter restarts debris IDs from debris-1', () => {
+    // Flight 1: use up some IDs.
+    resetDebrisIdCounter();
+    const firstIds = runFlightProducingDebris();
+    expect(firstIds.length).toBeGreaterThan(0);
+    expect(firstIds[0]).toBe('debris-1');
+
+    // Without reset, a second flight would continue numbering.
+    const withoutReset = runFlightProducingDebris();
+    expect(withoutReset[0]).not.toBe('debris-1');
+
+    // After reset, numbering restarts.
+    resetDebrisIdCounter();
+    const afterReset = runFlightProducingDebris();
+    expect(afterReset[0]).toBe('debris-1');
+  });
+
+  it('resetFlightState clears both debris counter and asteroid cooldowns across sequential flights', () => {
+    // --- Flight 1 ---
+    resetFlightState();
+
+    // (1a) Activate a stage to bump the debris counter past 1.
+    const flight1Ids = runFlightProducingDebris();
+    expect(flight1Ids[0]).toBe('debris-1');
+
+    // (1b) Trigger an asteroid collision to put the asteroid on cooldown.
+    const assembly = createRocketAssembly();
+    const probeId  = addPartToAssembly(assembly, 'probe-core-mk1', 0,  0);
+    const tankId   = addPartToAssembly(assembly, 'tank-small',     0, -40);
+    connectParts(assembly, probeId, 1, tankId, 0);
+    const psColl = createPhysicsState(assembly, makeFlightState());
+    psColl.velX = 3;
+    const asteroid = makeAsteroid('RESET-IT');
+    const hits1 = checkAsteroidCollisions(psColl, assembly, [asteroid], makeFlightState());
+    expect(hits1.length).toBe(1);
+
+    // Cooldown is now set — a second call in the same flight is skipped.
+    const skipped = checkAsteroidCollisions(psColl, assembly, [asteroid], makeFlightState());
+    expect(skipped.length).toBe(0);
+
+    // --- Between flights: the consolidated reset runs. ---
+    resetFlightState();
+
+    // --- Flight 2 ---
+    // (2a) Debris counter restarted: first new debris is debris-1 again.
+    const flight2Ids = runFlightProducingDebris();
+    expect(flight2Ids[0]).toBe('debris-1');
+
+    // (2b) Cooldowns cleared: the same asteroid can collide again.
+    const hits2 = checkAsteroidCollisions(psColl, assembly, [asteroid], makeFlightState());
+    expect(hits2.length).toBe(1);
+
+    // Leave shared state tidy for any subsequent tests in the file.
+    resetAsteroidCollisionCooldowns();
+    resetDebrisIdCounter();
   });
 });

@@ -42,7 +42,7 @@ import { deployParachute, DEPLOY_DURATION, LOW_DENSITY_THRESHOLD } from './parac
 import { deployLandingLeg, getDeployedLegFootOffset } from './legs.ts';
 import { activateEjectorSeat } from './ejector.ts';
 import { activateScienceModule, activateInstrument, parseInstrumentKey } from './sciencemodule.ts';
-import { applySeparationImpulse } from './collision.ts';
+import { applySeparationImpulse, resetAsteroidCollisionCooldowns } from './collision.ts';
 import { getMalfunction } from './malfunction.ts';
 import { MalfunctionType } from './constants.ts';
 
@@ -71,6 +71,28 @@ const SEPARATION_COOLDOWN_TICKS = 10;
 // ---------------------------------------------------------------------------
 
 let _debrisNextId = 1;
+
+/**
+ * Reset the module-level debris ID counter back to 1.
+ *
+ * Call on flight start/abort so debris IDs don't grow unbounded across
+ * a long session. Usually invoked via the consolidated {@link resetFlightState}.
+ */
+export function resetDebrisIdCounter(): void {
+  _debrisNextId = 1;
+}
+
+/**
+ * Reset all module-level flight-lifecycle state.
+ *
+ * Currently clears the debris ID counter and asteroid collision cooldowns.
+ * Call at every flight-start (and flight-abort) site so stale state from a
+ * prior flight cannot leak into the next one.
+ */
+export function resetFlightState(): void {
+  resetDebrisIdCounter();
+  resetAsteroidCollisionCooldowns();
+}
 
 // ---------------------------------------------------------------------------
 // Type Definitions

@@ -9,6 +9,7 @@ import { initFlightRenderer, destroyFlightRenderer, setFlightWeather } from '../
 import { hideHubScene } from '../../render/hub.ts';
 import { initMapRenderer, destroyMapRenderer } from '../../render/map.ts';
 import { createPhysicsState } from '../../core/physics.ts';
+import { resetFlightState } from '../../core/staging.ts';
 import { initFlightHud, destroyFlightHud, showLaunchTip } from '../flightHud.ts';
 import { initFlightContextMenu, destroyFlightContextMenu } from '../flightContextMenu.ts';
 import { setTopBarFlightItems, clearTopBarFlightItems, clearTopBarHubItems, setTopBarDropdownToggleCallback, setCurrentScreen } from '../topbar.ts';
@@ -116,6 +117,11 @@ export async function startFlightScene(
   onFlightEnd: (state: GameState | null, results?: unknown, dest?: string) => void,
 ): Promise<void> {
   logger.debug('flight', 'Starting flight scene', { missionId: flightState.missionId, bodyId: flightState.bodyId });
+
+  // Clear debris-id counter and asteroid collision cooldowns so a prior flight
+  // cannot leak state into this one (e.g. carried-over asteroid immunity).
+  resetFlightState();
+
   const s = getFCState();
 
   // Ensure hub overlay is fully hidden during flight. In the normal gameplay
@@ -394,5 +400,7 @@ export function stopFlightScene(): void {
   // Reset all state.
   resetFCState();
 
-
+  // Clear module-level flight-lifecycle state (debris counter, asteroid
+  // cooldowns) so a stopped/aborted flight cannot leak into the next one.
+  resetFlightState();
 }
