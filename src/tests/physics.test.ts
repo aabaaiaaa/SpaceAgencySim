@@ -9,7 +9,9 @@ import {
   setCapturedBody,
   clearCapturedBody,
   setThrustAligned,
+  computeDockingRadialOut,
 } from '../core/physics.ts';
+import { BODY_RADIUS } from '../core/constants.ts';
 import {
   LegState,
   LEG_DEPLOY_DURATION,
@@ -3154,5 +3156,48 @@ describe('tick() — totalMass zero guard', () => {
     expect(Number.isFinite(ps.posY)).toBe(true);
     expect(Number.isFinite(ps.velX)).toBe(true);
     expect(Number.isFinite(ps.velY)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeDockingRadialOut() — body-aware docking radial check (TASK-012)
+// ---------------------------------------------------------------------------
+
+describe('computeDockingRadialOut()', () => {
+  it('orients radial-out away from body centre with a non-Earth body', () => {
+    // Craft at (5_000_000, 0) with velocity (1000, 1000) — prograde ≈ (√½, √½).
+    // Initial radial-out = (progY, -progX) = (+√½, -√½) (points down-right).
+    // radCheck = √½·posX + (-√½)·(posY + R) = √½·(5_000_000 − R).
+    //   EARTH R = 6_371_000 ⇒ radCheck < 0 ⇒ flipped to (-√½, +√½)
+    //   MOON  R = 1_737_400 ⇒ radCheck > 0 ⇒ NOT flipped, stays (+√½, -√½)
+    // Using Earth radius for a Moon-based craft (the bug) reverses the radial
+    // thrust direction; this test asserts the corrected sign per body.
+    const posX = 5_000_000;
+    const posY = 0;
+    const velX = 1000;
+    const velY = 1000;
+    const angle = 0;
+
+    const earth = computeDockingRadialOut(posX, posY, velX, velY, angle, BODY_RADIUS.EARTH);
+    expect(earth.radOutX).toBeLessThan(0);
+    expect(earth.radOutY).toBeGreaterThan(0);
+
+    const moon = computeDockingRadialOut(posX, posY, velX, velY, angle, BODY_RADIUS.MOON);
+    expect(moon.radOutX).toBeGreaterThan(0);
+    expect(moon.radOutY).toBeLessThan(0);
+
+    // The signs differ between Earth and Moon: proves the body radius is
+    // actually being used, not a hardcoded Earth constant.
+    expect(Math.sign(earth.radOutX)).not.toBe(Math.sign(moon.radOutX));
+    expect(Math.sign(earth.radOutY)).not.toBe(Math.sign(moon.radOutY));
+  });
+
+  it('falls back to prograde from angle when speed is below threshold', () => {
+    // speed ≈ 0, angle = 0 ⇒ progX = sin(0) = 0, progY = cos(0) = 1.
+    // radOutX = progY = 1, radOutY = -progX = 0.
+    // radCheck = 1 * posX + 0 = posX.  posX = 10 > 0, so no flip.
+    const res = computeDockingRadialOut(10, 0, 0, 0, 0, BODY_RADIUS.MARS);
+    expect(res.radOutX).toBeCloseTo(1);
+    expect(res.radOutY).toBeCloseTo(0);
   });
 });

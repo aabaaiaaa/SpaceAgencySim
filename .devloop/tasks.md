@@ -67,7 +67,7 @@
 - **Verification**: `npx vitest run src/tests/vab*.test.ts` passes with the new test included.
 
 ### TASK-012: Replace hardcoded Earth radius in physics.ts docking radial check
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: At `src/core/physics.ts:1827`, replace `6_371_000` with a body-aware lookup. Use the current body id from the physics state or flight context to look up the radius from `BODY_RADIUS` (check `src/core/constants.ts`, `src/data/bodies.ts`, or `src/core/orbit.ts` for the canonical source). If the body id is genuinely unavailable in this scope, thread it through via the function signature. Fall back to `6_371_000` only if the id is undefined and log a warning. See requirements §3.1.
 - **Verification**: `npx vitest run src/tests/physics.test.ts` passes with a new test that exercises the radial check with a non-Earth body and asserts the correct `radOutX`/`radOutY` sign.

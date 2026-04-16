@@ -91,6 +91,7 @@ import { MalfunctionType, REDUCED_THRUST_FACTOR, PARTIAL_CHUTE_FACTOR } from './
 import { getWindForce } from './weather.ts';
 import { initPowerState, tickPower, recalcPowerState } from './power.ts';
 import { getOrbitalStateAtTime, orbitalStateToCartesian, computeOrbitalElements } from './orbit.ts';
+import { logger } from './logger.ts';
 
 import type { AltitudeBand, ControlMode as ControlModeType } from './constants.ts';
 import type { FlightState, FlightEvent, OrbitalElements, PowerState, GameState, InventoryPart } from './gameState.ts';
@@ -1242,7 +1243,7 @@ function _integrate(ps: PhysicsState, assembly: RocketAssembly, flightState: Fli
 
   // --- 6b. Docking / RCS mode local movement --------------------------------
   if (isDockingOrRcs) {
-    _applyDockingMovement(ps, assembly, totalMass, FIXED_DT);
+    _applyDockingMovement(ps, assembly, totalMass, FIXED_DT, bodyId);
   }
 
   // --- 7. Continuous steering ----------------------------------------------
@@ -1771,7 +1772,51 @@ function _computeParachuteTorque(
  * In DOCKING mode: A/D = along-track, W/S = radial.
  * In RCS mode: WASD = craft-relative directional translation.
  */
-function _applyDockingMovement(ps: PhysicsState, assembly: RocketAssembly, totalMass: number, dt: number): void {
+/**
+ * Compute the radial-out unit vector in DOCKING mode.
+ *
+ * Radial out is perpendicular to the prograde direction and flipped, if
+ * necessary, to point away from the reference body's centre.  The body centre
+ * sits at world-space `(0, -bodyRadius)` because the craft's `posY` is altitude
+ * above surface, not absolute Y.
+ *
+ * Exported for testing.
+ */
+export function computeDockingRadialOut(
+  posX: number,
+  posY: number,
+  velX: number,
+  velY: number,
+  angle: number,
+  bodyRadius: number,
+): { radOutX: number; radOutY: number } {
+  const speed: number = Math.hypot(velX, velY);
+  let progX: number;
+  let progY: number;
+  if (speed > 1e-3) {
+    progX = velX / speed;
+    progY = velY / speed;
+  } else {
+    progX = Math.sin(angle);
+    progY = Math.cos(angle);
+  }
+  let radOutX: number = progY;
+  let radOutY: number = -progX;
+  const radCheck: number = radOutX * posX + radOutY * (posY + bodyRadius);
+  if (radCheck < 0) {
+    radOutX = -radOutX;
+    radOutY = -radOutY;
+  }
+  return { radOutX, radOutY };
+}
+
+function _applyDockingMovement(
+  ps: PhysicsState,
+  assembly: RocketAssembly,
+  totalMass: number,
+  dt: number,
+  bodyId?: string,
+): void {
   const isDocking: boolean = ps.controlMode === ControlMode.DOCKING;
   const isRcs: boolean     = ps.controlMode === ControlMode.RCS;
   if (!isDocking && !isRcs) return;
@@ -1811,7 +1856,7 @@ function _applyDockingMovement(ps: PhysicsState, assembly: RocketAssembly, total
   } else {
     // DOCKING mode: A/D = along-track, W/S = radial.
     const speed: number = Math.hypot(ps.velX, ps.velY);
-    let progX: number, progY: number, radOutX: number, radOutY: number;
+    let progX: number, progY: number;
 
     if (speed > 1e-3) {
       progX = ps.velX / speed;
@@ -1820,15 +1865,18 @@ function _applyDockingMovement(ps: PhysicsState, assembly: RocketAssembly, total
       progX = Math.sin(ps.angle);
       progY = Math.cos(ps.angle);
     }
-    // Radial out = perpendicular to prograde, pointing away from body.
-    radOutX = progY;
-    radOutY = -progX;
-    // Ensure radial out actually points away from body centre.
-    const radCheck: number = radOutX * ps.posX + radOutY * (ps.posY + 6_371_000);
-    if (radCheck < 0) {
-      radOutX = -radOutX;
-      radOutY = -radOutY;
+
+    // Look up body radius so the radial-out check uses the correct body centre.
+    let bodyRadius: number;
+    if (bodyId === undefined) {
+      logger.warn('physics', 'Docking radial check: bodyId undefined, falling back to Earth radius');
+      bodyRadius = BODY_RADIUS.EARTH;
+    } else {
+      bodyRadius = BODY_RADIUS[bodyId] ?? BODY_RADIUS.EARTH;
     }
+    const { radOutX, radOutY } = computeDockingRadialOut(
+      ps.posX, ps.posY, ps.velX, ps.velY, ps.angle, bodyRadius,
+    );
 
     let dvX = 0;
     let dvY = 0;
