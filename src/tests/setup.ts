@@ -1,12 +1,12 @@
-// Vitest global setup helpers
-// This file is a placeholder for any global test setup needed across unit tests.
-// Import and configure shared utilities, custom matchers, or mock factories here.
+// Vitest global setup — pins logger level to 'warn' before each test to
+// suppress noisy debug/info output. Tests that need debug output can call
+// `logger.setLevel('debug')` locally in their own `beforeEach`.
 //
-// To activate as a global setup file, add the following to vite.config.js:
-//   test: {
-//     setupFiles: ['./src/tests/setup.ts'],
-//   }
-//
-// Example usage (uncomment as needed):
-// import { vi } from 'vitest';
-// vi.stubGlobal('someBrowserAPI', mockImplementation);
+// Wired up via `setupFiles: ['./src/tests/setup.ts']` in `vitest.config.ts`.
+
+import { beforeEach } from 'vitest';
+import { logger } from '../core/logger.js';
+
+beforeEach(() => {
+  logger.setLevel('warn');
+});

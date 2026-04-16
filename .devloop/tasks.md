@@ -83,7 +83,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 ## Section 3 — Test Infrastructure
 
 ### TASK-012: Create src/tests/setup.ts with logger default level
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §3.1. Create `src/tests/setup.ts` that imports `logger` from `src/core/logger.ts` and calls `logger.setLevel('warn')` in a `beforeEach` hook (use `vitest`'s `beforeEach` via `globalSetup` or a top-level import that auto-registers). The file should be importable by Vitest's `setupFiles` configuration.
 - **Verification**: `npm run typecheck` passes on the new file (`npx tsc --noEmit src/tests/setup.ts` — or confirm inclusion via full typecheck).
