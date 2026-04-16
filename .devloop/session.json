@@ -4,5 +4,11 @@
   "lastIteration": 0,
   "startedAt": "2026-04-16T18:55:54.489Z",
   "iteration": 18,
-  "devloopVersion": "4.1.0"
+  "devloopVersion": "4.1.0",
+  "activeTask": {
+    "taskId": "TASK-001",
+    "taskTitle": "Detect QuotaExceededError in saveload.ts saveGame",
+    "iterationNumber": 1,
+    "startedAt": "2026-04-16T18:55:56.586Z"
+  }
 }

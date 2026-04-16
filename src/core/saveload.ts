@@ -24,6 +24,22 @@ import type { GameState } from './gameState.ts';
 import type { MalfunctionMode as MalfunctionModeType } from './constants.ts';
 
 // ---------------------------------------------------------------------------
+// Errors
+// ---------------------------------------------------------------------------
+
+/**
+ * Thrown when an IndexedDB write fails because storage quota has been
+ * exceeded. Callers (UI) can catch this to surface an actionable message
+ * ("Save storage full — delete old saves") rather than a fatal error.
+ */
+export class StorageQuotaError extends Error {
+  constructor(message: string = 'Storage quota exceeded', public readonly cause?: unknown) {
+    super(message);
+    this.name = 'StorageQuotaError';
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
@@ -346,7 +362,14 @@ export async function saveGame(state: GameState, slotIndex: number, saveName: st
     ratio: json.length > 0 ? ((1 - compressed.length / json.length) * 100).toFixed(1) + '%' : 'N/A',
   });
 
-  await idbSet(key, compressed);
+  try {
+    await idbSet(key, compressed);
+  } catch (err) {
+    if (err instanceof Error && err.name === 'QuotaExceededError') {
+      throw new StorageQuotaError('Save failed: storage quota exceeded', err);
+    }
+    throw err;
+  }
 
   return summaryFromEnvelope(slotIndex, envelope, key);
 }

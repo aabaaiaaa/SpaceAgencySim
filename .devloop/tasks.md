@@ -1,7 +1,7 @@
 # Iteration 18 — Tasks
 
 ### TASK-001: Detect QuotaExceededError in saveload.ts saveGame
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Wrap the `await idbSet(key, compressed)` call at `src/core/saveload.ts:349` in try/catch. Detect `err.name === 'QuotaExceededError'` and rethrow as a new named error class `StorageQuotaError` (add to `saveload.ts` or a shared module). Other errors bubble through. See requirements §1.1.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` passes with all existing tests, and typecheck/lint clean for the modified file: `npx tsc --noEmit` on the project succeeds.
