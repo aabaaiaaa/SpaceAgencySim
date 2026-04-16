@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 30
-- **Remaining**: 74
-- **Last Updated**: 2026-04-16T23:40:52.066Z
+- **Completed**: 31
+- **Remaining**: 73
+- **Last Updated**: 2026-04-16T23:43:18.932Z
 
 ## Iteration Log
 
@@ -277,4 +277,13 @@
 - **Exit Status**: success
 - **Tokens**: 1,068,610 total (21 in, 6,619 out, 64,201 cache-create, 997,769 cache-read)
 - **Cost**: $1.0657
+
+### Iteration 31 - 2026-04-16T23:43:18.929Z
+- **Task Attempted**: TASK-031
+- **Task Completed**: TASK-031
+- **Summary**: Completed Audit src/render/flight/trails.ts for destroy
+- **Duration**: 2m 25s
+- **Exit Status**: success
+- **Tokens**: 1,186,208 total (25 in, 6,795 out, 73,661 cache-create, 1,105,727 cache-read)
+- **Cost**: $1.1832
 

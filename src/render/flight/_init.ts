@@ -21,6 +21,7 @@ import {
   emitSmokeSegments, updateTrails, renderTrails,
   updatePlumeStates, renderPlumes,
   renderRcsPlumes, renderMachEffects, trailDt,
+  destroyTrailsRender,
 } from './_trails.ts';
 import { renderDebris, renderDockingTarget, renderEjectedCrew } from './_debris.ts';
 import { getProximityObjects } from '../../core/transferObjects.ts';
@@ -184,7 +185,7 @@ export function destroyFlightRenderer(): void {
   if (s.groundGraphics)       app.stage.removeChild(s.groundGraphics);
   if (s.surfaceItemsGraphics) app.stage.removeChild(s.surfaceItemsGraphics);
   if (s.debrisContainer)      app.stage.removeChild(s.debrisContainer);
-  if (s.trailContainer)       app.stage.removeChild(s.trailContainer);
+  destroyTrailsRender();
   destroyRocketRender();
   if (s.biomeLabelContainer)  app.stage.removeChild(s.biomeLabelContainer);
   if (s.asteroidsContainer)   app.stage.removeChild(s.asteroidsContainer);
@@ -193,14 +194,8 @@ export function destroyFlightRenderer(): void {
   s.groundGraphics        = null;
   s.surfaceItemsGraphics  = null;
   s.debrisContainer       = null;
-  s.trailContainer        = null;
   s.biomeLabelContainer   = null;
   s.asteroidsContainer    = null;
-  s.trailSegments         = [];
-  s.lastTrailTime         = null;
-  s.plumeStates           = new Map();
-  s.machGraphics          = null;
-  s.machPhase             = 0;
   s.dockingTargetGfx      = null;
   s.currentBiomeName      = null;
   s.biomeLabelAlpha       = 0;

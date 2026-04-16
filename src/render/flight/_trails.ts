@@ -608,3 +608,34 @@ export function renderMachEffects(ps: ReadonlyPhysicsState, assembly: ReadonlyAs
     s.machGraphics = g;
   }
 }
+
+// ---------------------------------------------------------------------------
+// Teardown
+// ---------------------------------------------------------------------------
+
+/**
+ * Destroy the trail container and reset trail-owned state. Pooled Graphics
+ * children (plume, smoke, RCS plume layers) are released back to the pool
+ * before destroying the container so destroy doesn't corrupt pool entries.
+ * machGraphics is a pooled Graphics attached to rocketContainer.parent —
+ * release rather than destroy. Safe to call when containers were never
+ * initialised. Called from destroyFlightRenderer.
+ */
+export function destroyTrailsRender(): void {
+  const s = getFlightRenderState();
+
+  if (s.trailContainer) {
+    releaseContainerChildren(s.trailContainer);
+    if (s.trailContainer.parent) s.trailContainer.parent.removeChild(s.trailContainer);
+    s.trailContainer.destroy({ children: true });
+    s.trailContainer = null;
+  }
+
+  releaseGraphics(s.machGraphics);
+  s.machGraphics = null;
+
+  s.trailSegments = [];
+  s.lastTrailTime = null;
+  s.plumeStates   = new Map();
+  s.machPhase     = 0;
+}

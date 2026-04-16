@@ -205,7 +205,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes.
 
 ### TASK-031: Audit src/render/flight/trails.ts for destroy
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §5.3. Same treatment, `src/render/flight/trails.ts`.
 - **Verification**: `npm run typecheck` passes.
