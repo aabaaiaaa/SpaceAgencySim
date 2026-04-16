@@ -19,7 +19,7 @@
 - **Verification**: `npx vitest run src/tests/mainStartup.test.ts`
 
 ### TASK-004: Add Ia/Ib inline guards in collision.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/core/collision.ts`, inside `_resolveCollision`, add inline guards before each moment-of-inertia division. At line 533: change `a.ref.angularVelocity += torqueA * dt / Ia;` to `if (Ia > 0) a.ref.angularVelocity += torqueA * dt / Ia;`. At line 537: change `b.ref.angularVelocity += torqueB * dt / Ib;` to `if (Ib > 0) b.ref.angularVelocity += torqueB * dt / Ib;`. This makes the angular impulse code self-protecting, consistent with the mass guard at line 457. See requirements.md section 2.
 - **Verification**: `npx vitest run src/tests/collision.test.ts`

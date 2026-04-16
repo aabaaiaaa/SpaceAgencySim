@@ -530,11 +530,11 @@ function _resolveCollision(a: CollisionBody, b: CollisionBody, assembly: RocketA
   // Apply angular impulse: dw = torque * dt / I
   if (a.ref.angularVelocity != null) {
     const Ia = _bodyMoI(a.activeParts, a.fuelStore, assembly.parts as Map<string, PlacedPartLike>);
-    a.ref.angularVelocity += torqueA * dt / Ia;
+    if (Ia > 0) a.ref.angularVelocity += torqueA * dt / Ia;
   }
   if (b.ref.angularVelocity != null) {
     const Ib = _bodyMoI(b.activeParts, b.fuelStore, assembly.parts as Map<string, PlacedPartLike>);
-    b.ref.angularVelocity += torqueB * dt / Ib;
+    if (Ib > 0) b.ref.angularVelocity += torqueB * dt / Ib;
   }
 
   // Positional correction: push bodies apart proportional to inverse mass.
