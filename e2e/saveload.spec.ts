@@ -15,6 +15,7 @@ import {
   buildSaveEnvelope, dismissWelcomeModal,
   dragPartToCanvas,
   seedIdb, seedIdbMulti,
+  compressSaveString,
 } from './helpers.js';
 
 /**
@@ -53,7 +54,7 @@ async function startNewGameAndGoToVab(page: Page): Promise<void> {
 async function seedSaveAndGoToLoadScreen(page: Page, envelope: ReturnType<typeof buildSaveEnvelope>): Promise<void> {
   await page.setViewportSize({ width: VP_W, height: VP_H });
   await page.goto('/');
-  await seedIdb(page, SAVE_KEY, JSON.stringify(envelope));
+  await seedIdb(page, SAVE_KEY, compressSaveString(JSON.stringify(envelope)));
   await page.goto('/');
   await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 }
@@ -113,8 +114,8 @@ test.describe('Save & Load Flow', () => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await page.goto('/');
     await seedIdbMulti(page, [
-      { key: 'spaceAgencySave_0', value: JSON.stringify(makeEnvelope({ saveName: 'Save A' })) },
-      { key: 'spaceAgencySave_1', value: JSON.stringify(makeEnvelope({ saveName: 'Save B' })) },
+      { key: 'spaceAgencySave_0', value: compressSaveString(JSON.stringify(makeEnvelope({ saveName: 'Save A' }))) },
+      { key: 'spaceAgencySave_1', value: compressSaveString(JSON.stringify(makeEnvelope({ saveName: 'Save B' }))) },
     ]);
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
@@ -135,7 +136,7 @@ test.describe('Save & Load Flow', () => {
     // Seed IDB after page loads to establish origin.
     await page.goto('/');
     await page.waitForSelector('#mm-newgame-screen', { state: 'visible', timeout: 10_000 });
-    await seedIdb(page, SAVE_KEY, JSON.stringify(makeEnvelope()));
+    await seedIdb(page, SAVE_KEY, compressSaveString(JSON.stringify(makeEnvelope())));
 
     // Reload to pick up the seeded save.
     await page.goto('/');
@@ -236,8 +237,8 @@ test.describe('Save & Load Flow', () => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await page.goto('/');
     await seedIdbMulti(page, [
-      { key: 'spaceAgencySave_0', value: JSON.stringify(currentEnvelope) },
-      { key: 'spaceAgencySave_1', value: JSON.stringify(oldEnvelope) },
+      { key: 'spaceAgencySave_0', value: compressSaveString(JSON.stringify(currentEnvelope)) },
+      { key: 'spaceAgencySave_1', value: compressSaveString(JSON.stringify(oldEnvelope)) },
     ]);
 
     // Reload to pick up the seeded saves.
@@ -279,7 +280,7 @@ test.describe('Save & Load Flow', () => {
 
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await page.goto('/');
-    await seedIdb(page, 'spaceAgencySave_0', JSON.stringify(oldEnvelope));
+    await seedIdb(page, 'spaceAgencySave_0', compressSaveString(JSON.stringify(oldEnvelope)));
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 

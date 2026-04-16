@@ -43,7 +43,7 @@ vi.mock('../core/constants.js', async (importOriginal) => {
 });
 vi.mock('../data/parts.js', () => ({ getPartById: vi.fn() }));
 
-vi.mock('../ui/flightController/_timeWarp.js', () => ({
+vi.mock('../ui/flightController/_timeWarp.ts', () => ({
   checkTimeWarpResets: vi.fn(),
   applyTimeWarp: vi.fn(),
 }));
@@ -56,6 +56,9 @@ vi.mock('../ui/flightController/_orbitRcs.js', () => ({
 }));
 vi.mock('../ui/flightController/_flightPhase.js', () => ({
   evaluateFlightPhase: vi.fn(),
+}));
+vi.mock('../ui/flightController/_hubDocking.ts', () => ({
+  checkHubDocking: vi.fn(),
 }));
 vi.mock('../ui/flightController/_docking.js', () => ({
   tickDockingSystem: vi.fn(),
@@ -456,6 +459,7 @@ describe('Flight controller loop — post-flight auto-trigger', () => {
     resetFCState();
     setPhysicsState(null);
     setFlightState(null);
+    vi.mocked(showPostFlightSummary).mockClear();
     mockEvaluateComms.mockReset();
     mockEvaluateComms.mockReturnValue({ status: 'CONNECTED', linkType: 'DIRECT', canTransmit: true, controlLocked: false });
     mockLoggerError.mockReset();
@@ -521,6 +525,7 @@ describe('Flight controller loop — map active warp override', () => {
     resetFCState();
     setPhysicsState(null);
     setFlightState(null);
+    vi.mocked(applyTimeWarp).mockClear();
     mockEvaluateComms.mockReset();
     mockEvaluateComms.mockReturnValue({ status: 'CONNECTED', linkType: 'DIRECT', canTransmit: true, controlLocked: false });
     mockLoggerError.mockReset();

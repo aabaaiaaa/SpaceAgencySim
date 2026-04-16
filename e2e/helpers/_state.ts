@@ -3,9 +3,15 @@
  */
 
 import type { Page } from '@playwright/test';
+import LZString from 'lz-string';
 
 import { SAVE_KEY } from './_constants.js';
 import type { SaveEnvelope } from './_saveFactory.js';
+
+/** LZC-compress a JSON string, matching the format expected by saveload.ts. */
+export function compressSaveString(json: string): string {
+  return 'LZC:' + LZString.compressToUTF16(json);
+}
 
 interface PhysicsSnapshot {
   posX: number;
@@ -179,7 +185,7 @@ export async function readIdbAllKeys(
 export async function seedAndLoadSave(page: Page, envelope: SaveEnvelope | Record<string, unknown>): Promise<void> {
   // Navigate to establish origin so IndexedDB is accessible.
   await page.goto('/');
-  await seedIdb(page, SAVE_KEY, JSON.stringify(envelope));
+  await seedIdb(page, SAVE_KEY, compressSaveString(JSON.stringify(envelope)));
   // Reload so the app reads the freshly-seeded IDB data on startup.
   await page.goto('/');
   await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });

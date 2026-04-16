@@ -32,9 +32,11 @@ import {
   SAVE_VERSION,
   _setSessionStartTimeForTesting,
 } from '../core/saveload.ts';
+import { _resetCacheForTesting as _resetSettingsCache } from '../core/settingsStore.ts';
 
 beforeEach(() => {
   _idbStore.clear();
+  _resetSettingsCache();
   vi.useFakeTimers();
   vi.setSystemTime(0);
   _setSessionStartTimeForTesting(0);

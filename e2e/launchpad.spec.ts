@@ -4,6 +4,7 @@ import {
   SAVE_KEY, STARTING_MONEY,
   FIRST_FLIGHT_MISSION, buildSaveEnvelope,
   seedIdb,
+  compressSaveString,
 } from './helpers.js';
 
 /**
@@ -100,7 +101,7 @@ test.describe('Launch Pad', () => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     // Seed a save with one rocket design.
     await page.goto('/');
-    await seedIdb(page, SAVE_KEY, JSON.stringify(lpSaveEnvelope([SEEDED_DESIGN])));
+    await seedIdb(page, SAVE_KEY, compressSaveString(JSON.stringify(lpSaveEnvelope([SEEDED_DESIGN]))));
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
@@ -144,7 +145,7 @@ test.describe('Launch Pad', () => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     // Seed a save with NO rocket designs.
     await page.goto('/');
-    await seedIdb(page, SAVE_KEY, JSON.stringify(lpSaveEnvelope([])));
+    await seedIdb(page, SAVE_KEY, compressSaveString(JSON.stringify(lpSaveEnvelope([]))));
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
@@ -171,7 +172,7 @@ test.describe('Launch Pad', () => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     // Seed a save with the test rocket design.
     await page.goto('/');
-    await seedIdb(page, SAVE_KEY, JSON.stringify(lpSaveEnvelope([SEEDED_DESIGN])));
+    await seedIdb(page, SAVE_KEY, compressSaveString(JSON.stringify(lpSaveEnvelope([SEEDED_DESIGN]))));
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
@@ -232,7 +233,7 @@ test.describe('Launch Pad', () => {
     poorEnvelope.state.money = 5_000;
 
     await page.goto('/');
-    await seedIdb(page, SAVE_KEY, JSON.stringify(poorEnvelope));
+    await seedIdb(page, SAVE_KEY, compressSaveString(JSON.stringify(poorEnvelope)));
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 

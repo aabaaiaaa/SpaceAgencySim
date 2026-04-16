@@ -79,18 +79,22 @@ describe('showNotification()', () => {
   it('error type sets red background', () => {
     showNotification('Oops', 'error');
     const toast = getToasts()[0];
-    expect(toast.style.backgroundColor).toBe('#cc3333');
+    // jsdom normalizes hex colors to rgb() format when read back
+    expect(toast.style.backgroundColor).toBe('rgb(204, 51, 51)');
   });
 
   it('dismissed toasts cause remaining toasts to restack', () => {
     showNotification('First');
+    // Advance 1s so Second toast has a later dismiss time
+    vi.advanceTimersByTime(1000);
     showNotification('Second');
 
-    // Dismiss the first toast
-    vi.advanceTimersByTime(4000);
+    // Advance 3000ms more to hit First's 4s dismiss mark (total 4s from First)
+    vi.advanceTimersByTime(3000);
+    // Advance 300ms for First's fade-out
     vi.advanceTimersByTime(300);
 
-    // Only second toast remains
+    // Only second toast remains (its timer hasn't expired yet)
     const remaining = getToasts();
     expect(remaining).toHaveLength(1);
     expect(remaining[0].textContent).toBe('Second');

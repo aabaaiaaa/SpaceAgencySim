@@ -3,6 +3,7 @@ import type { Browser, BrowserContext, Page } from '@playwright/test';
 import {
   VP_W, VP_H, SAVE_KEY, STARTING_MONEY,
   buildSaveEnvelope, seedAndLoadSave, seedIdb, dismissWelcomeModal,
+  compressSaveString,
 } from './helpers.js';
 import type { SaveEnvelope } from './helpers.js';
 
@@ -110,9 +111,9 @@ test.describe('App Load & New Game Flow', () => {
 
     // Navigate first to establish origin for IDB access, then seed and reload.
     await p.goto('/');
-    await seedIdb(p, SAVE_KEY, JSON.stringify(
+    await seedIdb(p, SAVE_KEY, compressSaveString(JSON.stringify(
       buildSaveEnvelope({ saveName: SAVE_NAME, agencyName: AGENCY_NAME, money: MONEY }),
-    ));
+    )));
     await p.goto('/');
     await p.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 

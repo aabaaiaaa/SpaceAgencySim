@@ -4,7 +4,6 @@ import {
   saveGame,
   loadGame,
   deleteSave,
-  SAVE_VERSION,
   _setSessionStartTimeForTesting,
   decompressSaveData,
 } from '../core/saveload.ts';
@@ -287,21 +286,14 @@ describe('idbStorage module', () => {
 });
 
 // ---------------------------------------------------------------------------
-// saveGame() — IndexedDB mirroring
+// saveGame() — IDB-only persistence
 // ---------------------------------------------------------------------------
 
-describe('saveGame() IndexedDB mirroring', () => {
-  it('writes to both localStorage and IndexedDB', async () => {
+describe('saveGame() IDB persistence', () => {
+  it('writes to IndexedDB', async () => {
     const state = freshState();
     state.money = 42_000;
-    await saveGame(state, 0, 'Mirror Test');
-
-    // localStorage should have the save immediately.
-    const lsRaw = localStorage.getItem('spaceAgencySave_0');
-    expect(lsRaw).not.toBeNull();
-
-    // IndexedDB write is fire-and-forget; flush microtasks.
-    await vi.runAllTimersAsync();
+    await saveGame(state, 0, 'IDB Test');
 
     const idbRaw = await idbGet('spaceAgencySave_0');
     expect(idbRaw).not.toBeNull();
@@ -309,170 +301,45 @@ describe('saveGame() IndexedDB mirroring', () => {
     const idbEnvelope = JSON.parse(idbJson) as TestSaveEnvelope;
     expect(idbEnvelope.state.money).toBe(42_000);
   });
-
-  it('still saves to localStorage when IndexedDB is unavailable', async () => {
-    vi.stubGlobal('indexedDB', undefined);
-    _resetDbForTesting();
-
-    const state = freshState();
-    state.money = 99_000;
-    await saveGame(state, 0, 'LS Only');
-
-    const raw = localStorage.getItem('spaceAgencySave_0');
-    expect(raw).not.toBeNull();
-    const json = decompressSaveData(raw!);
-    const envelope = JSON.parse(json) as TestSaveEnvelope;
-    expect(envelope.state.money).toBe(99_000);
-  });
 });
 
 // ---------------------------------------------------------------------------
-// deleteSave() — IndexedDB mirroring
+// deleteSave() — IDB deletion
 // ---------------------------------------------------------------------------
 
-describe('deleteSave() IndexedDB mirroring', () => {
-  it('removes from both localStorage and IndexedDB', async () => {
+describe('deleteSave() IDB deletion', () => {
+  it('removes from IndexedDB', async () => {
     const state = freshState();
     await saveGame(state, 1, 'To Delete');
-    await vi.runAllTimersAsync();
 
-    // Verify both have the save.
-    expect(localStorage.getItem('spaceAgencySave_1')).not.toBeNull();
     expect(await idbGet('spaceAgencySave_1')).not.toBeNull();
 
     await deleteSave(1);
-    await vi.runAllTimersAsync();
 
-    expect(localStorage.getItem('spaceAgencySave_1')).toBeNull();
     expect(await idbGet('spaceAgencySave_1')).toBeNull();
   });
 });
 
 // ---------------------------------------------------------------------------
-// loadGame() — dual-layer loading
+// loadGame()
 // ---------------------------------------------------------------------------
 
 describe('loadGame()', () => {
-  it('loads from localStorage when both layers have the same save', async () => {
+  it('loads a saved game from IDB', async () => {
     const state = freshState();
     state.money = 50_000;
-    await saveGame(state, 0, 'Dual');
-    await vi.runAllTimersAsync();
+    await saveGame(state, 0, 'Test');
 
     const restored = await loadGame(0);
     expect(restored.money).toBe(50_000);
   });
 
-  it('uses the more recent save when IndexedDB has a newer timestamp', async () => {
-    // Write an older save to localStorage.
-    const oldState = freshState();
-    oldState.money = 10_000;
-    const oldEnvelope: TestSaveEnvelope = {
-      saveName: 'Old',
-      timestamp: '2025-01-01T00:00:00.000Z',
-      version: SAVE_VERSION,
-      state: JSON.parse(JSON.stringify(oldState)) as GameState,
-    };
-    localStorage.setItem('spaceAgencySave_0', JSON.stringify(oldEnvelope));
-
-    // Write a newer save directly to IndexedDB.
-    const newState = freshState();
-    newState.money = 99_000;
-    const newEnvelope: TestSaveEnvelope = {
-      saveName: 'New',
-      timestamp: '2025-06-01T00:00:00.000Z',
-      version: SAVE_VERSION,
-      state: JSON.parse(JSON.stringify(newState)) as GameState,
-    };
-    await idbSet('spaceAgencySave_0', JSON.stringify(newEnvelope));
-
-    const restored = await loadGame(0);
-    expect(restored.money).toBe(99_000);
-  });
-
-  it('uses localStorage save when it is more recent than IndexedDB', async () => {
-    // Write an older save to IndexedDB.
-    const oldState = freshState();
-    oldState.money = 10_000;
-    const oldEnvelope: TestSaveEnvelope = {
-      saveName: 'Old IDB',
-      timestamp: '2025-01-01T00:00:00.000Z',
-      version: SAVE_VERSION,
-      state: JSON.parse(JSON.stringify(oldState)) as GameState,
-    };
-    await idbSet('spaceAgencySave_0', JSON.stringify(oldEnvelope));
-
-    // Write a newer save to localStorage.
-    const newState = freshState();
-    newState.money = 77_000;
-    const newEnvelope: TestSaveEnvelope = {
-      saveName: 'New LS',
-      timestamp: '2025-06-01T00:00:00.000Z',
-      version: SAVE_VERSION,
-      state: JSON.parse(JSON.stringify(newState)) as GameState,
-    };
-    localStorage.setItem('spaceAgencySave_0', JSON.stringify(newEnvelope));
-
-    const restored = await loadGame(0);
-    expect(restored.money).toBe(77_000);
-  });
-
-  it('falls back to IndexedDB when localStorage is empty', async () => {
-    const state = freshState();
-    state.money = 88_000;
-    const envelope: TestSaveEnvelope = {
-      saveName: 'IDB Only',
-      timestamp: '2025-03-01T00:00:00.000Z',
-      version: SAVE_VERSION,
-      state: JSON.parse(JSON.stringify(state)) as GameState,
-    };
-    await idbSet('spaceAgencySave_2', JSON.stringify(envelope));
-
-    const restored = await loadGame(2);
-    expect(restored.money).toBe(88_000);
-  });
-
-  it('falls back to localStorage when IndexedDB is unavailable', async () => {
-    const state = freshState();
-    state.money = 33_000;
-    // Save while IDB is available.
-    await saveGame(state, 0, 'LS Fallback');
-    await vi.runAllTimersAsync();
-
-    // Now make IDB unavailable.
-    vi.stubGlobal('indexedDB', undefined);
-    _resetDbForTesting();
-
-    const restored = await loadGame(0);
-    expect(restored.money).toBe(33_000);
-  });
-
-  it('throws when both layers are empty', async () => {
+  it('throws when slot is empty', async () => {
     await expect(loadGame(3)).rejects.toThrow(/empty/i);
   });
 
   it('throws RangeError for invalid slot index', async () => {
     await expect(loadGame(-1)).rejects.toThrow(RangeError);
     await expect(loadGame(5)).rejects.toThrow(RangeError);
-  });
-
-  it('restores IndexedDB save to localStorage for subsequent sync loads', async () => {
-    // Put a save only in IndexedDB.
-    const state = freshState();
-    state.money = 55_000;
-    const envelope: TestSaveEnvelope = {
-      saveName: 'Sync Restore',
-      timestamp: '2025-04-01T00:00:00.000Z',
-      version: SAVE_VERSION,
-      state: JSON.parse(JSON.stringify(state)) as GameState,
-    };
-    await idbSet('spaceAgencySave_0', JSON.stringify(envelope));
-
-    // loadGame should write it back to localStorage.
-    await loadGame(0);
-
-    // Now loadGame should work.
-    const syncRestored = await loadGame(0);
-    expect(syncRestored.money).toBe(55_000);
   });
 });

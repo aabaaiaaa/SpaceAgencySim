@@ -41,6 +41,7 @@ vi.mock('../core/idbStorage.js', () => ({
 import {
   saveGame,
   importSave,
+  compressSaveData,
   _setSessionStartTimeForTesting,
 } from '../core/saveload.ts';
 import {
@@ -48,6 +49,7 @@ import {
   loadSharedLibrary,
 } from '../core/designLibrary.ts';
 import { idbSet } from '../core/idbStorage.ts';
+import { crc32 } from '../core/crc32.ts';
 
 beforeEach(() => {
   _idbStore.clear();
@@ -69,12 +71,37 @@ function freshState(): GameState {
   return createGameState();
 }
 
-function minimalEnvelopeJSON(): string {
-  const state = freshState();
-  return JSON.stringify({
+/** Build a base64-encoded SASV binary envelope from a JSON envelope object. */
+function buildBinaryImport(data: Record<string, unknown>): string {
+  const json = JSON.stringify(data);
+  const lzc = compressSaveData(json);
+  const encoder = new TextEncoder();
+  const payloadBytes = encoder.encode(lzc);
+  const checksum = crc32(payloadBytes);
+
+  const header = new Uint8Array(14);
+  const view = new DataView(header.buffer);
+  header[0] = 0x53; header[1] = 0x41; header[2] = 0x53; header[3] = 0x56;
+  view.setUint16(4, 1, false);
+  view.setUint32(6, checksum, false);
+  view.setUint32(10, payloadBytes.length, false);
+
+  const envelope = new Uint8Array(14 + payloadBytes.length);
+  envelope.set(header, 0);
+  envelope.set(payloadBytes, 14);
+
+  let binary = '';
+  for (let i = 0; i < envelope.length; i++) {
+    binary += String.fromCharCode(envelope[i]);
+  }
+  return btoa(binary);
+}
+
+function minimalBinaryImport(): string {
+  return buildBinaryImport({
     saveName: 'Test Save',
     timestamp: new Date(0).toISOString(),
-    state,
+    state: freshState(),
   });
 }
 
@@ -84,18 +111,31 @@ function minimalEnvelopeJSON(): string {
 
 describe('saveGame() error handling', () => {
   it('throws a user-friendly message on IDB write failure', async () => {
-    vi.mocked(idbSet).mockRejectedValueOnce(new Error('IDB write failed'));
+    // saveGame calls idbSet multiple times (settings + save data).
+    // Reject ALL calls so the save data write also fails.
+    vi.mocked(idbSet).mockRejectedValue(new Error('IDB write failed'));
 
     await expect(saveGame(freshState(), 0, 'test')).rejects.toThrow(
       /IDB write failed/i,
     );
+
+    // Restore default mock behavior.
+    vi.mocked(idbSet).mockImplementation((key: string, value: string) => {
+      _idbStore.set(key, value);
+      return Promise.resolve();
+    });
   });
 
   it('does not swallow non-quota errors', async () => {
     const otherError = new TypeError('something else broke');
-    vi.mocked(idbSet).mockRejectedValueOnce(otherError);
+    vi.mocked(idbSet).mockRejectedValue(otherError);
 
     await expect(saveGame(freshState(), 0, 'test')).rejects.toThrow(otherError);
+
+    vi.mocked(idbSet).mockImplementation((key: string, value: string) => {
+      _idbStore.set(key, value);
+      return Promise.resolve();
+    });
   });
 });
 
@@ -105,18 +145,20 @@ describe('saveGame() error handling', () => {
 
 describe('importSave() error handling', () => {
   it('throws on IDB write failure', async () => {
+    const base64 = minimalBinaryImport();
     vi.mocked(idbSet).mockRejectedValueOnce(new Error('IDB write failed'));
 
-    await expect(importSave(minimalEnvelopeJSON(), 0)).rejects.toThrow(
+    await expect(importSave(base64, 0)).rejects.toThrow(
       /IDB write failed/i,
     );
   });
 
   it('does not swallow other errors', async () => {
+    const base64 = minimalBinaryImport();
     const otherError = new Error('disk on fire');
     vi.mocked(idbSet).mockRejectedValueOnce(otherError);
 
-    await expect(importSave(minimalEnvelopeJSON(), 0)).rejects.toThrow(otherError);
+    await expect(importSave(base64, 0)).rejects.toThrow(otherError);
   });
 });
 

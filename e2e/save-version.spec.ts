@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { buildSaveEnvelope, SAVE_KEY, seedIdb, seedIdbMulti } from './helpers.js';
+import { buildSaveEnvelope, SAVE_KEY, seedIdb, seedIdbMulti, compressSaveString } from './helpers.js';
 import type { SaveEnvelope } from './helpers.js';
 
 /**
@@ -16,7 +16,7 @@ test.describe('Save Version Indicator', () => {
     // Seed a save with the current SAVE_VERSION.
     const envelope: SaveEnvelope = buildSaveEnvelope({ saveName: 'Current Version' });
     await page.goto('/');
-    await seedIdb(page, SAVE_KEY, JSON.stringify(envelope));
+    await seedIdb(page, SAVE_KEY, compressSaveString(JSON.stringify(envelope)));
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
@@ -32,7 +32,7 @@ test.describe('Save Version Indicator', () => {
     // Seed a save with version 0 (simulating a pre-versioning save).
     const envelope: SaveEnvelope = buildSaveEnvelope({ version: 0, saveName: 'Old Version' });
     await page.goto('/');
-    await seedIdb(page, SAVE_KEY, JSON.stringify(envelope));
+    await seedIdb(page, SAVE_KEY, compressSaveString(JSON.stringify(envelope)));
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 
@@ -53,8 +53,8 @@ test.describe('Save Version Indicator', () => {
     const oldEnvelope: SaveEnvelope = buildSaveEnvelope({ version: 0, saveName: 'Old Save' });
     await page.goto('/');
     await seedIdbMulti(page, [
-      { key: SAVE_KEY, value: JSON.stringify(currentEnvelope) },
-      { key: 'spaceAgencySave_1', value: JSON.stringify(oldEnvelope) },
+      { key: SAVE_KEY, value: compressSaveString(JSON.stringify(currentEnvelope)) },
+      { key: 'spaceAgencySave_1', value: compressSaveString(JSON.stringify(oldEnvelope)) },
     ]);
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
@@ -81,7 +81,7 @@ test.describe('Save Version Indicator', () => {
     // Seed a save with the current version.
     const envelope: SaveEnvelope = buildSaveEnvelope({ saveName: 'Current Save' });
     await page.goto('/');
-    await seedIdb(page, SAVE_KEY, JSON.stringify(envelope));
+    await seedIdb(page, SAVE_KEY, compressSaveString(JSON.stringify(envelope)));
     await page.goto('/');
     await page.waitForSelector('#mm-load-screen', { state: 'visible', timeout: 10_000 });
 

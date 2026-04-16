@@ -9,6 +9,7 @@ import {
   teleportCraft,
   openSettingsPanel,
   dismissWelcomeModal,
+  compressSaveString,
 } from './helpers.js';
 
 /**
@@ -93,7 +94,7 @@ test.describe('Auto-Save System', () => {
     await page.goto('/');
     await seedIdbMulti(page, envelopes.map((env, i) => ({
       key: `spaceAgencySave_${i}`,
-      value: JSON.stringify(env),
+      value: compressSaveString(JSON.stringify(env)),
     })));
 
     // Reload so the app discovers the seeded saves.
@@ -158,9 +159,9 @@ test.describe('Auto-Save System', () => {
     await seedIdbMulti(page, [
       ...manualEnvelopes.map((env, i) => ({
         key: `spaceAgencySave_${i}`,
-        value: JSON.stringify(env),
+        value: compressSaveString(JSON.stringify(env)),
       })),
-      { key: 'spaceAgencySave_auto', value: JSON.stringify(autoSaveEnvelope) },
+      { key: 'spaceAgencySave_auto', value: compressSaveString(JSON.stringify(autoSaveEnvelope)) },
     ]);
 
     // Reload to pick up the seeded saves.
