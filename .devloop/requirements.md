@@ -1,154 +1,198 @@
-# Iteration 17 — Test Stability, Defensive Guards, Error Handling & Cleanup
+# Iteration 18 — Review Gaps, Resilience & Tooling
 
 **Date:** 2026-04-16
-**Scope:** Flaky test fix, collision.ts defensive guards, IDB-unavailable user error, test log noise suppression, smoke tag additions, pure helper extraction
-**Builds on:** Iteration 16 (IndexedDB migration, Vitest 4 upgrade, notification queue)
-**Review driving this iteration:** `.devloop/archive/iteration-16/review.md`
+**Scope:** test-map.json gaps, smoke tag additions, collision MoI guard, showFatalError extraction, test-map auto-generation fix, IDB mid-session resilience
+**Builds on:** Iteration 17 (flaky test fix, collision guards, IDB startup error, log suppression, smoke tags, preview extraction)
+**Review driving this iteration:** `.devloop/archive/iteration-17/review.md`
 
 ---
 
-## 1. Fix Flaky workerBridgeTimeout Test
+## 1. Move showFatalError to a Dedicated UI Module
 
-**Location:** `src/tests/workerBridgeTimeout.test.ts`, line 110
+**Problem:** `showFatalError()` is defined in `src/main.ts` (lines 68-78) and exported from there. If other modules need to show fatal errors (e.g., IDB connection drop during gameplay — see section 5), they'd need to import from `main.ts`, creating circular dependency risk. The function is a UI utility, not app bootstrapping logic.
 
-**Problem:** The test `consumeMainThreadSnapshot returns null when no snapshot available` times out at 5000ms when run in the full suite, but passes reliably in isolation (29ms). The root cause is module-level state contention: the test uses a dynamic `import()` of `_workerBridge.ts` and calls `terminatePhysicsWorker()`, which races with other tests that also import the same module under Vitest's parallel worker pool.
+**Fix:** Extract `showFatalError` into a new file `src/ui/fatalError.ts`. The function body and its export move unchanged. Then:
 
-**Fix:** Isolate the module state per test. The `afterEach` already calls `terminatePhysicsWorker()` and `vi.restoreAllMocks()`, but the dynamic import shares cached module state across the worker. Options:
+- `src/main.ts` imports `showFatalError` from `./ui/fatalError.ts` instead of defining it locally. Remove the local function definition and the `export` keyword from main.ts.
+- `src/tests/mainStartup.test.ts` needs updated mocks:
+  - Add a `vi.mock('../ui/fatalError.ts', ...)` that exposes a hoisted mock for `showFatalError`.
+  - The two startup tests (IDB unavailable, IDB available) should assert against the mocked `showFatalError` directly rather than inspecting `document.body.appendChild`. This is cleaner and more robust.
+  - The third test (`showFatalError` direct testing) should import from `../ui/fatalError.ts` instead of `../main.ts`.
+- Verify: `npm run typecheck` passes, `npx vitest run src/tests/mainStartup.test.ts` passes.
 
-- **Option A (preferred):** Use `vi.resetModules()` in `beforeEach` to force a fresh module instance per test, ensuring no shared state leaks between tests. This is the cleanest approach.
-- **Option B:** Add `{ timeout: 15000 }` to the specific test. This masks the symptom rather than fixing the cause — use only if Option A causes other issues.
-
-After the fix, verify the test passes both in isolation (`npx vitest run src/tests/workerBridgeTimeout.test.ts`) and in the full suite (`npm run test:unit`). The test should complete in well under 1 second.
-
----
-
-## 2. Defensive Division Guards in collision.ts
-
-**Location:** `src/core/collision.ts`, lines 495-544 (function `_resolveCollision`)
-
-**Problem:** The collision response code divides by `a.mass!`, `b.mass!`, `Ia`, and `Ib` at multiple locations without local guards:
-
-- Line 495: `1 / a.mass! + 1 / b.mass!` (inverse mass sum)
-- Lines 499-502: `j / a.mass!` and `j / b.mass!` (velocity impulse)
-- Lines 530, 534: `torqueA * dt / Ia` and `torqueB * dt / Ib` (angular impulse)
-- Lines 541-544: `1 / a.mass!` and `1 / b.mass!` (positional correction)
-
-These divisions are currently safe because `_bodyMass()` (line 198) returns `Math.max(1, mass)` and `_bodyMoI()` (line 238) returns `Math.max(1, I)`. However, the division code relies entirely on this upstream guarantee. If the helpers are ever modified, the collision system will silently produce NaN/Infinity.
-
-**Fix:** Add an early-return guard at the top of `_resolveCollision()`, before any division:
-
+**The new file `src/ui/fatalError.ts` should contain only:**
 ```typescript
-if (!a.mass || a.mass <= 0 || !b.mass || b.mass <= 0) return;
+export function showFatalError(message: string): void {
+  const el = document.createElement('div');
+  el.style.cssText = [
+    'position:fixed', 'inset:0', 'display:flex', 'align-items:center',
+    'justify-content:center', 'background:#000', 'color:#b0d0f0',
+    'font-family:system-ui,sans-serif', 'font-size:1.2rem',
+    'padding:2rem', 'text-align:center', 'z-index:9999',
+  ].join(';');
+  el.textContent = message;
+  document.body.appendChild(el);
+}
 ```
 
-This matches the defensive pattern used at four locations in `physics.ts` (lines 1023, 1081, 1127, 1463) and makes the collision code self-protecting.
-
-**Tests:** Add a unit test in `src/tests/collision.test.ts` (or the appropriate existing test file) that verifies `_resolveCollision` does not produce NaN/Infinity when given zero-mass bodies. If `_resolveCollision` is not directly exported, test through the public collision API that calls it.
-
 ---
 
-## 3. IDB-Unavailable Startup Error
+## 2. Add Ia/Ib Defensive Guard in collision.ts
 
-**Problem:** With IndexedDB as the sole storage backend, if IDB is unavailable (e.g., private browsing in older Safari, storage quota exceeded, browser security restrictions), the game fails silently. `main.ts:228-230` catches the error with `logger.error()` to the console only — the player sees a blank or broken page with no explanation.
+**Location:** `src/core/collision.ts`, lines 531-538 (inside `_resolveCollision`)
 
-The `isIdbAvailable()` function exists in `idbStorage.ts:79-81` but is never called at startup.
+**Problem:** The function divides by `Ia` (moment of inertia of body A) and `Ib` (body B) at lines 533 and 537. These are protected upstream by `_bodyMoI()` returning `Math.max(1, I)` (line 238), but the division code relies entirely on this upstream guarantee. The mass guard at line 457 was added in iteration 17 but only covers mass divisions — the MoI divisions remain unguarded.
 
-**Fix:** Add an IDB availability check at the very start of `main()` in `src/main.ts`, before `initSettings()`. If `isIdbAvailable()` returns false, display a user-visible error message in the DOM and return early (do not continue initialization). The error should:
-
-- Be displayed in the existing `#ui-overlay` element (or a new element if the overlay isn't yet available at that point)
-- Use plain, non-technical language: e.g., "This game requires IndexedDB for saving. Your browser may be blocking storage access. Try disabling private browsing mode or checking your browser settings."
-- Be styled consistently with the game's existing UI (dark background, readable text)
-- Not attempt to initialize the renderer, settings, or any other system
-
-Also update the generic `main().catch()` handler at line 228 to display a visible error in the DOM rather than only logging to console, since any uncaught startup error (not just IDB) leaves the player stranded on a blank page.
-
-**Tests:** Add a unit test that verifies: when `isIdbAvailable()` returns false, the startup path displays an error and does not call `initSettings()`. This may require extracting the check into a testable function.
-
----
-
-## 4. Suppress Debug Log Spam in Tests
-
-**Problem:** The test suite outputs hundreds of `[DEBUG] [save] Compression stats` lines during `npm run test:unit`. This comes from `src/core/saveload.ts:343`:
+**Fix:** Add inline guards around each MoI division, without early-returning from the function (since the positional correction below doesn't depend on MoI):
 
 ```typescript
-logger.debug('save', 'Compression stats', { rawSize, compressedSize, ratio });
+// Before (line 533):
+a.ref.angularVelocity += torqueA * dt / Ia;
+
+// After:
+if (Ia > 0) a.ref.angularVelocity += torqueA * dt / Ia;
+
+// Before (line 537):
+b.ref.angularVelocity += torqueB * dt / Ib;
+
+// After:
+if (Ib > 0) b.ref.angularVelocity += torqueB * dt / Ib;
 ```
 
-The logger (`src/core/logger.ts:16`) defaults to `'debug'` level in non-production environments, so all debug output appears during test runs. Other test files (like `branchCoverage.test.ts`) already call `logger.setLevel('warn')` to suppress this, but `saveload.test.ts` and several other high-traffic test files don't.
+This uses inline guards (not early return) because only the angular impulse depends on MoI — the positional correction at lines 541-548 should still execute.
 
-**Fix:** Add `logger.setLevel('warn')` in the `beforeEach` (or `beforeAll`) of test files that exercise save/load code paths, and restore the original level in `afterEach`/`afterAll`. The affected test files are:
-
-- `src/tests/saveload.test.ts` (primary source of compression stats spam)
-- `src/tests/autoSave.test.ts`
-- `src/tests/storageErrors.test.ts`
-- `src/tests/debugMode.test.ts`
-
-Alternatively, if there's a Vitest setup file that runs before all tests, setting the logger level there would be a single-point fix. Check for `vitest.setup.ts` or similar.
-
-After the fix, run `npm run test:unit` and verify that `[DEBUG]` lines no longer appear in the output (warnings and errors should still appear).
+**Tests:** The existing test at `collision.test.ts:453` ("does not produce NaN or Infinity with minimal-mass colliding bodies") already exercises this code path through `tickCollisions`. The `_bodyMoI` function guarantees `>= 1`, so the guard is defense-in-depth. No new test is required — the existing test verifies finite angular velocity.
 
 ---
 
-## 5. Add @smoke Tags to IDB Round-Trip Tests
+## 3. Add @smoke Tags to mainStartup.test.ts and previewLayout.test.ts
 
-**Context:** The `@smoke` tag system allows running a fast subset of critical-path tests. Currently only one IDB test has a smoke tag (`saveload.test.ts:1372` — compressed save/load cycle). The IDB migration was the largest change in iteration 16, and the core persistence path should have better smoke coverage.
+**Problem:** Two critical-path test files created in iteration 17 have no `@smoke` tags:
+- `mainStartup.test.ts` — tests the IDB startup check. If this breaks, the game won't load.
+- `previewLayout.test.ts` — tests the extracted preview scaling math used by rocket card rendering.
 
-**Add `@smoke` to these tests:**
+**Fix:** Add `@smoke` to the test description string of one representative test in each file:
 
-- **`saveload.test.ts`**: One test for `listSaves()` returning saved games (verifies IDB key scanning works)
-- **`autoSave.test.ts`**: One test for the auto-save round-trip (trigger → check exists → load)
-- **`settingsStore.test.ts`**: One test for settings persistence round-trip (save → load from IDB → verify cache)
-- **`idbStorage.test.ts`**: One test for basic `idbSet` → `idbGet` round-trip
+- **`mainStartup.test.ts`:** Tag `'shows fatal error and does not call initSettings when IDB is unavailable @smoke'` — this is the most critical path (startup failure handling).
+- **`previewLayout.test.ts`:** Tag `'computes scale that fits multiple parts within preview bounds @smoke'` — this exercises the most common code path (multiple parts).
 
-Pick the most representative test in each file — the one that exercises the broadest code path. Tag it by adding `@smoke` to its description string.
-
-After tagging, verify with `npm run test:smoke:unit` that the new smoke tests are discovered and pass.
-
-Also update `test-map.json` if any new mappings are needed for the affected test files.
+**Verify:** `npm run test:smoke:unit` discovers and passes the new smoke tests.
 
 ---
 
-## 6. Extract Preview Scaling Math from rocketCardUtil.ts
+## 4. Update generate-test-map.mjs for src/main.ts
 
-**Location:** `src/ui/rocketCardUtil.ts`, lines 110-133
+**Problem:** `src/main.ts` is not classified by the test-map generator because `classifySource()` only handles files matching `src/{layer}/{module}.ts` (two path segments). Root-level files like `src/main.ts` return `null` and are silently ignored. This means `mainStartup.test.ts` (which imports `main.ts`) won't be mapped to any area.
 
-**Context:** The review identified three helper extraction candidates. Two are already done:
-- `_staging.ts` → `computeStageDeltaV` already extracted to `src/core/stagingCalc.ts`
-- `map.ts` → orbit math already imported from `core/orbit.ts`, `core/mapView.ts`, `core/mapGeometry.ts`
+**Fix:** Add `src/main.ts` to the `SOURCE_GROUPS` object in `scripts/generate-test-map.mjs`:
 
-The remaining candidate is `rocketCardUtil.ts`, which contains ~10 lines of pure preview scaling math embedded in the canvas rendering function `renderRocketPreview()`.
+```javascript
+'app/main': ['src/main.ts'],
+```
 
-**What to extract:** The bounding-box calculation (lines 95-106: min/max X/Y from parts) and the scale/offset computation (lines 110-121: computing `scale`, `cx`, `cy`, `midX`, `midY` from the bounding box and preview dimensions) are pure geometry with no DOM or canvas dependency. The actual canvas drawing (lines 122-133: `ctx.fillRect`/`ctx.strokeRect`) stays in the UI module.
+This creates an `app/main` area that the import analysis will associate with `mainStartup.test.ts`. After the `showFatalError` extraction (section 1), `mainStartup.test.ts` will also import `src/ui/fatalError.ts`, which auto-classifies as `ui/fatalError`.
 
-**Extract to:** A new function in an existing core utility or a small new file (e.g., `src/core/previewLayout.ts`) that takes an array of part positions/sizes and preview dimensions, and returns `{ scale, offsetX, offsetY }`. The UI function then uses these values for the canvas drawing.
+Additionally, after section 1 creates `src/ui/fatalError.ts`, the generator will auto-discover:
+- `src/ui/fatalError.ts` → area `ui/fatalError` (standard `src/{layer}/{module}.ts` pattern)
+- `src/core/previewLayout.ts` → area `core/previewLayout` (already auto-discovered)
+- `src/ui/notification.ts` → area `ui/notification` (already auto-discovered)
 
-**Tests:** Add a unit test for the extracted function: given known part positions and preview dimensions, verify the computed scale and offsets are correct. Test edge cases: single part, parts in a vertical line (rocketW ≈ 0), parts in a horizontal line (rocketH ≈ 0).
+**After modifying the script, regenerate `test-map.json`:**
+```bash
+node scripts/generate-test-map.mjs
+```
+
+**Verify:** The output JSON contains:
+- An `app/main` area with `src/main.ts` in sources and `src/tests/mainStartup.test.ts` in unit
+- A `core/previewLayout` area with `src/core/previewLayout.ts` in sources and `src/tests/previewLayout.test.ts` in unit
+- A `ui/notification` area with `src/ui/notification.ts` in sources and `src/tests/notification.test.ts` in unit
+- A `ui/fatalError` area with `src/ui/fatalError.ts` in sources and `src/tests/mainStartup.test.ts` in unit
+
+---
+
+## 5. IDB Mid-Session Resilience
+
+**Problem:** The iteration 17 startup check handles "IDB unavailable at page load", but if IndexedDB becomes unavailable *during* gameplay (e.g., storage pressure eviction on mobile, user clearing site data in another tab), IDB operations will silently fail. The `openDB()` function caches a single `IDBDatabase` connection; if that connection dies, all subsequent operations reject with opaque errors, and the player gets no visible feedback.
+
+**Fix:** Add connection-level error handling to `idbStorage.ts`:
+
+1. **Add a callback registration function:**
+   ```typescript
+   let _onConnectionLost: ((msg: string) => void) | null = null;
+
+   export function registerIdbErrorHandler(handler: (msg: string) => void): void {
+     _onConnectionLost = handler;
+   }
+   ```
+
+2. **In `openDB()`, after `_db = request.result`, attach an `onclose` handler:**
+   ```typescript
+   _db.onclose = () => {
+     _db = null;
+     _dbPromise = null;
+     if (_onConnectionLost) {
+       _onConnectionLost(
+         'The storage connection was unexpectedly closed. ' +
+         'Your recent progress may not be saved. Try refreshing the page.',
+       );
+     }
+   };
+   ```
+
+   The `onclose` event fires when the browser forcibly closes the IDB connection (storage eviction, private browsing cleanup, etc.). Resetting `_db` and `_dbPromise` allows a reconnection attempt on the next operation.
+
+3. **In `main.ts`, register the handler after startup:**
+   ```typescript
+   import { registerIdbErrorHandler } from './core/idbStorage.ts';
+   import { showFatalError } from './ui/fatalError.ts';
+
+   // Inside main(), after the IDB availability check passes:
+   registerIdbErrorHandler(showFatalError);
+   ```
+
+4. **Also reset the handler in `_resetDbForTesting()`** so tests don't leak callbacks:
+   ```typescript
+   export function _resetDbForTesting(): void {
+     if (_db) _db.close();
+     _db = null;
+     _dbPromise = null;
+     _onConnectionLost = null;
+   }
+   ```
+
+**Tests:** Add a test in `src/tests/idbStorage.test.ts` (or a new `src/tests/idbResilience.test.ts` if the existing file is too large) that:
+1. Registers a mock error handler via `registerIdbErrorHandler`
+2. Opens the DB (triggers `openDB` internally via `idbSet` or `idbGet`)
+3. Simulates the `onclose` event firing on the cached connection
+4. Verifies the handler was called with the expected message
+5. Verifies that `_db` was reset (subsequent operations attempt a fresh connection)
+
+Because `_db` is private, the test should verify behavior through the public API: after `onclose` fires, the next `idbSet`/`idbGet` call should attempt to reopen (or reject if IDB is truly gone).
 
 ---
 
 ## Testing Strategy
 
-| Area | What Changes |
-|------|-------------|
-| `workerBridgeTimeout.test.ts` | Add `vi.resetModules()` in beforeEach; verify passes in full suite |
-| `collision.test.ts` (or equivalent) | Add test for zero-mass collision guard |
-| `main.ts` / new startup test | Test IDB-unavailable error display |
-| `saveload.test.ts` | Add `logger.setLevel('warn')` to suppress debug spam |
-| `autoSave.test.ts` | Add `logger.setLevel('warn')` and `@smoke` tag |
-| `settingsStore.test.ts` | Add `@smoke` tag |
-| `idbStorage.test.ts` | Add `@smoke` tag |
-| `previewLayout.test.ts` (new) | Unit tests for extracted scaling math |
+| Area | What Changes | Verification |
+|------|-------------|-------------|
+| `src/ui/fatalError.ts` (new) | Extract showFatalError from main.ts | `npx vitest run src/tests/mainStartup.test.ts` |
+| `src/main.ts` | Import showFatalError, register IDB handler | `npx vitest run src/tests/mainStartup.test.ts` |
+| `src/core/collision.ts` | Add Ia/Ib inline guards | `npx vitest run src/tests/collision.test.ts` |
+| `src/tests/mainStartup.test.ts` | Update mocks, add @smoke tag | `npx vitest run --testNamePattern "@smoke" src/tests/mainStartup.test.ts` |
+| `src/tests/previewLayout.test.ts` | Add @smoke tag | `npx vitest run --testNamePattern "@smoke" src/tests/previewLayout.test.ts` |
+| `src/core/idbStorage.ts` | Add onclose handler, registerIdbErrorHandler | `npx vitest run src/tests/idbStorage.test.ts` |
+| `scripts/generate-test-map.mjs` | Add src/main.ts to SOURCE_GROUPS | `node scripts/generate-test-map.mjs --dry-run` |
+| `test-map.json` | Regenerated from script | Inspect output for new areas |
 
-### Verification
+### Final Verification
 
-After all changes: `npm run build`, `npm run typecheck`, `npm run lint`, and `npm run test:unit` must all pass with zero errors. `npm run test:smoke:unit` must include the newly tagged smoke tests.
+After all changes: `npm run build`, `npm run typecheck`, `npm run lint`, and `npm run test:unit` must all pass. `npm run test:smoke:unit` must include the newly tagged smoke tests.
 
 ---
 
 ## Technical Decisions
 
-- **Module isolation over timeouts.** The flaky test is fixed by resetting module cache, not by increasing timeouts. Timeouts mask problems.
-- **Early-return guard pattern.** Collision guards use early return (not clamping), matching the existing physics.ts defensive style.
-- **User-visible startup errors.** Any fatal startup error (IDB or otherwise) should produce a visible DOM message, not just a console log.
-- **Logger suppression in tests.** Per-file `logger.setLevel('warn')` in beforeEach/afterEach, not a global test setup change, to keep the fix targeted and visible.
-- **Minimal extraction scope.** Only the bounding-box and scale computation are extracted from rocketCardUtil.ts — the canvas rendering stays in place.
+- **Inline MoI guards, not early return.** The Ia/Ib guards use `if (Ia > 0)` around the single division line rather than early-returning from `_resolveCollision`, because the positional correction below doesn't depend on MoI and should still execute.
+- **Callback pattern for IDB resilience.** `idbStorage.ts` (core) cannot import from `src/ui/` (architecture rule). Instead, it exports a `registerIdbErrorHandler` callback that `main.ts` wires to `showFatalError`. This preserves the three-layer separation.
+- **Auto-generate over manual edits.** `test-map.json` is regenerated by running the script rather than hand-editing, ensuring consistency and catching any other unmapped files.
+- **Item 7 already complete.** The review suggested extracting pure delta-V computation from `ui/vab/_staging.ts`, but `computeStageDeltaV` was already extracted to `core/stagingCalc.ts` in a prior iteration. The remaining `_staging.ts` code is DOM rendering — no extractable pure logic remains.

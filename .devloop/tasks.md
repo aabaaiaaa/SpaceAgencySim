@@ -1,79 +1,73 @@
-# Iteration 17 — Tasks
+# Iteration 18 — Tasks
 
-### TASK-001: Fix flaky workerBridgeTimeout test with module isolation
-- **Status**: done
+### TASK-001: Extract showFatalError to src/ui/fatalError.ts
+- **Status**: pending
 - **Dependencies**: none
-- **Description**: In `src/tests/workerBridgeTimeout.test.ts`, add `vi.resetModules()` in `beforeEach` to force a fresh module instance per test, preventing shared state leaks across Vitest's parallel worker pool. The test `consumeMainThreadSnapshot returns null when no snapshot available` (line 110) times out intermittently in the full suite due to module-level state contention from the dynamic `import()` of `_workerBridge.ts`. After adding the reset, verify the dynamic import in each test gets a clean module. See requirements Section 1.
-- **Verification**: `npx vitest run src/tests/workerBridgeTimeout.test.ts` passes in under 5 seconds, then `npx vitest run src/tests/workerBridgeTimeout.test.ts src/tests/physics.test.ts src/tests/saveload.test.ts` passes (simulates parallel contention).
+- **Description**: Create `src/ui/fatalError.ts` containing the `showFatalError` function currently defined at `src/main.ts:68-78`. Copy the function body exactly as-is. The file should export only this one function. See requirements.md section 1 for the exact code.
+- **Verification**: `npx tsc --noEmit src/ui/fatalError.ts` (no type errors)
 
-### TASK-002: Add defensive division guard in collision.ts _resolveCollision
-- **Status**: done
-- **Dependencies**: none
-- **Description**: In `src/core/collision.ts`, add an early-return guard at the top of `_resolveCollision()` (before line 495) that returns if `a.mass` or `b.mass` is falsy or <= 0. This prevents NaN/Infinity from division by zero if `_bodyMass()` or `_bodyMoI()` are ever modified to remove their `Math.max(1, ...)` floor. The guard follows the same defensive pattern used in `physics.ts` at lines 1023, 1081, 1127, 1463. See requirements Section 2.
-- **Verification**: `npx vitest run src/tests/collision.test.ts` passes (or the file containing collision tests). Run `npm run typecheck` with no errors.
+### TASK-002: Update main.ts to import showFatalError from new location
+- **Status**: pending
+- **Dependencies**: TASK-001
+- **Description**: In `src/main.ts`: (1) Remove the `showFatalError` function definition (lines 68-78) and its JSDoc comment (lines 63-67). (2) Add `import { showFatalError } from './ui/fatalError.ts';` to the imports section. (3) Verify both usages at line ~87 (IDB check) and line ~258 (catch handler) still reference `showFatalError` correctly — they should work unchanged since the function signature is identical. Do NOT remove the `export` from the main function.
+- **Verification**: `npx tsc --noEmit src/main.ts` (no type errors)
 
-### TASK-003: Add unit test for zero-mass collision guard
-- **Status**: done
+### TASK-003: Update mainStartup.test.ts mocks for fatalError extraction
+- **Status**: pending
 - **Dependencies**: TASK-002
-- **Description**: Add a unit test verifying that the collision system does not produce NaN/Infinity when bodies have zero mass. If `_resolveCollision` is not directly exported, test through the public collision API. Create a scenario with two colliding bodies where mass would be zero (e.g., empty `activeParts` sets with mocked `_bodyMass` returning 0), and assert that resulting velocities/positions are finite numbers. See requirements Section 2.
-- **Verification**: `npx vitest run src/tests/collision.test.ts` passes, including the new test.
+- **Description**: In `src/tests/mainStartup.test.ts`: (1) Add a hoisted mock for `showFatalError` in the `mocks` object: `showFatalError: vi.fn()`. (2) Add `vi.mock('../ui/fatalError.ts', () => ({ showFatalError: mocks.showFatalError }));` to the module mocks section. (3) Update the first test ('shows fatal error...') to assert `expect(mocks.showFatalError).toHaveBeenCalledTimes(1)` and that the call argument contains 'IndexedDB', instead of checking `document.body.appendChild`. (4) Update the second test ('calls initSettings...') to assert `expect(mocks.showFatalError).not.toHaveBeenCalled()`. (5) Update the third test ('creates a styled error overlay...') to import `showFatalError` from `'../ui/fatalError.ts'` instead of `'../main.ts'`, and test it directly (this test can keep using the DOM stub approach since it tests the function's DOM behavior). Keep all existing assertions that still apply.
+- **Verification**: `npx vitest run src/tests/mainStartup.test.ts`
 
-### TASK-004: Add IDB availability check at startup
-- **Status**: done
+### TASK-004: Add Ia/Ib inline guards in collision.ts
+- **Status**: pending
 - **Dependencies**: none
-- **Description**: At the start of `main()` in `src/main.ts` (before `initSettings()` on line 68), add a check: if `isIdbAvailable()` returns false, display a user-visible error in the DOM and return early. Import `isIdbAvailable` from `./core/idbStorage.ts`. The error message should be plain language (e.g., "This game requires IndexedDB for saving. Your browser may be blocking storage access."), displayed in a styled div inserted into `document.body`, and should prevent any further initialization. See requirements Section 3.
-- **Verification**: `npm run typecheck` passes. `npm run build` succeeds. Manual inspection: the `isIdbAvailable()` call exists before `initSettings()`.
+- **Description**: In `src/core/collision.ts`, inside `_resolveCollision`, add inline guards before each moment-of-inertia division. At line 533: change `a.ref.angularVelocity += torqueA * dt / Ia;` to `if (Ia > 0) a.ref.angularVelocity += torqueA * dt / Ia;`. At line 537: change `b.ref.angularVelocity += torqueB * dt / Ib;` to `if (Ib > 0) b.ref.angularVelocity += torqueB * dt / Ib;`. This makes the angular impulse code self-protecting, consistent with the mass guard at line 457. See requirements.md section 2.
+- **Verification**: `npx vitest run src/tests/collision.test.ts`
 
-### TASK-005: Improve main.ts generic error handler to show visible errors
-- **Status**: done
-- **Dependencies**: TASK-004
-- **Description**: Update the `main().catch()` handler at `src/main.ts:228-230` to display a user-visible error in the DOM, not just `logger.error()`. Extract the error display logic from TASK-004 into a shared helper (e.g., `_showFatalError(message: string)`) that both the IDB check and the catch handler can use. The helper should create a styled overlay div with the error message. See requirements Section 3.
-- **Verification**: `npm run typecheck` passes. `npm run build` succeeds. Inspect `main.ts` — the catch handler now calls the visible error function.
+### TASK-005: Add @smoke tag to mainStartup.test.ts
+- **Status**: pending
+- **Dependencies**: TASK-003
+- **Description**: In `src/tests/mainStartup.test.ts`, add ` @smoke` to the description string of the first test: change `'shows fatal error and does not call initSettings when IDB is unavailable'` to `'shows fatal error and does not call initSettings when IDB is unavailable @smoke'`.
+- **Verification**: `npx vitest run --testNamePattern "@smoke" src/tests/mainStartup.test.ts`
 
-### TASK-006: Add unit test for IDB-unavailable startup path
-- **Status**: done
-- **Dependencies**: TASK-004, TASK-005
-- **Description**: Add a test that verifies: when `isIdbAvailable()` returns false, the startup error display function is invoked and `initSettings()` is not called. This may require extracting the IDB check into a testable function or mocking `isIdbAvailable`. If testing `main()` directly is impractical (DOM dependencies), test the extracted `_showFatalError` helper and the conditional logic separately. See requirements Section 3.
-- **Verification**: `npx vitest run` on the new test file passes.
-
-### TASK-007: Suppress debug log spam in saveload.test.ts
-- **Status**: done
+### TASK-006: Add @smoke tag to previewLayout.test.ts
+- **Status**: pending
 - **Dependencies**: none
-- **Description**: In `src/tests/saveload.test.ts`, add `logger.setLevel('warn')` in `beforeAll` (or the outermost `beforeEach`) and restore the original level in `afterAll`. Import `logger` from `../core/logger.ts`. This suppresses the hundreds of `[DEBUG] [save] Compression stats` lines that clutter test output. See requirements Section 4.
-- **Verification**: `npx vitest run src/tests/saveload.test.ts 2>&1 | grep -c "\[DEBUG\]"` returns 0 (no debug lines in output). All tests still pass.
+- **Description**: In `src/tests/previewLayout.test.ts`, add ` @smoke` to the description string of the second test: change `'computes scale that fits multiple parts within preview bounds'` to `'computes scale that fits multiple parts within preview bounds @smoke'`.
+- **Verification**: `npx vitest run --testNamePattern "@smoke" src/tests/previewLayout.test.ts`
 
-### TASK-008: Suppress debug log spam in remaining test files
-- **Status**: done
+### TASK-007: Add IDB connection-lost handler to idbStorage.ts
+- **Status**: pending
+- **Dependencies**: none
+- **Description**: In `src/core/idbStorage.ts`: (1) Add a module-level variable `let _onConnectionLost: ((msg: string) => void) | null = null;` after the existing module-level variables. (2) Export a registration function `registerIdbErrorHandler(handler: (msg: string) => void): void` that sets `_onConnectionLost = handler`. (3) In the `openDB()` function, after `_db = request.result;` (line 58), add a `_db.onclose` handler that resets `_db = null; _dbPromise = null;` and calls `_onConnectionLost` with the message: `'The storage connection was unexpectedly closed. Your recent progress may not be saved. Try refreshing the page.'`. (4) In `_resetDbForTesting()`, add `_onConnectionLost = null;` to prevent test callback leaks. See requirements.md section 5 for exact code.
+- **Verification**: `npx vitest run src/tests/idbStorage.test.ts`
+
+### TASK-008: Register IDB error handler in main.ts
+- **Status**: pending
+- **Dependencies**: TASK-002, TASK-007
+- **Description**: In `src/main.ts`: (1) Add `registerIdbErrorHandler` to the import from `'./core/idbStorage.ts'` (which already imports `isIdbAvailable`). (2) After the IDB availability check passes (after line ~93, before `await initSettings()`), add `registerIdbErrorHandler(showFatalError);`. This wires the IDB connection-lost event to the fatal error UI overlay.
+- **Verification**: `npx vitest run src/tests/mainStartup.test.ts`
+
+### TASK-009: Add unit test for IDB connection-lost handler
+- **Status**: pending
 - **Dependencies**: TASK-007
-- **Description**: Apply the same `logger.setLevel('warn')` pattern from TASK-007 to these test files: `src/tests/autoSave.test.ts`, `src/tests/storageErrors.test.ts`, `src/tests/debugMode.test.ts`. Each file should set logger level to `'warn'` in `beforeAll` and restore in `afterAll`. See requirements Section 4.
-- **Verification**: `npx vitest run src/tests/autoSave.test.ts src/tests/storageErrors.test.ts src/tests/debugMode.test.ts 2>&1 | grep -c "\[DEBUG\]"` returns 0. All tests pass.
+- **Description**: Add a test in `src/tests/idbStorage.test.ts` (in a new `describe` block named 'IDB connection-lost handler') that: (1) Registers a mock handler via `registerIdbErrorHandler(mockFn)`. (2) Performs an `idbSet` to force `openDB()` to run and cache `_db`. (3) Retrieves the cached DB's `onclose` handler and invokes it (simulating browser eviction). (4) Asserts the mock handler was called with a string containing 'unexpectedly closed'. (5) Asserts that a subsequent `idbSet`/`idbGet` attempts to reopen (doesn't use the stale connection). Import `registerIdbErrorHandler` from the module. The test may need to access internals through the `_resetDbForTesting` pattern — check what's already exported. Tag one test `@smoke` if it exercises a broad code path.
+- **Verification**: `npx vitest run src/tests/idbStorage.test.ts`
 
-### TASK-009: Add @smoke tags to IDB round-trip tests
-- **Status**: done
+### TASK-010: Add src/main.ts to generate-test-map.mjs SOURCE_GROUPS
+- **Status**: pending
 - **Dependencies**: none
-- **Description**: Add `@smoke` to the description of one representative test in each of these files: (1) `src/tests/saveload.test.ts` — a test for `listSaves()` returning saved games; (2) `src/tests/autoSave.test.ts` — a test for auto-save trigger → exists check → load; (3) `src/tests/settingsStore.test.ts` — a test for settings persistence round-trip; (4) `src/tests/idbStorage.test.ts` — a test for `idbSet` → `idbGet` round-trip. Pick the test in each file that exercises the broadest code path. See requirements Section 5.
-- **Verification**: `npx vitest run --testNamePattern "@smoke" src/tests/saveload.test.ts src/tests/autoSave.test.ts src/tests/settingsStore.test.ts src/tests/idbStorage.test.ts` finds and runs at least 4 smoke-tagged tests (plus the existing one in saveload), all passing.
+- **Description**: In `scripts/generate-test-map.mjs`, add an entry to the `SOURCE_GROUPS` object (around line 186): `'app/main': ['src/main.ts'],`. This ensures the test-map generator classifies `src/main.ts` imports properly and maps `mainStartup.test.ts` to the `app/main` area. Also add `'ui/fatalError': ['src/ui/fatalError.ts'],` to SOURCE_GROUPS since it's a standalone utility not grouped with other UI utilities.
+- **Verification**: `node scripts/generate-test-map.mjs --dry-run 2>&1 | grep -c "app/main"` should output 1
 
-### TASK-010: Update test-map.json for new smoke coverage
-- **Status**: done
-- **Dependencies**: TASK-009
-- **Description**: Review `test-map.json` and ensure the mappings for `src/core/idbStorage.ts`, `src/core/autoSave.ts`, `src/core/settingsStore.ts`, and `src/core/saveload.ts` include their respective test files. Add any missing mappings. See requirements Section 5.
-- **Verification**: `node scripts/run-affected.mjs --dry-run` runs without errors. Inspect `test-map.json` — all four source modules map to their test files.
+### TASK-011: Regenerate test-map.json
+- **Status**: pending
+- **Dependencies**: TASK-001, TASK-010
+- **Description**: Run `node scripts/generate-test-map.mjs` to regenerate `test-map.json`. Then verify the output contains the expected new areas: (1) `app/main` area with `src/main.ts` in sources and `src/tests/mainStartup.test.ts` in unit. (2) `core/previewLayout` area with `src/core/previewLayout.ts` in sources and `src/tests/previewLayout.test.ts` in unit. (3) `ui/notification` area with `src/ui/notification.ts` in sources and `src/tests/notification.test.ts` in unit. (4) `ui/fatalError` area with `src/ui/fatalError.ts` in sources. If any expected area is missing, investigate and fix the generator script.
+- **Verification**: `node scripts/generate-test-map.mjs --dry-run 2>&1 | grep -E "(app/main|core/previewLayout|ui/notification|ui/fatalError)" | head -10`
 
-### TASK-011: Extract preview scaling math from rocketCardUtil.ts
-- **Status**: done
-- **Dependencies**: none
-- **Description**: Extract the pure bounding-box and scale computation from `src/ui/rocketCardUtil.ts` (lines 95-121) into a new file `src/core/previewLayout.ts`. The function should take an array of part positions/sizes (e.g., `{ x, y, width, height }[]`) and preview dimensions (`{ width, height, padding }`), and return `{ scale: number, offsetX: number, offsetY: number }`. The UI function `renderRocketPreview()` should import and use this instead of inlining the math. See requirements Section 6.
-- **Verification**: `npm run typecheck` passes. `npm run build` succeeds. The canvas rendering in `rocketCardUtil.ts` still works (uses the extracted function).
-
-### TASK-012: Add unit tests for previewLayout.ts
-- **Status**: done
-- **Dependencies**: TASK-011
-- **Description**: Create `src/tests/previewLayout.test.ts` with unit tests for the extracted scaling function. Test cases: (1) normal case with multiple parts — verify scale fits within preview bounds; (2) single part — verify it centres correctly; (3) parts in a vertical line (rocketW ≈ 0) — verify no division by zero, scale is finite; (4) parts in a horizontal line (rocketH ≈ 0) — same check. See requirements Section 6.
-- **Verification**: `npx vitest run src/tests/previewLayout.test.ts` passes with all 4+ tests green.
-
-### TASK-013: Final typecheck, lint, build, and smoke test verification
-- **Status**: done
-- **Dependencies**: TASK-001, TASK-002, TASK-003, TASK-004, TASK-005, TASK-006, TASK-007, TASK-008, TASK-009, TASK-010, TASK-011, TASK-012
-- **Description**: Run the full verification suite to confirm all changes work together. Check for any regressions. Verify no debug log spam in test output. Verify smoke tests include the new tags.
-- **Verification**: All of these pass with 0 errors: `npm run build`, `npm run typecheck`, `npm run lint`, `npm run test:unit`, `npm run test:smoke:unit`.
+### TASK-012: Final typecheck, lint, build, and smoke test verification
+- **Status**: pending
+- **Dependencies**: TASK-003, TASK-004, TASK-005, TASK-006, TASK-008, TASK-009, TASK-011
+- **Description**: Run the full verification suite to confirm all changes integrate cleanly: (1) `npm run typecheck` — zero errors. (2) `npm run lint` — zero errors. (3) `npm run build` — succeeds with no errors or warnings. (4) `npm run test:unit` — all tests pass. (5) `npm run test:smoke:unit` — includes the new @smoke-tagged tests in mainStartup.test.ts and previewLayout.test.ts. Fix any failures found.
+- **Verification**: All five commands above pass with zero errors.
