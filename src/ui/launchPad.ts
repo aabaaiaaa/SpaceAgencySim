@@ -36,6 +36,7 @@ import { createFlightState } from '../core/gameState.ts';
 import { startFlightScene } from './flightController/_init.ts';
 import { showReturnResultsOverlay } from './hub.ts';
 import { buildRocketCard } from './rocketCardUtil.ts';
+import { createListenerTracker, type ListenerTracker } from './listenerTracker.ts';
 import './launchPad.css';
 
 // ---------------------------------------------------------------------------
@@ -53,6 +54,9 @@ let _state: GameState | null = null;
 
 /** Callback to navigate back to the hub. */
 let _onBack: (() => void) | null = null;
+
+/** Tracker for DOM listeners created during the launch-pad's lifetime. */
+let _listeners: ListenerTracker | null = null;
 
 // ---------------------------------------------------------------------------
 // Formatting helpers
@@ -209,6 +213,7 @@ export function initLaunchPadUI(
   _container = container;
   _state     = state;
   _onBack    = onBack;
+  _listeners = createListenerTracker();
 
   _overlay = document.createElement('div');
   _overlay.id = 'launch-pad-overlay';
@@ -221,6 +226,10 @@ export function initLaunchPadUI(
  * Remove the Launch Pad overlay from the DOM.
  */
 export function destroyLaunchPadUI(): void {
+  if (_listeners) {
+    _listeners.removeAll();
+    _listeners = null;
+  }
   if (_overlay) {
     _overlay.remove();
     _overlay = null;
@@ -628,16 +637,22 @@ function _showExtremeWeatherWarning(design: RocketDesign, assembly: RocketAssemb
   overlay.appendChild(dialog);
   document.body.appendChild(overlay);
 
-  overlay.querySelector('#lp-weather-cancel')?.addEventListener('click', () => {
-    overlay.remove();
-  });
+  const cancelBtn = overlay.querySelector('#lp-weather-cancel');
+  if (cancelBtn) {
+    _listeners?.add(cancelBtn, 'click', () => {
+      overlay.remove();
+    });
+  }
 
-  overlay.querySelector('#lp-weather-proceed')?.addEventListener('click', () => {
-    overlay.remove();
-    _proceedToLaunch(design, assembly, stagingConfig);
-  });
+  const proceedBtn = overlay.querySelector('#lp-weather-proceed');
+  if (proceedBtn) {
+    _listeners?.add(proceedBtn, 'click', () => {
+      overlay.remove();
+      _proceedToLaunch(design, assembly, stagingConfig);
+    });
+  }
 
-  overlay.addEventListener('pointerdown', (e: Event) => {
+  _listeners?.add(overlay, 'pointerdown', (e: Event) => {
     if (e.target === overlay) overlay.remove();
   });
 }

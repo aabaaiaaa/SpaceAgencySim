@@ -233,7 +233,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes. `grep -n "addEventListener" src/ui/flightController/_menuActions.ts` returns zero raw calls or only those wrapped by the tracker.
 
 ### TASK-035: Migrate listeners in launchPad.ts through ListenerTracker
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §6.2. Open `src/ui/launchPad.ts:631–640`. Route listener registrations through a `ListenerTracker` instance. Clear the tracker on launch-pad teardown.
 - **Verification**: `npm run typecheck` passes.
