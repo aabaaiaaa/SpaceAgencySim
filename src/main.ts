@@ -65,7 +65,7 @@ declare global {
  * Inserts a styled div into document.body so the player sees an explanation
  * instead of a blank/broken page.
  */
-function showFatalError(message: string): void {
+export function showFatalError(message: string): void {
   const el = document.createElement('div');
   el.style.cssText = [
     'position:fixed', 'inset:0', 'display:flex', 'align-items:center',
@@ -77,7 +77,7 @@ function showFatalError(message: string): void {
   document.body.appendChild(el);
 }
 
-async function main() {
+export async function main() {
   logger.debug('app', 'Game starting');
 
   // ── Storage check ──────────────────────────────────────────────────────

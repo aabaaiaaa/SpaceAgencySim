@@ -31,7 +31,7 @@
 - **Verification**: `npm run typecheck` passes. `npm run build` succeeds. Inspect `main.ts` — the catch handler now calls the visible error function.
 
 ### TASK-006: Add unit test for IDB-unavailable startup path
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-004, TASK-005
 - **Description**: Add a test that verifies: when `isIdbAvailable()` returns false, the startup error display function is invoked and `initSettings()` is not called. This may require extracting the IDB check into a testable function or mocking `isIdbAvailable`. If testing `main()` directly is impractical (DOM dependencies), test the extracted `_showFatalError` helper and the conditional logic separately. See requirements Section 3.
 - **Verification**: `npx vitest run` on the new test file passes.
