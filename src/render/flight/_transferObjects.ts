@@ -187,3 +187,24 @@ function _renderStreakObject(
   g.circle(headX, headY, 3);
   g.fill({ color: STREAK_COLOR, alpha: 1.0 });
 }
+
+// ---------------------------------------------------------------------------
+// Teardown
+// ---------------------------------------------------------------------------
+
+/**
+ * Destroy the transfer-objects container. Children are pooled Graphics
+ * (acquired via acquireGraphics) so they are released back to the pool
+ * before destroy so pool entries aren't corrupted. Safe to call when the
+ * container was never initialised. Called from destroyFlightRenderer.
+ */
+export function destroyTransferObjectsRender(): void {
+  const s = getFlightRenderState();
+
+  if (s.transferObjectsContainer) {
+    releaseContainerChildren(s.transferObjectsContainer);
+    if (s.transferObjectsContainer.parent) s.transferObjectsContainer.parent.removeChild(s.transferObjectsContainer);
+    s.transferObjectsContainer.destroy({ children: true });
+    s.transferObjectsContainer = null;
+  }
+}

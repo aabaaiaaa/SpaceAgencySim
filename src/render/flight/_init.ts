@@ -15,7 +15,7 @@ import { getFlightRenderState } from './_state.ts';
 import { MIN_ZOOM, MAX_ZOOM } from './_constants.ts';
 import { updateCamera, resetCameraState } from './_camera.ts';
 import { updateBodyVisuals, renderSky, renderStars, renderHorizon, renderWeatherHaze, generateStars, destroySkyRender } from './_sky.ts';
-import { renderGround, renderSurfaceItems, renderBiomeLabel } from './_ground.ts';
+import { renderGround, renderSurfaceItems, renderBiomeLabel, destroyGroundRender } from './_ground.ts';
 import { renderRocket, hitTestFlightPart as _hitTestFlightPart, destroyRocketRender } from './_rocket.ts';
 import {
   emitSmokeSegments, updateTrails, renderTrails,
@@ -23,13 +23,13 @@ import {
   renderRcsPlumes, renderMachEffects, trailDt,
   destroyTrailsRender,
 } from './_trails.ts';
-import { renderDebris, renderDockingTarget, renderEjectedCrew } from './_debris.ts';
+import { renderDebris, renderDockingTarget, renderEjectedCrew, destroyDebrisRender } from './_debris.ts';
 import { getProximityObjects } from '../../core/transferObjects.ts';
-import { renderTransferObjects } from './_transferObjects.ts';
+import { renderTransferObjects, destroyTransferObjectsRender } from './_transferObjects.ts';
 import { hasAsteroids } from '../../core/asteroidBelt.ts';
-import { renderBeltAsteroids } from './_asteroids.ts';
+import { renderBeltAsteroids, destroyAsteroidsRender } from './_asteroids.ts';
 import { onMouseMove, onWheel } from './_input.ts';
-import { drainPools, releaseGraphics } from './_pool.ts';
+import { drainPools } from './_pool.ts';
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -176,29 +176,22 @@ export function renderFlightFrame(
 
 /**
  * Tear down the flight scene.
+ *
+ * Calls each sub-module's destroy hook so every PixiJS container created by
+ * initFlightRenderer is removed from its parent and destroyed with
+ * `{ children: true }`. Pools are drained last so released graphics aren't
+ * re-acquired during teardown.
  */
 export function destroyFlightRenderer(): void {
-  const s   = getFlightRenderState();
-  const app = getApp();
+  const s = getFlightRenderState();
 
   destroySkyRender();
-  if (s.groundGraphics)       app.stage.removeChild(s.groundGraphics);
-  if (s.surfaceItemsGraphics) app.stage.removeChild(s.surfaceItemsGraphics);
-  if (s.debrisContainer)      app.stage.removeChild(s.debrisContainer);
+  destroyGroundRender();
+  destroyDebrisRender();
+  destroyTransferObjectsRender();
+  destroyAsteroidsRender();
   destroyTrailsRender();
   destroyRocketRender();
-  if (s.biomeLabelContainer)  app.stage.removeChild(s.biomeLabelContainer);
-  if (s.asteroidsContainer)   app.stage.removeChild(s.asteroidsContainer);
-  releaseGraphics(s.dockingTargetGfx);
-
-  s.groundGraphics        = null;
-  s.surfaceItemsGraphics  = null;
-  s.debrisContainer       = null;
-  s.biomeLabelContainer   = null;
-  s.asteroidsContainer    = null;
-  s.dockingTargetGfx      = null;
-  s.currentBiomeName      = null;
-  s.biomeLabelAlpha       = 0;
 
   resetCameraState();
 
@@ -213,7 +206,6 @@ export function destroyFlightRenderer(): void {
   s.zoomLevel = 1.0;
 
   drainPools();
-
 }
 
 export function hideFlightScene(): void {

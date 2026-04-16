@@ -211,7 +211,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes.
 
 ### TASK-032: Audit remaining src/render/flight/* sub-modules for destroy
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-028, TASK-029, TASK-030, TASK-031
 - **Description**: Per requirements §5.3. Sweep remaining files under `src/render/flight/` (debris renderer, particles, etc.). For any that create PixiJS containers, add a destroy hook. Wire all hooks into the flight scene's single teardown entry point so one call tears everything down cleanly.
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/render-*.test.ts` passes.

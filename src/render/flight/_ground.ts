@@ -184,3 +184,38 @@ export function renderBiomeLabel(altitude: number, w: number, h: number, dt: num
   s.biomeLabelContainer.addChild(label);
   s.biomeLabelContainer.addChild(subLabel);
 }
+
+// ---------------------------------------------------------------------------
+// Teardown
+// ---------------------------------------------------------------------------
+
+/**
+ * Destroy ground-owned containers (ground, surface items, biome label) and
+ * reset biome-label state. Pooled Text children in the biome label container
+ * are released back to the pool before destroy so pool entries aren't
+ * corrupted. Safe to call when containers were never initialised. Called
+ * from destroyFlightRenderer.
+ */
+export function destroyGroundRender(): void {
+  const s = getFlightRenderState();
+
+  if (s.groundGraphics) {
+    if (s.groundGraphics.parent) s.groundGraphics.parent.removeChild(s.groundGraphics);
+    s.groundGraphics.destroy({ children: true });
+    s.groundGraphics = null;
+  }
+  if (s.surfaceItemsGraphics) {
+    if (s.surfaceItemsGraphics.parent) s.surfaceItemsGraphics.parent.removeChild(s.surfaceItemsGraphics);
+    s.surfaceItemsGraphics.destroy({ children: true });
+    s.surfaceItemsGraphics = null;
+  }
+  if (s.biomeLabelContainer) {
+    releaseContainerChildren(s.biomeLabelContainer);
+    if (s.biomeLabelContainer.parent) s.biomeLabelContainer.parent.removeChild(s.biomeLabelContainer);
+    s.biomeLabelContainer.destroy({ children: true });
+    s.biomeLabelContainer = null;
+  }
+
+  s.currentBiomeName = null;
+  s.biomeLabelAlpha  = 0;
+}

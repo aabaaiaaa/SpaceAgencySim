@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 31
-- **Remaining**: 73
-- **Last Updated**: 2026-04-16T23:43:18.932Z
+- **Completed**: 32
+- **Remaining**: 72
+- **Last Updated**: 2026-04-16T23:47:48.953Z
 
 ## Iteration Log
 
@@ -286,4 +286,13 @@
 - **Exit Status**: success
 - **Tokens**: 1,186,208 total (25 in, 6,795 out, 73,661 cache-create, 1,105,727 cache-read)
 - **Cost**: $1.1832
+
+### Iteration 32 - 2026-04-16T23:47:48.948Z
+- **Task Attempted**: TASK-032
+- **Task Completed**: TASK-032
+- **Summary**: Completed Audit remaining src/render/flight/* sub-modules for destroy
+- **Duration**: 4m 28s
+- **Exit Status**: success
+- **Tokens**: 2,826,329 total (6,269 in, 11,839 out, 88,450 cache-create, 2,719,771 cache-read)
+- **Cost**: $2.2400
 

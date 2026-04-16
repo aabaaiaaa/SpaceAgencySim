@@ -11,7 +11,7 @@ import { ppm, worldToScreen } from './_camera.ts';
 import { getApp } from '../index.ts';
 import { SCALE_M_PER_PX, FLIGHT_PIXELS_PER_METRE } from './_constants.ts';
 import { drawPartRect, drawLandingLeg, makePartLabel } from './_rocket.ts';
-import { acquireGraphics, releaseContainerChildren } from './_pool.ts';
+import { acquireGraphics, releaseContainerChildren, releaseGraphics } from './_pool.ts';
 
 // ---------------------------------------------------------------------------
 // Debris rendering
@@ -185,4 +185,29 @@ export function renderEjectedCrew(ps: ReadonlyPhysicsState, w: number, h: number
 
     s.debrisContainer.addChild(g);
   }
+}
+
+// ---------------------------------------------------------------------------
+// Teardown
+// ---------------------------------------------------------------------------
+
+/**
+ * Destroy the debris container and release the docking-target Graphics.
+ * Debris children are pooled Graphics (acquired via acquireGraphics) so they
+ * are released back to the pool before destroy. dockingTargetGfx is also a
+ * pooled Graphics — released rather than destroyed. Safe to call when
+ * containers were never initialised. Called from destroyFlightRenderer.
+ */
+export function destroyDebrisRender(): void {
+  const s = getFlightRenderState();
+
+  if (s.debrisContainer) {
+    releaseContainerChildren(s.debrisContainer);
+    if (s.debrisContainer.parent) s.debrisContainer.parent.removeChild(s.debrisContainer);
+    s.debrisContainer.destroy({ children: true });
+    s.debrisContainer = null;
+  }
+
+  releaseGraphics(s.dockingTargetGfx);
+  s.dockingTargetGfx = null;
 }

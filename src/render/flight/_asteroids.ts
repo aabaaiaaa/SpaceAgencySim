@@ -403,3 +403,25 @@ export function renderBeltAsteroids(
     }
   }
 }
+
+// ---------------------------------------------------------------------------
+// Teardown
+// ---------------------------------------------------------------------------
+
+/**
+ * Destroy the asteroids container. Children are pooled Graphics / Text
+ * (acquired via acquireGraphics / acquireText) so they are released back
+ * to the pool before destroy so pool entries aren't corrupted. Safe to
+ * call when the container was never initialised. Called from
+ * destroyFlightRenderer.
+ */
+export function destroyAsteroidsRender(): void {
+  const s = getFlightRenderState();
+
+  if (s.asteroidsContainer) {
+    releaseContainerChildren(s.asteroidsContainer);
+    if (s.asteroidsContainer.parent) s.asteroidsContainer.parent.removeChild(s.asteroidsContainer);
+    s.asteroidsContainer.destroy({ children: true });
+    s.asteroidsContainer = null;
+  }
+}
