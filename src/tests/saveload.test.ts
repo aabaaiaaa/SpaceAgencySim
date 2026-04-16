@@ -16,7 +16,7 @@
  *   - Slot bounds    — RangeError for invalid indices
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach, vi } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
 import {
   SAVE_SLOT_COUNT,
@@ -40,6 +40,8 @@ import type { GameState, Contract, CrewMember, MissionInstance, OrbitalObject, R
 import type { SaveSlotSummary } from '../core/saveload.ts';
 import { makeContract, makeCrewMember, makeFlightResult, makeMissionInstance, makeOrbitalObject, makeRocketDesign } from './_factories.js';
 import { _resetCacheForTesting as _resetSettingsCache } from '../core/settingsStore.ts';
+import { logger } from '../core/logger.ts';
+import type { LogLevel } from '../core/logger.ts';
 
 // Node.js Buffer is available in Vitest's Node environment but @types/node is not installed.
 declare const Buffer: {
@@ -76,6 +78,17 @@ vi.mock('../core/idbStorage.js', () => ({
     return Promise.resolve([..._idbStore.keys()]);
   }),
 }));
+
+let _savedLogLevel: LogLevel;
+
+beforeAll(() => {
+  _savedLogLevel = logger.getLevel();
+  logger.setLevel('warn');
+});
+
+afterAll(() => {
+  logger.setLevel(_savedLogLevel);
+});
 
 beforeEach(() => {
   _idbStore.clear();

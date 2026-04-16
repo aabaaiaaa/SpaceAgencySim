@@ -37,7 +37,7 @@
 - **Verification**: `npx vitest run` on the new test file passes.
 
 ### TASK-007: Suppress debug log spam in saveload.test.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/tests/saveload.test.ts`, add `logger.setLevel('warn')` in `beforeAll` (or the outermost `beforeEach`) and restore the original level in `afterAll`. Import `logger` from `../core/logger.ts`. This suppresses the hundreds of `[DEBUG] [save] Compression stats` lines that clutter test output. See requirements Section 4.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts 2>&1 | grep -c "\[DEBUG\]"` returns 0 (no debug lines in output). All tests still pass.
