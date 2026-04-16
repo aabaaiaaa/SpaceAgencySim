@@ -147,7 +147,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 ## Section 4 — High-Value Cleanups
 
 ### TASK-022: Delete RocketAssembly / StagingConfig any aliases in testFlightBuilder.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §4.1. Open `src/core/testFlightBuilder.ts` lines 27–30. Delete the local `type RocketAssembly = any` and `type StagingConfig = any` declarations plus the surrounding `/* eslint-disable ... */` comment. Import the real types from `src/core/rocketbuilder.ts`.
 - **Verification**: `npm run typecheck` passes. `grep -n "RocketAssembly = any" src/core/testFlightBuilder.ts` returns empty.

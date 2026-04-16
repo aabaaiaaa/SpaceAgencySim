@@ -20,14 +20,9 @@ import {
   createStagingConfig,
   syncStagingWithAssembly,
   autoStageNewPart,
+  type RocketAssembly,
+  type StagingConfig,
 } from './rocketbuilder.ts';
-
-// Use `any` for rocketbuilder objects — the JS module's inferred JSDoc types
-// do not have .d.ts declarations, so we avoid re-declaring conflicting shapes.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type RocketAssembly = any;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type StagingConfig = any;
 
 export interface TestRocketResult {
   assembly: RocketAssembly;
