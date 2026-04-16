@@ -97,7 +97,7 @@
 - **Verification**: `node scripts/generate-test-map.mjs --dry-run` shows the new entries; running `node scripts/generate-test-map.mjs` updates `test-map.json`; `git diff test-map.json` shows the expected additions.
 
 ### TASK-017: Inventory E2E keyboard.press sites and add dispatchEvent helper
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Enumerate the 12 Playwright specs that use `page.keyboard.press` (grep `e2e/**/*.spec.ts` for the call). Check `e2e/helpers/` for an existing keyboard-dispatch helper — if present, document it; if absent, add one (e.g. `e2e/helpers/_keyboard.ts` exporting `dispatchKey(page, key, opts?)` that calls `page.evaluate` with `window.dispatchEvent(new KeyboardEvent('keydown', ...))`). Do not migrate call sites yet. See requirements §4.
 - **Verification**: The helper compiles (`npx tsc --noEmit`) and a sanity-check E2E spec that uses it passes: `npx playwright test e2e/<chosen-spec>.spec.ts`.

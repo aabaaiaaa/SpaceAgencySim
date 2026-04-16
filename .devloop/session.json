@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 15,
+  "lastIteration": 16,
   "startedAt": "2026-04-16T18:55:54.489Z",
   "iteration": 18,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-016",
-    "taskTitle": "Add dragCoefficient.ts to test-map.json and SOURCE_GROUPS",
-    "iterationNumber": 16,
-    "startedAt": "2026-04-16T19:40:23.950Z"
+    "taskId": "TASK-017",
+    "taskTitle": "Inventory E2E keyboard.press sites and add dispatchEvent helper",
+    "iterationNumber": 17,
+    "startedAt": "2026-04-16T19:43:22.388Z"
   }
 }
