@@ -9,7 +9,7 @@
  *   - IDB write failure handling
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
 
 import type { GameState } from '../core/gameState.ts';
@@ -49,6 +49,19 @@ import {
 
 import { compressSaveData, decompressSaveData } from '../core/saveload.ts';
 import { idbSet, idbDelete } from '../core/idbStorage.ts';
+import { logger } from '../core/logger.ts';
+import type { LogLevel } from '../core/logger.ts';
+
+let _savedLogLevel: LogLevel;
+
+beforeAll(() => {
+  _savedLogLevel = logger.getLevel();
+  logger.setLevel('warn');
+});
+
+afterAll(() => {
+  logger.setLevel(_savedLogLevel);
+});
 
 beforeEach(() => {
   _idbStore.clear();

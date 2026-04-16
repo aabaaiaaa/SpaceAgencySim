@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { createGameState } from '../core/gameState.ts';
 import type { GameState } from '../core/gameState.ts';
 
@@ -33,6 +33,19 @@ import {
   _setSessionStartTimeForTesting,
 } from '../core/saveload.ts';
 import { _resetCacheForTesting as _resetSettingsCache } from '../core/settingsStore.ts';
+import { logger } from '../core/logger.ts';
+import type { LogLevel } from '../core/logger.ts';
+
+let _savedLogLevel: LogLevel;
+
+beforeAll(() => {
+  _savedLogLevel = logger.getLevel();
+  logger.setLevel('warn');
+});
+
+afterAll(() => {
+  logger.setLevel(_savedLogLevel);
+});
 
 beforeEach(() => {
   _idbStore.clear();

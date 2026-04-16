@@ -43,7 +43,7 @@
 - **Verification**: `npx vitest run src/tests/saveload.test.ts 2>&1 | grep -c "\[DEBUG\]"` returns 0 (no debug lines in output). All tests still pass.
 
 ### TASK-008: Suppress debug log spam in remaining test files
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Apply the same `logger.setLevel('warn')` pattern from TASK-007 to these test files: `src/tests/autoSave.test.ts`, `src/tests/storageErrors.test.ts`, `src/tests/debugMode.test.ts`. Each file should set logger level to `'warn'` in `beforeAll` and restore in `afterAll`. See requirements Section 4.
 - **Verification**: `npx vitest run src/tests/autoSave.test.ts src/tests/storageErrors.test.ts src/tests/debugMode.test.ts 2>&1 | grep -c "\[DEBUG\]"` returns 0. All tests pass.
