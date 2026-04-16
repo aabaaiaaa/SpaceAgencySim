@@ -19,7 +19,7 @@
 - **Verification**: `npx vitest run src/tests/autoSave.test.ts` passes, including a new test that simulates quota exhaustion and asserts the user-facing message.
 
 ### TASK-004: Add unit tests for QuotaExceededError propagation
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-002, TASK-003
 - **Description**: Add unit tests in the relevant test files that mock `idbSet` to throw a synthetic `QuotaExceededError` (create one via `Object.assign(new Error(), { name: 'QuotaExceededError' })`). Verify `saveGame()`, `saveSettings()`, and the auto-save path all surface the error appropriately. See requirements §1.3.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts src/tests/settingsStore.test.ts src/tests/autoSave.test.ts` passes.

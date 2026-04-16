@@ -47,6 +47,8 @@ import {
 } from '../core/settingsStore.ts';
 import type { PersistedSettings } from '../core/settingsStore.ts';
 import { DEFAULT_DIFFICULTY_SETTINGS, MalfunctionMode } from '../core/constants.ts';
+import { StorageQuotaError } from '../core/saveload.ts';
+import { idbSet } from '../core/idbStorage.ts';
 
 // ---------------------------------------------------------------------------
 // Setup / teardown
@@ -519,6 +521,43 @@ describe('settingsStore', () => {
       const loaded = loadSettings();
       expect(loaded.difficultySettings).to.deep.equal({ ...DEFAULT_DIFFICULTY_SETTINGS });
       expect(loaded.autoSaveEnabled).to.equal(false);
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // 8b. QuotaExceededError propagation
+  // -----------------------------------------------------------------------
+
+  describe('QuotaExceededError propagation', () => {
+    it('throws StorageQuotaError when idbSet throws QuotaExceededError', async () => {
+      const quotaErr = Object.assign(new Error('The quota has been exceeded.'), {
+        name: 'QuotaExceededError',
+      });
+      vi.mocked(idbSet).mockRejectedValueOnce(quotaErr);
+
+      await expect(saveSettings(customSettings())).rejects.toBeInstanceOf(StorageQuotaError);
+    });
+
+    it('StorageQuotaError preserves the original error as cause', async () => {
+      const quotaErr = Object.assign(new Error('The quota has been exceeded.'), {
+        name: 'QuotaExceededError',
+      });
+      vi.mocked(idbSet).mockRejectedValueOnce(quotaErr);
+
+      try {
+        await saveSettings(customSettings());
+        expect.fail('saveSettings should have thrown');
+      } catch (err) {
+        expect(err).to.be.instanceOf(StorageQuotaError);
+        expect((err as StorageQuotaError).cause).to.equal(quotaErr);
+      }
+    });
+
+    it('rethrows non-quota errors unchanged', async () => {
+      const genericErr = new Error('Connection lost');
+      vi.mocked(idbSet).mockRejectedValueOnce(genericErr);
+
+      await expect(saveSettings(customSettings())).rejects.toBe(genericErr);
     });
   });
 

@@ -32,7 +32,9 @@ import {
   _setSessionStartTimeForTesting,
   compressSaveData,
   decompressSaveData,
+  StorageQuotaError,
 } from '../core/saveload.ts';
+import { idbSet } from '../core/idbStorage.ts';
 import { crc32 } from '../core/crc32.ts';
 import { AstronautStatus, MiningModuleType, ResourceState, ResourceType } from '../core/constants.ts';
 
@@ -1819,4 +1821,74 @@ describe('Overflow saves via storageKey parameter', () => {
     vi.unstubAllGlobals();
   });
 
+});
+
+// ---------------------------------------------------------------------------
+// saveGame — QuotaExceededError propagation
+// ---------------------------------------------------------------------------
+
+describe('saveGame() — QuotaExceededError propagation', () => {
+  /**
+   * saveGame calls idbSet twice: once (unawaited) for settings under
+   * 'spaceAgency_settings', and once (awaited) for the save slot under
+   * 'spaceAgencySave_N'. To test the main-save error path deterministically
+   * without tripping on the settings write, install a mock that rejects only
+   * for the save-slot key.
+   */
+  function rejectSaveSlotOnce(err: unknown): void {
+    vi.mocked(idbSet).mockImplementation((key: string, value: string) => {
+      if (key.startsWith('spaceAgencySave_')) {
+        // Restore the default mock for any subsequent calls in the same test.
+        vi.mocked(idbSet).mockImplementation((k: string, v: string) => {
+          _idbStore.set(k, v);
+          return Promise.resolve();
+        });
+        return Promise.reject(err);
+      }
+      _idbStore.set(key, value);
+      return Promise.resolve();
+    });
+  }
+
+  afterEach(() => {
+    // Restore the original in-memory idbSet mock between tests.
+    vi.mocked(idbSet).mockImplementation((key: string, value: string) => {
+      _idbStore.set(key, value);
+      return Promise.resolve();
+    });
+  });
+
+  it('throws StorageQuotaError when idbSet throws QuotaExceededError', async () => {
+    const state = freshState();
+    const quotaErr = Object.assign(new Error('The quota has been exceeded.'), {
+      name: 'QuotaExceededError',
+    });
+    rejectSaveSlotOnce(quotaErr);
+
+    await expect(saveGame(state, 0, 'quota test')).rejects.toBeInstanceOf(StorageQuotaError);
+  });
+
+  it('StorageQuotaError preserves the original error as cause', async () => {
+    const state = freshState();
+    const quotaErr = Object.assign(new Error('The quota has been exceeded.'), {
+      name: 'QuotaExceededError',
+    });
+    rejectSaveSlotOnce(quotaErr);
+
+    try {
+      await saveGame(state, 0, 'quota test');
+      expect.fail('saveGame should have thrown');
+    } catch (err) {
+      expect(err).toBeInstanceOf(StorageQuotaError);
+      expect((err as StorageQuotaError).cause).toBe(quotaErr);
+    }
+  });
+
+  it('rethrows non-quota errors unchanged', async () => {
+    const state = freshState();
+    const genericErr = new Error('Connection lost');
+    rejectSaveSlotOnce(genericErr);
+
+    await expect(saveGame(state, 0, 'generic test')).rejects.toBe(genericErr);
+  });
 });
