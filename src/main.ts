@@ -24,7 +24,7 @@ import { autoSaveImmediate } from './ui/autoSaveToast.ts';
 import { isAutoSaveEnabled, AUTO_SAVE_KEY } from './core/autoSave.ts';
 import { initSettings } from './core/settingsStore.ts';
 import { logger } from './core/logger.ts';
-import { isIdbAvailable } from './core/idbStorage.ts';
+import { isIdbAvailable, registerIdbErrorHandler } from './core/idbStorage.ts';
 import { showFatalError } from './ui/fatalError.ts';
 
 // E2E test API options for programmatic flight launches.
@@ -75,6 +75,10 @@ export async function main() {
     );
     return;
   }
+
+  // Wire up the IDB connection-lost handler so mid-session storage failures
+  // surface a visible error to the player instead of silently failing.
+  registerIdbErrorHandler(showFatalError);
 
   // ── Settings ───────────────────────────────────────────────────────────
   // Load persisted settings from IndexedDB into the in-memory cache before

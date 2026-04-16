@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 6,
+  "lastIteration": 7,
   "startedAt": "2026-04-16T15:21:22.622Z",
   "iteration": 18,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-007",
-    "taskTitle": "Add IDB connection-lost handler to idbStorage.ts",
-    "iterationNumber": 7,
-    "startedAt": "2026-04-16T15:32:02.771Z"
+    "taskId": "TASK-008",
+    "taskTitle": "Register IDB error handler in main.ts",
+    "iterationNumber": 8,
+    "startedAt": "2026-04-16T15:34:19.895Z"
   }
 }

@@ -43,7 +43,7 @@
 - **Verification**: `npx vitest run src/tests/idbStorage.test.ts`
 
 ### TASK-008: Register IDB error handler in main.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-002, TASK-007
 - **Description**: In `src/main.ts`: (1) Add `registerIdbErrorHandler` to the import from `'./core/idbStorage.ts'` (which already imports `isIdbAvailable`). (2) After the IDB availability check passes (after line ~93, before `await initSettings()`), add `registerIdbErrorHandler(showFatalError);`. This wires the IDB connection-lost event to the fatal error UI overlay.
 - **Verification**: `npx vitest run src/tests/mainStartup.test.ts`
