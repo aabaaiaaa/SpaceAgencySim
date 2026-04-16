@@ -299,6 +299,7 @@ const E2E_SPEC_AREAS = {
   'e2e/missions.spec.ts':                 ['core/missions', 'ui/missionControl', 'data/missions'],
   'e2e/flight-mission.spec.ts':           ['core/missions', 'core/physics'],
   'e2e/mission-progression.spec.ts':      ['core/missions', 'data/missions'],
+  'e2e/mission-finance-loop.spec.ts':     ['core/missions', 'core/finance'],
   'e2e/crew.spec.ts':                     ['core/crew', 'ui/crewAdmin'],
   'e2e/agency-depth.spec.ts':             ['core/contracts', 'core/crew', 'core/finance', 'core/designLibrary', 'ui/crewAdmin', 'data/contracts'],
   'e2e/newgame.spec.ts':                  ['core/gameState', 'ui/hub', 'ui/mainmenu', 'render/hub'],

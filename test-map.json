@@ -198,7 +198,8 @@
       ],
       "e2e": [
         "e2e/agency-depth.spec.ts",
-        "e2e/failure-paths.spec.ts"
+        "e2e/failure-paths.spec.ts",
+        "e2e/mission-finance-loop.spec.ts"
       ]
     },
     "core/flightPhase": {
@@ -458,6 +459,7 @@
       ],
       "e2e": [
         "e2e/flight-mission.spec.ts",
+        "e2e/mission-finance-loop.spec.ts",
         "e2e/mission-progression.spec.ts",
         "e2e/missions.spec.ts"
       ]

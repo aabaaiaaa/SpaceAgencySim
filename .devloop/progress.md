@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 20
-- **Remaining**: 84
-- **Last Updated**: 2026-04-16T23:20:44.587Z
+- **Completed**: 21
+- **Remaining**: 83
+- **Last Updated**: 2026-04-16T23:21:47.387Z
 
 ## Iteration Log
 
@@ -187,4 +187,13 @@
 - **Exit Status**: success
 - **Tokens**: 2,963,151 total (43 in, 13,177 out, 163,639 cache-create, 2,786,292 cache-read)
 - **Cost**: $2.7455
+
+### Iteration 21 - 2026-04-16T23:21:47.384Z
+- **Task Attempted**: TASK-021
+- **Task Completed**: TASK-021
+- **Summary**: Completed Update generator + test-map.json after new mission-finance spec
+- **Duration**: 1m 0s
+- **Exit Status**: success
+- **Tokens**: 445,775 total (12 in, 1,682 out, 54,240 cache-create, 389,841 cache-read)
+- **Cost**: $0.5760
 

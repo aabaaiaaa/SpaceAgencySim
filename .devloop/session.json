@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 19,
+  "lastIteration": 20,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-020",
-    "taskTitle": "Add mission→finance smoke E2E test",
-    "iterationNumber": 20,
-    "startedAt": "2026-04-16T23:04:17.379Z"
+    "taskId": "TASK-021",
+    "taskTitle": "Update generator + test-map.json after new mission-finance spec",
+    "iterationNumber": 21,
+    "startedAt": "2026-04-16T23:20:46.886Z"
   }
 }

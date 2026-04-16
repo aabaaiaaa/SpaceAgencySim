@@ -137,7 +137,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx playwright test e2e/mission-finance-loop.spec.ts` passes (or the extended spec).
 
 ### TASK-021: Update generator + test-map.json after new mission-finance spec
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-020
 - **Description**: Per requirements §11. First edit `scripts/generate-test-map.mjs`: add an entry `'e2e/mission-finance-loop.spec.ts': ['core/missions', 'core/finance']` to `E2E_SPEC_AREAS`. If the spec was added to an existing file rather than as a new spec, skip the generator edit. Then run `npm run test-map:generate` and verify the mapping.
 - **Verification**: `grep -B 1 -A 5 'mission-finance-loop.spec.ts' test-map.json` shows the spec under the correct area(s). (If added to an existing spec, confirm that spec's existing mapping still covers `core/missions` + `core/finance`.)
