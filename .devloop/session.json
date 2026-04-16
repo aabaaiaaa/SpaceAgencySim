@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 5,
+  "lastIteration": 6,
   "startedAt": "2026-04-16T18:55:54.489Z",
   "iteration": 18,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-006",
-    "taskTitle": "Add setThrottleInstant core helper",
-    "iterationNumber": 6,
-    "startedAt": "2026-04-16T19:07:38.735Z"
+    "taskId": "TASK-007",
+    "taskTitle": "Route flightHud X/Z keys through setThrottleInstant",
+    "iterationNumber": 7,
+    "startedAt": "2026-04-16T19:09:24.899Z"
   }
 }

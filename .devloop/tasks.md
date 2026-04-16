@@ -37,7 +37,7 @@
 - **Verification**: `npx vitest run src/tests/` (targeted at the new helper's test file) passes with a new test covering both throttle modes.
 
 ### TASK-007: Route flightHud X/Z keys through setThrottleInstant
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006
 - **Description**: Update the keydown handler in `src/ui/flightHud.ts:192–208` to call `setThrottleInstant(_ps, 0)` for X and `setThrottleInstant(_ps, 1)` for Z instead of mutating `_ps.throttle` and `_ps.targetTWR` directly. Keep the `markThrottleDirty()` call. See requirements §2.1.
 - **Verification**: `npx vitest run src/tests/flightHud.test.ts` (or the nearest existing test covering this handler) passes, and a manual grep confirms no direct `_ps.throttle =` or `_ps.targetTWR =` assignments remain in `src/ui/flightHud.ts`.

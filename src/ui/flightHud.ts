@@ -46,6 +46,7 @@ import { getBiome } from '../core/biomes.ts';
 import { getAvailableSurfaceActions } from '../core/surfaceOps.ts';
 import './flightHud.css';
 import { markThrottleDirty } from './flightController/_loop.ts';
+import { setThrottleInstant } from '../core/throttleControl.ts';
 import type { PhysicsState } from '../core/physics.ts';
 import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.ts';
 import type { FlightState, GameState } from '../core/gameState.ts';
@@ -192,18 +193,11 @@ export function initFlightHud(
   _keyHandler = (e: KeyboardEvent): void => {
     if (!_ps) return;
     const k = e.key;
-    const twrMode = _ps.throttleMode === 'twr';
     if (k === 'x' || k === 'X') {
-      if (twrMode) {
-        _ps.targetTWR = 0;
-      }
-      _ps.throttle = 0;
+      setThrottleInstant(_ps, 0);
       markThrottleDirty();
     } else if (k === 'z' || k === 'Z') {
-      if (twrMode) {
-        _ps.targetTWR = Infinity;
-      }
-      _ps.throttle = 1;
+      setThrottleInstant(_ps, 1);
       markThrottleDirty();
     }
   };
