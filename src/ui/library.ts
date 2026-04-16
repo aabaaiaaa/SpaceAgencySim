@@ -25,6 +25,7 @@ import {
 } from '../core/library.ts';
 import { AstronautStatus } from '../core/constants.ts';
 import { escapeHtml } from './escapeHtml.ts';
+import { createListenerTracker, type ListenerTracker } from './listenerTracker.ts';
 import './library.css';
 import type { GameState } from '../core/gameState.ts';
 
@@ -47,6 +48,7 @@ let _overlay: HTMLDivElement | null = null;
 let _state: GameState | null = null;
 let _onBack: (() => void) | null = null;
 let _activeTab: LibraryTab = 'stats';
+let _tracker: ListenerTracker | null = null;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -67,6 +69,7 @@ export function initLibraryUI(
   _state = state;
   _onBack = onBack;
   _activeTab = 'stats';
+  _tracker = createListenerTracker();
 
   _overlay = document.createElement('div');
   _overlay.id = 'lib-overlay';
@@ -79,6 +82,10 @@ export function initLibraryUI(
  * Remove the Library overlay.
  */
 export function destroyLibraryUI(): void {
+  if (_tracker) {
+    _tracker.removeAll();
+    _tracker = null;
+  }
   if (_overlay) {
     _overlay.remove();
     _overlay = null;
@@ -93,6 +100,7 @@ export function destroyLibraryUI(): void {
 
 function _render(): void {
   if (!_overlay || !_state) return;
+  if (_tracker) _tracker.removeAll();
   _overlay.innerHTML = '';
 
   // Header.
@@ -102,7 +110,7 @@ function _render(): void {
   const backBtn: HTMLButtonElement = document.createElement('button');
   backBtn.id = 'lib-back-btn';
   backBtn.textContent = '\u2190 Hub';
-  backBtn.addEventListener('click', () => {
+  _tracker!.add(backBtn, 'click', () => {
     const onBack = _onBack; // capture before destroy nulls it
     destroyLibraryUI();
     if (onBack) onBack();
@@ -130,7 +138,7 @@ function _render(): void {
     const tab: HTMLButtonElement = document.createElement('button');
     tab.className = `lib-tab${def.id === _activeTab ? ' active' : ''}`;
     tab.textContent = def.label;
-    tab.addEventListener('click', () => {
+    _tracker!.add(tab, 'click', () => {
       _activeTab = def.id;
       _render();
     });
