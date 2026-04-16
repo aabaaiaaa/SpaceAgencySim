@@ -170,7 +170,7 @@ describe('performAutoSave', () => {
     expect(result.error).toBe('IDB write failed');
   });
 
-  it('creates a deep clone of state in the envelope', async () => {
+  it('creates a deep clone of state in the envelope @smoke', async () => {
     const state = freshState();
     state.agencyName = 'Before';
 

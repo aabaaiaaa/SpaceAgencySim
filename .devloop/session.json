@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 7,
+  "lastIteration": 8,
   "startedAt": "2026-04-16T13:35:03.728Z",
   "iteration": 17,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-008",
-    "taskTitle": "Suppress debug log spam in remaining test files",
-    "iterationNumber": 8,
-    "startedAt": "2026-04-16T13:56:42.932Z"
+    "taskId": "TASK-009",
+    "taskTitle": "Add @smoke tags to IDB round-trip tests",
+    "iterationNumber": 9,
+    "startedAt": "2026-04-16T13:59:43.277Z"
   }
 }

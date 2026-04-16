@@ -1419,7 +1419,7 @@ describe('Save compression', () => {
       expect(restored.missions.completed[0].id).toBe('m2');
     });
 
-    it('listSaves reads compressed save slots correctly', async () => {
+    it('listSaves reads compressed save slots correctly @smoke', async () => {
       const state = freshState();
       state.agencyName = 'Listed Agency';
       await saveGame(state, 2, 'Slot 2 Save');

@@ -208,7 +208,7 @@ describe('idbStorage module', () => {
   });
 
   describe('idbSet() and idbGet()', () => {
-    it('stores and retrieves a value', async () => {
+    it('stores and retrieves a value @smoke', async () => {
       await idbSet('testKey', 'testValue');
       const result = await idbGet('testKey');
       expect(result).toBe('testValue');

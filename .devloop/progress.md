@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 13
-- **Completed**: 8
-- **Remaining**: 5
-- **Last Updated**: 2026-04-16T13:59:41.237Z
+- **Completed**: 9
+- **Remaining**: 4
+- **Last Updated**: 2026-04-16T14:03:05.930Z
 
 ## Iteration Log
 
@@ -79,4 +79,13 @@
 - **Exit Status**: success
 - **Tokens**: 465,199 total (14 in, 4,234 out, 30,183 cache-create, 430,768 cache-read)
 - **Cost**: $0.5099
+
+### Iteration 9 - 2026-04-16T14:03:05.928Z
+- **Task Attempted**: TASK-009
+- **Task Completed**: TASK-009
+- **Summary**: Completed Add @smoke tags to IDB round-trip tests
+- **Duration**: 3m 23s
+- **Exit Status**: success
+- **Tokens**: 460,591 total (1,155 in, 9,002 out, 38,437 cache-create, 411,997 cache-read)
+- **Cost**: $0.6771
 

@@ -49,7 +49,7 @@
 - **Verification**: `npx vitest run src/tests/autoSave.test.ts src/tests/storageErrors.test.ts src/tests/debugMode.test.ts 2>&1 | grep -c "\[DEBUG\]"` returns 0. All tests pass.
 
 ### TASK-009: Add @smoke tags to IDB round-trip tests
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add `@smoke` to the description of one representative test in each of these files: (1) `src/tests/saveload.test.ts` — a test for `listSaves()` returning saved games; (2) `src/tests/autoSave.test.ts` — a test for auto-save trigger → exists check → load; (3) `src/tests/settingsStore.test.ts` — a test for settings persistence round-trip; (4) `src/tests/idbStorage.test.ts` — a test for `idbSet` → `idbGet` round-trip. Pick the test in each file that exercises the broadest code path. See requirements Section 5.
 - **Verification**: `npx vitest run --testNamePattern "@smoke" src/tests/saveload.test.ts src/tests/autoSave.test.ts src/tests/settingsStore.test.ts src/tests/idbStorage.test.ts` finds and runs at least 4 smoke-tagged tests (plus the existing one in saveload), all passing.
