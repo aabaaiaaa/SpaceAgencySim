@@ -795,7 +795,9 @@ function _beginGame(state: GameState): void {
 /**
  * Shows a confirm/cancel modal dialog.
  */
-function _showConfirmModal(title: string, body: string, confirmText: string, onConfirm: () => void | Promise<void>): void {
+export function _showConfirmModal(title: string, body: string, confirmText: string, onConfirm: () => void | Promise<void>): void {
+  const previouslyFocused: Element | null = document.activeElement;
+
   const backdrop: HTMLDivElement = document.createElement('div');
   backdrop.className = 'mm-modal-backdrop';
   backdrop.innerHTML = `
@@ -813,6 +815,9 @@ function _showConfirmModal(title: string, body: string, confirmText: string, onC
   const remove = (): void => {
     document.removeEventListener('keydown', onEscape);
     backdrop.remove();
+    if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) {
+      previouslyFocused.focus();
+    }
   };
 
   const onEscape = (e: KeyboardEvent): void => {
@@ -829,8 +834,8 @@ function _showConfirmModal(title: string, body: string, confirmText: string, onC
     if (e.target === backdrop) remove();
   });
 
-  // Focus the cancel button so Escape works immediately and focus is trapped.
-  (backdrop.querySelector('#mm-modal-cancel') as HTMLElement)?.focus();
+  // Focus the primary action (confirm) button on open.
+  (backdrop.querySelector('#mm-modal-confirm') as HTMLElement)?.focus();
 }
 
 /**

@@ -115,7 +115,7 @@
 - **Verification**: `npx playwright test <the remaining migrated specs>` passes.
 
 ### TASK-020: Add focus management to welcome and confirmation modals
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/ui/hub.ts` (welcome modal) and `src/ui/mainmenu.ts` (save/load confirmation modals), on modal open: save the currently-focused element via `document.activeElement`, then `.focus()` the primary action button. On modal close: restore focus to the saved element if it is still in the DOM. See requirements §5.1.
 - **Verification**: `npx vitest run src/tests/hub.test.ts src/tests/mainmenu.test.ts` (or the nearest existing unit tests) passes with a new test that opens the modal, verifies focus moved to the primary button, closes, and verifies focus restored.

@@ -144,6 +144,8 @@ export function showWelcomeModal(container: HTMLElement, state: GameState): void
   const existing = document.getElementById('welcome-modal');
   if (existing) existing.remove();
 
+  const previouslyFocused: Element | null = document.activeElement;
+
   const overlay: HTMLDivElement = document.createElement('div');
   overlay.id = 'welcome-modal';
 
@@ -198,10 +200,14 @@ export function showWelcomeModal(container: HTMLElement, state: GameState): void
   dismissBtn.addEventListener('click', () => {
     state.welcomeShown = true;
     overlay.remove();
+    if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) {
+      previouslyFocused.focus();
+    }
   });
 
   content.appendChild(dismissBtn);
   container.appendChild(overlay);
+  dismissBtn.focus();
 }
 
 // ---------------------------------------------------------------------------
