@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 22,
+  "lastIteration": 23,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-023",
-    "taskTitle": "Add logger.warn to swallowed settings-sync error in saveload.ts",
-    "iterationNumber": 23,
-    "startedAt": "2026-04-16T23:22:56.267Z"
+    "taskId": "TASK-024",
+    "taskTitle": "Add 5-second timeout to resyncWorkerState in _workerBridge.ts",
+    "iterationNumber": 24,
+    "startedAt": "2026-04-16T23:23:58.671Z"
   }
 }

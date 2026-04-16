@@ -210,6 +210,34 @@ describe('workerBridge — public API', () => {
     ).rejects.toThrow('Worker not available');
   });
 
+  it('resyncWorkerState rejects when worker does not send ready within 5s', async () => {
+    const bridge = await import('../ui/flightController/_workerBridge.ts');
+    bridge.terminatePhysicsWorker();
+
+    const initPromise = bridge.initPhysicsWorker(
+      makePhysicsState(),
+      makeRocketAssembly(),
+      makeStagingConfig(),
+      makeFlightState(),
+    );
+
+    vi.advanceTimersByTime(100);
+    latestMockWorker!._simulateMessage({ type: 'ready' });
+    await initPromise;
+
+    const resyncPromise = bridge.resyncWorkerState(
+      makePhysicsState(),
+      makeRocketAssembly(),
+      makeStagingConfig(),
+      makeFlightState(),
+    );
+
+    // Worker never sends ready. Advance past 5s resync timeout.
+    vi.advanceTimersByTime(5_001);
+
+    await expect(resyncPromise).rejects.toThrow('Physics worker resync did not respond within 5s');
+  });
+
   it('resyncWorkerState resolves when worker sends ready again', async () => {
     const bridge = await import('../ui/flightController/_workerBridge.ts');
     bridge.terminatePhysicsWorker();

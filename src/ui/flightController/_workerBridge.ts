@@ -158,10 +158,23 @@ export function resyncWorkerState(
 ): Promise<void> {
   if (!_worker || _error) return Promise.reject(new Error('Worker not available'));
 
-  return new Promise<void>((resolve) => {
+  return new Promise<void>((resolve, reject) => {
     _ready = false;
     _readyResolve = resolve;
+    _readyReject = reject;
     _latestSnapshot = null;
+
+    _clearReadyTimeout();
+    _readyTimeout = setTimeout(() => {
+      _readyTimeout = null;
+      if (_readyResolve) {
+        _readyResolve = null;
+        _readyReject = null;
+        const msg = 'Physics worker resync did not respond within 5s';
+        logger.warn('worker', 'resync timed out', { timeoutMs: 5000 });
+        reject(new Error(msg));
+      }
+    }, 5_000);
 
     // partsCatalog and bodiesCatalog are sent as empty placeholders because the
     // worker imports them directly via ES module imports (see physicsWorker.ts).

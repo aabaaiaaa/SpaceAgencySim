@@ -159,7 +159,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` passes. `npm run typecheck` passes.
 
 ### TASK-024: Add 5-second timeout to resyncWorkerState in _workerBridge.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §4.3. Open `src/ui/flightController/_workerBridge.ts:152–177` (`resyncWorkerState()`). Wrap the resync promise in `Promise.race` with a 5-second timeout. On timeout, log a `logger.warn('worker', 'resync timed out', ...)` and either throw or return a resolved value appropriate to the existing contract (read the callers before choosing).
 - **Verification**: `npx vitest run src/tests/workerBridgeTimeout.test.ts` passes. Extend the test to cover the new timeout if feasible.
