@@ -39,7 +39,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx playwright test e2e/auto-save-hub-return.spec.ts` (or the extended auto-save.spec.ts) passes.
 
 ### TASK-006: Verify bug-fix specs pass end-to-end
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-002, TASK-005
 - **Description**: Run the two new/extended E2E specs together to confirm neither regressed. No code changes — this is a verification gate before moving on.
 - **Verification**: `npx playwright test e2e/flight-hud-surface.spec.ts e2e/auto-save-hub-return.spec.ts` (or auto-save.spec.ts) both pass.

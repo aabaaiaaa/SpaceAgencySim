@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 4,
+  "lastIteration": 5,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-005",
-    "taskTitle": "Add E2E regression test for hub-return toast visibility",
-    "iterationNumber": 5,
-    "startedAt": "2026-04-16T22:35:50.346Z"
+    "taskId": "TASK-006",
+    "taskTitle": "Verify bug-fix specs pass end-to-end",
+    "iterationNumber": 6,
+    "startedAt": "2026-04-16T22:37:53.497Z"
   }
 }
