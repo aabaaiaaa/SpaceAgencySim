@@ -49,7 +49,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 ## Section 2 — E2E Keyboard Migration
 
 ### TASK-007: Add dispatchKeyDown / dispatchKeyUp helpers in _keyboard.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §2.2. Extend `e2e/helpers/_keyboard.ts` with `dispatchKeyDown(page, key)` and `dispatchKeyUp(page, key)` functions that dispatch `keydown` / `keyup` events via `page.evaluate(() => window.dispatchEvent(new KeyboardEvent(...)))`. Mirror the existing `dispatchKey` style. Ensure the helpers are re-exported from `e2e/helpers.ts` (the barrel).
 - **Verification**: `npm run typecheck` passes. Grep confirms `dispatchKeyDown` and `dispatchKeyUp` are exported from the barrel.

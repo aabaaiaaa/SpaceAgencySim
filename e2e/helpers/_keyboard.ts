@@ -92,3 +92,27 @@ export async function dispatchKey(
     { c: code, k: key, t: type, b: bubbles, sh: shiftKey, ct: ctrlKey, al: altKey, me: metaKey },
   );
 }
+
+/**
+ * Dispatch a `keydown` event on `window`. Thin wrapper around {@link dispatchKey}
+ * for call sites migrating from `page.keyboard.down()`.
+ */
+export async function dispatchKeyDown(
+  page: Page,
+  key: string,
+  opts: Omit<DispatchKeyOptions, 'type'> = {},
+): Promise<void> {
+  await dispatchKey(page, key, { ...opts, type: 'keydown' });
+}
+
+/**
+ * Dispatch a `keyup` event on `window`. Thin wrapper around {@link dispatchKey}
+ * for call sites migrating from `page.keyboard.up()`.
+ */
+export async function dispatchKeyUp(
+  page: Page,
+  key: string,
+  opts: Omit<DispatchKeyOptions, 'type'> = {},
+): Promise<void> {
+  await dispatchKey(page, key, { ...opts, type: 'keyup' });
+}

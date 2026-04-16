@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 5,
+  "lastIteration": 6,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-006",
-    "taskTitle": "Verify bug-fix specs pass end-to-end",
-    "iterationNumber": 6,
-    "startedAt": "2026-04-16T22:37:53.497Z"
+    "taskId": "TASK-007",
+    "taskTitle": "Add dispatchKeyDown / dispatchKeyUp helpers in _keyboard.ts",
+    "iterationNumber": 7,
+    "startedAt": "2026-04-16T22:38:12.483Z"
   }
 }
