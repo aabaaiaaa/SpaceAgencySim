@@ -832,8 +832,8 @@ function _createDebrisFromParts(
       parachuteStates.set(id, {
         state: src.state,
         deployTimer: src.deployTimer,
-        canopyAngle: src.canopyAngle ?? 0,
-        canopyAngularVel: src.canopyAngularVel ?? 0,
+        canopyAngle: Number.isFinite(src.canopyAngle) ? src.canopyAngle : 0,
+        canopyAngularVel: Number.isFinite(src.canopyAngularVel) ? src.canopyAngularVel : 0,
         stowTimer: src.stowTimer,
       });
     }
@@ -867,7 +867,7 @@ function _createDebrisFromParts(
     velX:    ps.velX,
     velY:    ps.velY,
     angle:   ps.angle,
-    angularVelocity: (ps.angularVelocity ?? 0) + (Math.random() - 0.5) * 0.3,
+    angularVelocity: (Number.isFinite(ps.angularVelocity) ? ps.angularVelocity : 0) + (Math.random() - 0.5) * 0.3,
     throttle: 1.0,  // SRBs ignore throttle; liquid engines will flame out.
     landed:  false,
     crashed: false,

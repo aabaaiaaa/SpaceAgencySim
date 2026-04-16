@@ -216,7 +216,7 @@ export function deployParachute(
   entry.deployTimer      = DEPLOY_DURATION;
   // Initialise canopy orientation to the rocket's current angle so it starts
   // aligned with the rocket and then springs toward upright independently.
-  entry.canopyAngle      = ps.angle ?? 0;
+  entry.canopyAngle      = Number.isFinite(ps.angle) ? (ps.angle as number) : 0;
   entry.canopyAngularVel = 0;
 }
 

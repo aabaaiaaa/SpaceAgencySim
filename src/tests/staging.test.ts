@@ -1455,3 +1455,26 @@ describe('activateCurrentStage() — invalid stage', () => {
     expect(debris).toHaveLength(0);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Debris creation guards against NaN angularVelocity on parent physics state
+// ---------------------------------------------------------------------------
+
+describe('debris angularVelocity — NaN guard', () => {
+  it('produces finite angularVelocity even when ps.angularVelocity is NaN', () => {
+    const { assembly, staging } = makeTwoStageRocket();
+    const ps = makePhysicsState(assembly);
+    const fs = makeFlightState();
+
+    activateCurrentStage(ps, assembly, staging, fs); // stage 1: ignite engine
+
+    // Corrupt the parent rocket's angular velocity before separation.
+    ps.angularVelocity = NaN;
+
+    const debris = activateCurrentStage(ps, assembly, staging, fs); // stage 2: decouple
+    expect(debris.length).toBeGreaterThan(0);
+    for (const d of debris) {
+      expect(Number.isFinite(d.angularVelocity)).toBe(true);
+    }
+  });
+});

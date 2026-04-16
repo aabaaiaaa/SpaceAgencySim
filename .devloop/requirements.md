@@ -1,198 +1,235 @@
-# Iteration 18 — Review Gaps, Resilience & Tooling
+# Iteration 18 — Correctness, Robustness & Listener Hygiene
 
 **Date:** 2026-04-16
-**Scope:** test-map.json gaps, smoke tag additions, collision MoI guard, showFatalError extraction, test-map auto-generation fix, IDB mid-session resilience
-**Builds on:** Iteration 17 (flaky test fix, collision guards, IDB startup error, log suppression, smoke tags, preview extraction)
-**Review driving this iteration:** `.devloop/archive/iteration-17/review.md`
+**Scope:** Persistence robustness, UI layering violations, listener leaks, physics correctness bugs, drag-math extraction, E2E keyboard migration, small hygiene items
+**Builds on:** Iteration 17 (flaky test fix, IDB-unavailable startup, collision guards, preview layout extraction)
+**Driven by:** Fresh code review conducted 2026-04-16 (no prior review doc referenced)
 
 ---
 
-## 1. Move showFatalError to a Dedicated UI Module
+## Motivation
 
-**Problem:** `showFatalError()` is defined in `src/main.ts` (lines 68-78) and exported from there. If other modules need to show fatal errors (e.g., IDB connection drop during gameplay — see section 5), they'd need to import from `main.ts`, creating circular dependency risk. The function is a UI utility, not app bootstrapping logic.
+A fresh review of the codebase surfaced six verified bug-class or robustness issues, plus several hygiene items that have been outstanding across iterations. The suite is healthy overall — build, typecheck, lint, and all 4,561 unit tests pass — but the following items are user-visible risks or architectural violations that are cheap to fix now and get more expensive the longer they linger.
 
-**Fix:** Extract `showFatalError` into a new file `src/ui/fatalError.ts`. The function body and its export move unchanged. Then:
+This iteration is intentionally broad (~17 tasks) because the items are independent and each is small. The user has explicitly opted in to a large iteration.
 
-- `src/main.ts` imports `showFatalError` from `./ui/fatalError.ts` instead of defining it locally. Remove the local function definition and the `export` keyword from main.ts.
-- `src/tests/mainStartup.test.ts` needs updated mocks:
-  - Add a `vi.mock('../ui/fatalError.ts', ...)` that exposes a hoisted mock for `showFatalError`.
-  - The two startup tests (IDB unavailable, IDB available) should assert against the mocked `showFatalError` directly rather than inspecting `document.body.appendChild`. This is cleaner and more robust.
-  - The third test (`showFatalError` direct testing) should import from `../ui/fatalError.ts` instead of `../main.ts`.
-- Verify: `npm run typecheck` passes, `npx vitest run src/tests/mainStartup.test.ts` passes.
+---
 
-**The new file `src/ui/fatalError.ts` should contain only:**
+## 1. Persistence Robustness
+
+### 1.1 QuotaExceededError Handling
+
+**Locations:**
+- `src/core/saveload.ts:349` — `await idbSet(key, compressed)` in `saveGame()`
+- `src/core/settingsStore.ts:202` — `await idbSet(...)` in `saveSettings()`
+- `src/core/autoSave.ts:150` — already wrapped in try/catch (correct pattern, but does not distinguish quota)
+
+**Problem:** When IndexedDB storage quota is exceeded (mobile browsers with aggressive eviction, users with many large saves, enterprise-restricted storage), the `idbSet` call throws `QuotaExceededError`. In `saveload.ts` and `settingsStore.ts`, the error is unhandled — it propagates to the caller and typically ends in an unhandled promise rejection or, for the save path invoked from the UI, an uncaught exception that leaves the player with no indication that their save failed.
+
+**Fix:** Wrap both `idbSet` calls in try/catch. Detect `QuotaExceededError` by name (`err.name === 'QuotaExceededError'`) and re-throw as a typed error (e.g. `StorageQuotaError`) that the UI caller can catch and surface via the existing notification or fatal-error mechanism. For other errors (connection lost, permission denied), log and re-throw so the startup-registered `showFatalError` handler can take over.
+
+The autoSave path already catches errors and logs them — it's the correct template, but the distinction between "quota exceeded" (user-actionable: delete saves) and "unknown failure" (fatal) is not currently made. Upgrade the autoSave handler to also surface a user-visible "Save storage full — consider deleting old saves" message rather than only logging.
+
+### 1.2 Fire-and-Forget saveSettings During Save
+
+**Location:** `src/core/saveload.ts:320–328`
+
+**Problem:** `saveGame()` currently fires off `void saveSettings(...)` without awaiting or handling errors. The comment at line 320 admits this is intentional ("Best-effort fire-and-forget"). However, if the settings write fails (quota, connection lost), the user sees the main save succeed while their settings silently fail to persist — on next load, their difficulty/debug/autosave settings revert.
+
+**Fix:** Replace `void saveSettings(...)` with a variant that doesn't block the main save's success, but DOES propagate/surface write failures through a dedicated error path (e.g. `.catch(err => logger.warn('save', 'Settings sync failed during save', err))` or better, a user-visible toast via the existing notification system). The main save should still succeed if the settings sync fails — those are conceptually separate writes — but the failure must not be invisible.
+
+### 1.3 Tests
+
+Add unit tests that simulate `QuotaExceededError` from `idbSet` and verify:
+- `saveGame()` surfaces the error in a way the UI can act on
+- `saveSettings()` called standalone surfaces the error
+- `saveSettings()` called from within `saveGame()` does not kill the main save but logs/surfaces the settings failure
+
+---
+
+## 2. UI Layering & Listener Hygiene
+
+### 2.1 Throttle Key Routing Through Core
+
+**Location:** `src/ui/flightHud.ts:192–208` (X/Z key handler)
+
+**Problem:** The keydown handler for X (throttle zero) and Z (throttle max) directly mutates `_ps.throttle` and `_ps.targetTWR` from the UI layer. This violates the project's stated layering (CLAUDE.md: "UI layer calls core functions, then triggers re-renders — it does not manipulate state directly"). The rest of the flight loop correctly routes input through `physics.handleKeyDown()`; X/Z are the outliers.
+
+**Fix:** Add a small core helper (e.g. `setThrottleInstant(ps, value)` in `src/core/physics.ts` or a new `src/core/throttleControl.ts`) that encapsulates "set throttle to value; in TWR mode also set targetTWR to the matching extreme". Call this helper from the flightHud key handler. No behaviour change — purely a layering correction.
+
+Add a unit test for the helper. Leave the existing `markThrottleDirty()` call in the UI — that's UI state, correctly placed.
+
+### 2.2 VAB Keyboard Listener Cleanup
+
+**Location:** `src/ui/vab/_panels.ts:354, 373, 396`
+
+**Problem:** Three bare `window.addEventListener('keydown', ...)` calls (delete/backspace handler, undo/redo handler, spacebar handler) are registered on VAB open but never removed. Each time the player opens VAB, three new listeners accumulate. Over a session this can cause duplicate handler invocation and memory pressure.
+
+**Fix:** Route these registrations through the existing `listenerTracker` (`src/ui/listenerTracker.ts`) which is already used consistently by `topbar.ts` and `crewAdmin.ts`. The tracker has `add(target, type, handler)` and `removeAll()` semantics — on VAB destroy, the tracker clears everything.
+
+If the VAB's init/destroy lifecycle doesn't currently create a tracker instance, do so and plumb it through `_panels.ts`. Mirror the pattern in `crewAdmin.ts` for consistency.
+
+### 2.3 VAB Canvas Listener Cleanup
+
+**Location:** `src/ui/vab/_canvasInteraction.ts:300, 381–383, 716–793`
+
+**Problem:** Canvas pointerdown/pointermove/pointercancel/contextmenu/wheel listeners are registered directly via `addEventListener` with no cleanup on VAB destroy. Additionally line 300 adds a `document.addEventListener('pointerdown', ...)` and lines 381–383 add `window.addEventListener('pointermove/pointerup/pointercancel', ...)` inside a drag-start flow; these window listeners ARE removed on `onDragEnd`, but if drag-end never fires (app crash, modal appears mid-drag, user closes VAB mid-drag), they leak.
+
+**Fix:** Use the same `listenerTracker` introduced in 2.2 for all `_canvasInteraction.ts` window/document listeners. For the drag-flow listeners, keep the current removal-on-drag-end behaviour BUT also register them with the tracker so that a VAB destroy mid-drag cleans them up.
+
+### 2.4 Tests
+
+Add a unit test that simulates VAB init → add listeners → destroy → verify all window/document listeners are removed. The test can track listener registration via a small mock of `window.addEventListener`/`removeEventListener` or by using JSDOM's listener introspection.
+
+---
+
+## 3. Physics Correctness
+
+### 3.1 Body-Aware Docking Radius
+
+**Location:** `src/core/physics.ts:1827`
+
+**Problem:** The docking radial-out check uses a hardcoded `6_371_000` (Earth's radius in metres) to orient the radial vector away from the body:
+
 ```typescript
-export function showFatalError(message: string): void {
-  const el = document.createElement('div');
-  el.style.cssText = [
-    'position:fixed', 'inset:0', 'display:flex', 'align-items:center',
-    'justify-content:center', 'background:#000', 'color:#b0d0f0',
-    'font-family:system-ui,sans-serif', 'font-size:1.2rem',
-    'padding:2rem', 'text-align:center', 'z-index:9999',
-  ].join(';');
-  el.textContent = message;
-  document.body.appendChild(el);
-}
+const radCheck: number = radOutX * ps.posX + radOutY * (ps.posY + 6_371_000);
 ```
 
----
+On any non-Earth body (Mun, Duna, etc.), this computes a check against a wrong origin, flipping the radial direction incorrectly. The bug manifests as W/S keys producing reversed radial thrust near other bodies.
 
-## 2. Add Ia/Ib Defensive Guard in collision.ts
+**Fix:** Look up the body's radius from `BODY_RADIUS` (in `src/core/constants.ts` or `src/data/bodies.ts`) using the current body id. If the current body id isn't available in this scope, thread it through — it must be knowable since physics is always relative to a current reference body. Fall back to `6_371_000` only if the body id is genuinely unknown, and log a warning.
 
-**Location:** `src/core/collision.ts`, lines 531-538 (inside `_resolveCollision`)
+Add a unit test that exercises the radial-check code with a non-Earth body and asserts the correct sign.
 
-**Problem:** The function divides by `Ia` (moment of inertia of body A) and `Ib` (body B) at lines 533 and 537. These are protected upstream by `_bodyMoI()` returning `Math.max(1, I)` (line 238), but the division code relies entirely on this upstream guarantee. The mass guard at line 457 was added in iteration 17 but only covers mass divisions — the MoI divisions remain unguarded.
+### 3.2 NaN Guard on Debris Angular Velocity
 
-**Fix:** Add inline guards around each MoI division, without early-returning from the function (since the positional correction below doesn't depend on MoI):
+**Location:** `src/core/staging.ts:870`
+
+**Problem:**
 
 ```typescript
-// Before (line 533):
-a.ref.angularVelocity += torqueA * dt / Ia;
-
-// After:
-if (Ia > 0) a.ref.angularVelocity += torqueA * dt / Ia;
-
-// Before (line 537):
-b.ref.angularVelocity += torqueB * dt / Ib;
-
-// After:
-if (Ib > 0) b.ref.angularVelocity += torqueB * dt / Ib;
+angularVelocity: (ps.angularVelocity ?? 0) + (Math.random() - 0.5) * 0.3,
 ```
 
-This uses inline guards (not early return) because only the angular impulse depends on MoI — the positional correction at lines 541-548 should still execute.
+The `??` operator only catches `null` and `undefined` — NOT `NaN`. If `ps.angularVelocity` has become `NaN` upstream (e.g. from a numerical instability elsewhere), the debris inherits `NaN` rotation, which silently corrupts all subsequent physics involving that debris.
 
-**Tests:** The existing test at `collision.test.ts:453` ("does not produce NaN or Infinity with minimal-mass colliding bodies") already exercises this code path through `tickCollisions`. The `_bodyMoI` function guarantees `>= 1`, so the guard is defense-in-depth. No new test is required — the existing test verifies finite angular velocity.
+**Fix:** Replace `(ps.angularVelocity ?? 0)` with `(Number.isFinite(ps.angularVelocity) ? ps.angularVelocity : 0)`. Also grep the codebase for other `?? 0` patterns on numeric fields that could be NaN (e.g. `??` on velocities, angles, forces) and convert to `Number.isFinite` guards where the source could plausibly be NaN.
+
+Add a unit test: pass a `ps` with `angularVelocity: NaN` into the staging path and assert the resulting debris has a finite `angularVelocity`.
+
+### 3.3 Flight Lifecycle Global State Reset
+
+**Locations:**
+- `src/core/collision.ts:170` — `_asteroidCollisionCooldowns` (a module-level `Map`)
+- `src/core/staging.ts:73` — `_debrisNextId` (a module-level counter)
+
+**Problem:** These module-scoped variables persist across flights. The existing `resetAsteroidCollisionCooldowns()` function (collision.ts:~848) is correctly exported but there's no guarantee every flight-start/flight-abort code path calls it. `_debrisNextId` has no reset function at all.
+
+The symptom for `_asteroidCollisionCooldowns`: if the player collides with an asteroid, aborts the flight, and starts a new one, the cooldown from the old flight can carry over, granting temporary asteroid immunity. The symptom for `_debrisNextId`: debris IDs grow monotonically over the session — a long-lived session has surprisingly large IDs, and any consumer assuming bounded ID ranges could misbehave.
+
+**Fix:**
+- Add `resetDebrisIdCounter()` in `staging.ts` and export it
+- Identify every flight-start and flight-abort path (likely in `src/ui/flightController/` and `src/ui/launchPad.ts`) and ensure both reset functions are called
+- Consider consolidating into a single `resetFlightState()` in a new or existing module that callers can invoke; this avoids the "forgot to reset X" class of bug going forward
+
+Unit test: simulate two sequential flights, verify cooldowns and debris IDs are reset between them.
+
+### 3.4 Drag-Coefficient Math Extraction
+
+**Locations:**
+- `src/core/physics.ts:1660–1702` — `_computeDragForce` (part-level drag computation)
+- `src/core/staging.ts:946–974` — `_debrisDrag` (debris drag computation)
+
+**Problem:** Both functions do essentially the same math: look up the part's drag coefficient, scale by parachute deploy progress if applicable, multiply by atmospheric density, square speed. The code has diverged slightly over time and will continue to diverge without shared infrastructure.
+
+**Fix:** Extract the pure per-part CdA (drag coefficient × area) computation to a new core module (e.g. `src/core/dragCoefficient.ts`) exporting a function like:
+
+```typescript
+export function computePartCdA(
+  def: PartDef,
+  deployProgress: number | null,
+  atmosphereDensity: number,
+): number
+```
+
+Have both `physics.ts` and `staging.ts` call this helper. Keep the parachute interpolation logic inside the helper — it's the bulk of the duplication. The per-frame force application (summing forces, applying to body) stays in its respective caller.
+
+Add comprehensive unit tests for the extracted function: non-parachute parts, undeployed parachute, partially-deployed parachute, fully-deployed parachute, zero-density atmosphere.
 
 ---
 
-## 3. Add @smoke Tags to mainStartup.test.ts and previewLayout.test.ts
+## 4. E2E Keyboard Migration
 
-**Problem:** Two critical-path test files created in iteration 17 have no `@smoke` tags:
-- `mainStartup.test.ts` — tests the IDB startup check. If this breaks, the game won't load.
-- `previewLayout.test.ts` — tests the extracted preview scaling math used by rocket card rendering.
+**Location:** 12 Playwright specs use `page.keyboard.press` (58 call sites). The project owner has a standing preference (stored in agent memory) for `window.dispatchEvent` in E2E keyboard interactions because `page.keyboard.press` is unreliable under parallel Playwright workers.
 
-**Fix:** Add `@smoke` to the test description string of one representative test in each file:
+**Problem:** Specs using `page.keyboard.press` are at elevated flakiness risk. The workaround is to dispatch the event directly into the page via `page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'X' })))`. Existing helpers in `e2e/helpers/` may already have a utility for this — if so, migrate call sites to use the helper; if not, add one.
 
-- **`mainStartup.test.ts`:** Tag `'shows fatal error and does not call initSettings when IDB is unavailable @smoke'` — this is the most critical path (startup failure handling).
-- **`previewLayout.test.ts`:** Tag `'computes scale that fits multiple parts within preview bounds @smoke'` — this exercises the most common code path (multiple parts).
+**Fix:** Split across 2–3 tasks (the migration is mechanical but spread across many files). First task: inventory the 12 specs, add or confirm a helper in `e2e/helpers/` for dispatching keyboard events. Second and third tasks: perform the migration in batches of specs, keeping behaviour identical.
 
-**Verify:** `npm run test:smoke:unit` discovers and passes the new smoke tests.
+Verification: rerun the migrated specs only (not the full E2E suite, per standing preference) and confirm they still pass.
 
 ---
 
-## 4. Update generate-test-map.mjs for src/main.ts
+## 5. Small Hygiene Items
 
-**Problem:** `src/main.ts` is not classified by the test-map generator because `classifySource()` only handles files matching `src/{layer}/{module}.ts` (two path segments). Root-level files like `src/main.ts` return `null` and are silently ignored. This means `mainStartup.test.ts` (which imports `main.ts`) won't be mapped to any area.
+### 5.1 Modal Focus Management
 
-**Fix:** Add `src/main.ts` to the `SOURCE_GROUPS` object in `scripts/generate-test-map.mjs`:
+**Locations:**
+- `src/ui/hub.ts` — welcome modal (approx line 198)
+- `src/ui/mainmenu.ts` — save-confirm modals (approx line 198)
 
-```javascript
-'app/main': ['src/main.ts'],
-```
+**Problem:** When these modals open, no element is programmatically focused. Keyboard-only users must tab into the modal; screen-reader users may not notice the modal appeared. Additionally, there's no focus restoration when the modal closes.
 
-This creates an `app/main` area that the import analysis will associate with `mainStartup.test.ts`. After the `showFatalError` extraction (section 1), `mainStartup.test.ts` will also import `src/ui/fatalError.ts`, which auto-classifies as `ui/fatalError`.
+**Fix:** On modal open, call `.focus()` on the primary action button (confirm/dismiss). On close, restore focus to the element that had focus when the modal opened (save a reference in the modal's open handler). This is a small, low-risk UX improvement.
 
-Additionally, after section 1 creates `src/ui/fatalError.ts`, the generator will auto-discover:
-- `src/ui/fatalError.ts` → area `ui/fatalError` (standard `src/{layer}/{module}.ts` pattern)
-- `src/core/previewLayout.ts` → area `core/previewLayout` (already auto-discovered)
-- `src/ui/notification.ts` → area `ui/notification` (already auto-discovered)
+### 5.2 Logger Consistency
 
-**After modifying the script, regenerate `test-map.json`:**
-```bash
-node scripts/generate-test-map.mjs
-```
+**Location:** `src/core/settingsStore.ts:273`
 
-**Verify:** The output JSON contains:
-- An `app/main` area with `src/main.ts` in sources and `src/tests/mainStartup.test.ts` in unit
-- A `core/previewLayout` area with `src/core/previewLayout.ts` in sources and `src/tests/previewLayout.test.ts` in unit
-- A `ui/notification` area with `src/ui/notification.ts` in sources and `src/tests/notification.test.ts` in unit
-- A `ui/fatalError` area with `src/ui/fatalError.ts` in sources and `src/tests/mainStartup.test.ts` in unit
+**Problem:** One `console.warn()` call slipped through; the rest of the codebase uses the structured `logger.warn()` helper. Consistency matters because log aggregation and level-based suppression (used in tests) only apply to `logger.*` calls.
+
+**Fix:** Replace with `logger.warn('settings', '...', {...})`.
 
 ---
 
-## 5. IDB Mid-Session Resilience
+## 6. Final Verification
 
-**Problem:** The iteration 17 startup check handles "IDB unavailable at page load", but if IndexedDB becomes unavailable *during* gameplay (e.g., storage pressure eviction on mobile, user clearing site data in another tab), IDB operations will silently fail. The `openDB()` function caches a single `IDBDatabase` connection; if that connection dies, all subsequent operations reject with opaque errors, and the player gets no visible feedback.
-
-**Fix:** Add connection-level error handling to `idbStorage.ts`:
-
-1. **Add a callback registration function:**
-   ```typescript
-   let _onConnectionLost: ((msg: string) => void) | null = null;
-
-   export function registerIdbErrorHandler(handler: (msg: string) => void): void {
-     _onConnectionLost = handler;
-   }
-   ```
-
-2. **In `openDB()`, after `_db = request.result`, attach an `onclose` handler:**
-   ```typescript
-   _db.onclose = () => {
-     _db = null;
-     _dbPromise = null;
-     if (_onConnectionLost) {
-       _onConnectionLost(
-         'The storage connection was unexpectedly closed. ' +
-         'Your recent progress may not be saved. Try refreshing the page.',
-       );
-     }
-   };
-   ```
-
-   The `onclose` event fires when the browser forcibly closes the IDB connection (storage eviction, private browsing cleanup, etc.). Resetting `_db` and `_dbPromise` allows a reconnection attempt on the next operation.
-
-3. **In `main.ts`, register the handler after startup:**
-   ```typescript
-   import { registerIdbErrorHandler } from './core/idbStorage.ts';
-   import { showFatalError } from './ui/fatalError.ts';
-
-   // Inside main(), after the IDB availability check passes:
-   registerIdbErrorHandler(showFatalError);
-   ```
-
-4. **Also reset the handler in `_resetDbForTesting()`** so tests don't leak callbacks:
-   ```typescript
-   export function _resetDbForTesting(): void {
-     if (_db) _db.close();
-     _db = null;
-     _dbPromise = null;
-     _onConnectionLost = null;
-   }
-   ```
-
-**Tests:** Add a test in `src/tests/idbStorage.test.ts` (or a new `src/tests/idbResilience.test.ts` if the existing file is too large) that:
-1. Registers a mock error handler via `registerIdbErrorHandler`
-2. Opens the DB (triggers `openDB` internally via `idbSet` or `idbGet`)
-3. Simulates the `onclose` event firing on the cached connection
-4. Verifies the handler was called with the expected message
-5. Verifies that `_db` was reset (subsequent operations attempt a fresh connection)
-
-Because `_db` is private, the test should verify behavior through the public API: after `onclose` fires, the next `idbSet`/`idbGet` call should attempt to reopen (or reject if IDB is truly gone).
+After all tasks: `npm run build`, `npm run typecheck`, `npm run lint`, `npm run test:unit`, and `npm run test:smoke:unit` must all pass with zero errors. Additionally, a targeted run of the migrated E2E specs (not the full suite — per standing preference) to confirm keyboard migration didn't break anything.
 
 ---
 
 ## Testing Strategy
 
-| Area | What Changes | Verification |
-|------|-------------|-------------|
-| `src/ui/fatalError.ts` (new) | Extract showFatalError from main.ts | `npx vitest run src/tests/mainStartup.test.ts` |
-| `src/main.ts` | Import showFatalError, register IDB handler | `npx vitest run src/tests/mainStartup.test.ts` |
-| `src/core/collision.ts` | Add Ia/Ib inline guards | `npx vitest run src/tests/collision.test.ts` |
-| `src/tests/mainStartup.test.ts` | Update mocks, add @smoke tag | `npx vitest run --testNamePattern "@smoke" src/tests/mainStartup.test.ts` |
-| `src/tests/previewLayout.test.ts` | Add @smoke tag | `npx vitest run --testNamePattern "@smoke" src/tests/previewLayout.test.ts` |
-| `src/core/idbStorage.ts` | Add onclose handler, registerIdbErrorHandler | `npx vitest run src/tests/idbStorage.test.ts` |
-| `scripts/generate-test-map.mjs` | Add src/main.ts to SOURCE_GROUPS | `node scripts/generate-test-map.mjs --dry-run` |
-| `test-map.json` | Regenerated from script | Inspect output for new areas |
-
-### Final Verification
-
-After all changes: `npm run build`, `npm run typecheck`, `npm run lint`, and `npm run test:unit` must all pass. `npm run test:smoke:unit` must include the newly tagged smoke tests.
+| Area | What Changes |
+|------|-------------|
+| `saveload.test.ts` | New tests for QuotaExceededError propagation and saveSettings-during-save failure handling |
+| `settingsStore.test.ts` | New test for quota error path |
+| `autoSave.test.ts` | New test for quota-specific user message vs generic failure |
+| `physics.test.ts` (or new `throttleControl.test.ts`) | Unit test for the new throttle helper |
+| `vab*.test.ts` (new or existing) | Listener-cleanup test on VAB destroy |
+| `physics.test.ts` | Body-aware docking radius test |
+| `staging.test.ts` or `collision.test.ts` | NaN guard test; flight-lifecycle reset test |
+| `dragCoefficient.test.ts` (new) | Parachute interpolation + density tests for the extracted helper |
+| Migrated E2E specs | Rerun to confirm migration is behaviour-preserving |
 
 ---
 
 ## Technical Decisions
 
-- **Inline MoI guards, not early return.** The Ia/Ib guards use `if (Ia > 0)` around the single division line rather than early-returning from `_resolveCollision`, because the positional correction below doesn't depend on MoI and should still execute.
-- **Callback pattern for IDB resilience.** `idbStorage.ts` (core) cannot import from `src/ui/` (architecture rule). Instead, it exports a `registerIdbErrorHandler` callback that `main.ts` wires to `showFatalError`. This preserves the three-layer separation.
-- **Auto-generate over manual edits.** `test-map.json` is regenerated by running the script rather than hand-editing, ensuring consistency and catching any other unmapped files.
-- **Item 7 already complete.** The review suggested extracting pure delta-V computation from `ui/vab/_staging.ts`, but `computeStageDeltaV` was already extracted to `core/stagingCalc.ts` in a prior iteration. The remaining `_staging.ts` code is DOM rendering — no extractable pure logic remains.
+- **Error typing over error codes.** QuotaExceededError is detected by `err.name` rather than a custom code, matching the Web IDL spec and keeping the detection portable.
+- **Extract over annotate.** The drag-coefficient duplication is fixed by extraction (new module) rather than by adding TODOs — the review history shows extraction candidates compound over iterations.
+- **Listener tracker over ad-hoc cleanup.** Rather than remembering listener references in each panel, use the existing `listenerTracker` consistently. This continues the pattern already present in `topbar.ts` and `crewAdmin.ts`.
+- **No save migration framework this iteration.** Per standing preference (user memory: "no save migration during dev"), the save-version-mismatch fatality is left as-is. Saves remain conceptually disposable during the development phase.
+- **No toast accessibility this iteration.** Explicitly deferred by the user for this iteration; may appear in a later iteration.
+- **Drop previously flagged "no tests" items.** The review's initial sweep identified `designLibrary`, `controlMode`, `undoRedo`, `grabbing`, `previewLayout` as untested — verification showed tests for all five already exist. No work needed.
+
+---
+
+## Scope Boundary
+
+**Out of scope:**
+- Save-version migration framework
+- Toast aria-live / role=alert
+- Full physics.ts or flightHud.ts refactor (3000-line files noted; too large for this iteration)
+- IDB reconnect logic (`registerIdbErrorHandler` already surfaces the failure)
+- Any new gameplay features
