@@ -16,9 +16,26 @@ import { getFCState, getPhysicsState, getFlightState } from './_state.ts';
 import { showPhaseNotification } from './_flightPhase.ts';
 import { showPostFlightSummary, buildFlightEventList } from './_postFlight.ts';
 import { stopFlightScene, startFlightScene } from './_init.ts';
+import { getFlightControllerListenerTracker } from './_listenerTracker.ts';
 
 import type { RocketAssembly } from '../../core/rocketbuilder.ts';
 import type { GameState } from '../../core/gameState.ts';
+
+/**
+ * Register a DOM listener through the flight-controller tracker so it gets
+ * cleaned up when the flight scene is torn down. If the tracker is somehow
+ * unavailable (should never happen: menu actions only fire during an active
+ * flight) the registration is skipped — a missed listener is preferable to a
+ * leaked one.
+ */
+function _addTracked(
+  target: EventTarget,
+  event: string,
+  handler: EventListenerOrEventListenerObject,
+): void {
+  const tracker = getFlightControllerListenerTracker();
+  if (tracker) tracker.add(target, event, handler);
+}
 
 /**
  * Save the current game to the first available (empty) slot, or slot 0 as a
@@ -72,7 +89,7 @@ export function handleMenuRestart(): void {
   modal.setAttribute('role', 'alertdialog');
   modal.setAttribute('aria-modal', 'true');
   modal.setAttribute('aria-label', 'Restart Flight');
-  modal.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
+  _addTracked(modal, 'click', (e: Event) => e.stopPropagation());
 
   // Title
   const titleRow: HTMLDivElement = document.createElement('div');
@@ -105,7 +122,7 @@ export function handleMenuRestart(): void {
   const cancelBtn: HTMLButtonElement = document.createElement('button');
   cancelBtn.className = 'confirm-btn confirm-btn-cancel';
   cancelBtn.textContent = 'Cancel';
-  cancelBtn.addEventListener('click', () => {
+  _addTracked(cancelBtn, 'click', () => {
     s.timeWarp = s.preMenuTimeWarp ?? 1;
     backdrop.remove();
   });
@@ -113,7 +130,7 @@ export function handleMenuRestart(): void {
   const confirmBtn: HTMLButtonElement = document.createElement('button');
   confirmBtn.className = 'confirm-btn confirm-btn-danger';
   confirmBtn.textContent = 'Restart';
-  confirmBtn.addEventListener('click', () => {
+  _addTracked(confirmBtn, 'click', () => {
     backdrop.remove();
     _executeRestart(totalRocketCost);
   });
@@ -122,7 +139,7 @@ export function handleMenuRestart(): void {
   btnRow.appendChild(confirmBtn);
   modal.appendChild(btnRow);
 
-  backdrop.addEventListener('click', () => {
+  _addTracked(backdrop, 'click', () => {
     s.timeWarp = s.preMenuTimeWarp ?? 1;
     backdrop.remove();
   });
@@ -288,7 +305,7 @@ export function handleMenuReturnToAgency(): void {
     modal.setAttribute('role', 'alertdialog');
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-label', 'Return from Orbit');
-    modal.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
+    _addTracked(modal, 'click', (e: Event) => e.stopPropagation());
 
     const titleRow: HTMLDivElement = document.createElement('div');
     titleRow.className = 'topbar-modal-title-row';
@@ -311,7 +328,7 @@ export function handleMenuReturnToAgency(): void {
     continueBtn.className = 'confirm-btn confirm-btn-cancel';
     continueBtn.textContent = 'Stay in Orbit';
     continueBtn.dataset.testid = 'abort-continue-btn';
-    continueBtn.addEventListener('click', () => {
+    _addTracked(continueBtn, 'click', () => {
       s.timeWarp = s.preMenuTimeWarp ?? 1;
       backdrop.remove();
     });
@@ -320,7 +337,7 @@ export function handleMenuReturnToAgency(): void {
     returnBtn.className = 'confirm-btn confirm-btn-primary';
     returnBtn.textContent = 'Return to Agency';
     returnBtn.dataset.testid = 'orbit-return-btn';
-    returnBtn.addEventListener('click', () => {
+    _addTracked(returnBtn, 'click', () => {
       backdrop.remove();
       _handleReturnToAgency();
     });
@@ -329,7 +346,7 @@ export function handleMenuReturnToAgency(): void {
     btnRow.appendChild(returnBtn);
     modal.appendChild(btnRow);
 
-    backdrop.addEventListener('click', () => {
+    _addTracked(backdrop, 'click', () => {
       s.timeWarp = s.preMenuTimeWarp ?? 1;
       backdrop.remove();
     });
@@ -363,7 +380,7 @@ export function handleMenuReturnToAgency(): void {
     modal.setAttribute('role', 'alertdialog');
     modal.setAttribute('aria-modal', 'true');
     modal.setAttribute('aria-label', 'Abort Flight');
-    modal.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
+    _addTracked(modal, 'click', (e: Event) => e.stopPropagation());
 
     // Title
     const titleRow: HTMLDivElement = document.createElement('div');
@@ -397,7 +414,7 @@ export function handleMenuReturnToAgency(): void {
     continueBtn.className = 'confirm-btn confirm-btn-cancel';
     continueBtn.textContent = 'Continue Flying';
     continueBtn.dataset.testid = 'abort-continue-btn';
-    continueBtn.addEventListener('click', () => {
+    _addTracked(continueBtn, 'click', () => {
       s.timeWarp = s.preMenuTimeWarp ?? 1;
       backdrop.remove();
     });
@@ -406,7 +423,7 @@ export function handleMenuReturnToAgency(): void {
     abortBtn.className = 'confirm-btn confirm-btn-danger';
     abortBtn.textContent = 'Abort & Return';
     abortBtn.dataset.testid = 'abort-confirm-btn';
-    abortBtn.addEventListener('click', () => {
+    _addTracked(abortBtn, 'click', () => {
       backdrop.remove();
       handleAbortReturnToAgency();
     });
@@ -415,7 +432,7 @@ export function handleMenuReturnToAgency(): void {
     btnRow.appendChild(abortBtn);
     modal.appendChild(btnRow);
 
-    backdrop.addEventListener('click', () => {
+    _addTracked(backdrop, 'click', () => {
       s.timeWarp = s.preMenuTimeWarp ?? 1;
       backdrop.remove();
     });
@@ -500,18 +517,18 @@ export function handleMenuFlightLog(): void {
   const closeBtn: HTMLButtonElement = document.createElement('button');
   closeBtn.className = 'fl-close-btn';
   closeBtn.textContent = 'Close';
-  closeBtn.addEventListener('click', () => {
+  _addTracked(closeBtn, 'click', () => {
     overlay.remove();
     s.timeWarp = savedWarp || 1;
   });
   content.appendChild(closeBtn);
 
   // Backdrop click closes the log.
-  overlay.addEventListener('click', () => {
+  _addTracked(overlay, 'click', () => {
     overlay.remove();
     s.timeWarp = savedWarp || 1;
   });
-  content.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
+  _addTracked(content, 'click', (e: Event) => e.stopPropagation());
 
   host.appendChild(overlay);
 }

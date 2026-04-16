@@ -227,7 +227,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 ## Section 6 — Listener Tracker Migration
 
 ### TASK-034: Migrate listeners in flightController/_menuActions.ts through ListenerTracker
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §6.1. Open `src/ui/flightController/_menuActions.ts:75` and any other raw `addEventListener` calls in the file. Route registrations through a `ListenerTracker` instance tied to the flight-controller lifecycle. Mirror the pattern used by `topbar.ts` and `crewAdmin.ts`. Ensure the tracker is cleared on flight-controller teardown.
 - **Verification**: `npm run typecheck` passes. `grep -n "addEventListener" src/ui/flightController/_menuActions.ts` returns zero raw calls or only those wrapped by the tracker.

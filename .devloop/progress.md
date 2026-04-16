@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 33
-- **Remaining**: 71
-- **Last Updated**: 2026-04-16T23:49:15.344Z
+- **Completed**: 34
+- **Remaining**: 70
+- **Last Updated**: 2026-04-16T23:52:34.728Z
 
 ## Iteration Log
 
@@ -304,4 +304,13 @@
 - **Exit Status**: success
 - **Tokens**: 390,705 total (131 in, 2,742 out, 50,098 cache-create, 337,734 cache-read)
 - **Cost**: $0.5512
+
+### Iteration 34 - 2026-04-16T23:52:34.723Z
+- **Task Attempted**: TASK-034
+- **Task Completed**: TASK-034
+- **Summary**: Completed Migrate listeners in flightController/_menuActions.ts through ListenerTracker
+- **Duration**: 3m 17s
+- **Exit Status**: success
+- **Tokens**: 1,661,597 total (2,955 in, 12,254 out, 66,678 cache-create, 1,579,710 cache-read)
+- **Cost**: $1.5277
 

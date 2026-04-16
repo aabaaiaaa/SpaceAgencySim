@@ -38,6 +38,7 @@ import {
 } from './_menuActions.ts';
 import { logger } from '../../core/logger.ts';
 import { initPhysicsWorker, resyncWorkerState, terminatePhysicsWorker } from './_workerBridge.ts';
+import { initFlightControllerListenerTracker, destroyFlightControllerListenerTracker } from './_listenerTracker.ts';
 
 import type { PhysicsState } from '../../core/physics.ts';
 import type { RocketAssembly, StagingConfig, PlacedPart } from '../../core/rocketbuilder.ts';
@@ -121,6 +122,10 @@ export async function startFlightScene(
   // Clear debris-id counter and asteroid collision cooldowns so a prior flight
   // cannot leak state into this one (e.g. carried-over asteroid immunity).
   resetFlightState();
+
+  // Create a fresh listener tracker for this flight session so sub-modules
+  // (e.g. _menuActions.ts) can register listeners that get cleaned up on stop.
+  initFlightControllerListenerTracker();
 
   const s = getFCState();
 
@@ -396,6 +401,10 @@ export function stopFlightScene(): void {
     window.__addTransferObject = undefined;
     window.__getProximityObjects = undefined;
   }
+
+  // Bulk-remove any listeners registered via the flight-controller tracker
+  // (modal/overlay click handlers from _menuActions.ts, etc).
+  destroyFlightControllerListenerTracker();
 
   // Reset all state.
   resetFCState();
