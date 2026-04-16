@@ -270,3 +270,43 @@ export function renderWeatherHaze(altitude: number, w: number, h: number, bodyId
   s.hazeGraphics.rect(0, 0, w, h);
   s.hazeGraphics.fill({ color: hazeColor, alpha: hazeAlpha });
 }
+
+// ---------------------------------------------------------------------------
+// Teardown
+// ---------------------------------------------------------------------------
+
+/**
+ * Destroy the sky/stars/horizon/haze containers and reset sky-owned state.
+ * Pooled star Graphics are released back to the pool before destroying the
+ * stars container so destroy doesn't corrupt pool entries. The other three
+ * graphics own no pooled children. Safe to call when containers were never
+ * initialised. Called from destroyFlightRenderer.
+ */
+export function destroySkyRender(): void {
+  const s = getFlightRenderState();
+
+  if (s.skyGraphics) {
+    if (s.skyGraphics.parent) s.skyGraphics.parent.removeChild(s.skyGraphics);
+    s.skyGraphics.destroy({ children: true });
+    s.skyGraphics = null;
+  }
+  if (s.starsContainer) {
+    releaseContainerChildren(s.starsContainer);
+    if (s.starsContainer.parent) s.starsContainer.parent.removeChild(s.starsContainer);
+    s.starsContainer.destroy({ children: true });
+    s.starsContainer = null;
+  }
+  if (s.horizonGraphics) {
+    if (s.horizonGraphics.parent) s.horizonGraphics.parent.removeChild(s.horizonGraphics);
+    s.horizonGraphics.destroy({ children: true });
+    s.horizonGraphics = null;
+  }
+  if (s.hazeGraphics) {
+    if (s.hazeGraphics.parent) s.hazeGraphics.parent.removeChild(s.hazeGraphics);
+    s.hazeGraphics.destroy({ children: true });
+    s.hazeGraphics = null;
+  }
+
+  s.stars             = [];
+  s.weatherVisibility = 0;
+}

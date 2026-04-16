@@ -14,7 +14,7 @@ import type { ReadonlyPhysicsState, ReadonlyAssembly, ReadonlySurfaceItem } from
 import { getFlightRenderState } from './_state.ts';
 import { MIN_ZOOM, MAX_ZOOM } from './_constants.ts';
 import { updateCamera, resetCameraState } from './_camera.ts';
-import { updateBodyVisuals, renderSky, renderStars, renderHorizon, renderWeatherHaze, generateStars } from './_sky.ts';
+import { updateBodyVisuals, renderSky, renderStars, renderHorizon, renderWeatherHaze, generateStars, destroySkyRender } from './_sky.ts';
 import { renderGround, renderSurfaceItems, renderBiomeLabel } from './_ground.ts';
 import { renderRocket, hitTestFlightPart as _hitTestFlightPart, destroyRocketRender } from './_rocket.ts';
 import {
@@ -180,31 +180,22 @@ export function destroyFlightRenderer(): void {
   const s   = getFlightRenderState();
   const app = getApp();
 
-  if (s.skyGraphics)          app.stage.removeChild(s.skyGraphics);
-  if (s.starsContainer)       app.stage.removeChild(s.starsContainer);
-  if (s.horizonGraphics)      app.stage.removeChild(s.horizonGraphics);
+  destroySkyRender();
   if (s.groundGraphics)       app.stage.removeChild(s.groundGraphics);
   if (s.surfaceItemsGraphics) app.stage.removeChild(s.surfaceItemsGraphics);
   if (s.debrisContainer)      app.stage.removeChild(s.debrisContainer);
   if (s.trailContainer)       app.stage.removeChild(s.trailContainer);
   destroyRocketRender();
   if (s.biomeLabelContainer)  app.stage.removeChild(s.biomeLabelContainer);
-  if (s.hazeGraphics)         app.stage.removeChild(s.hazeGraphics);
   if (s.asteroidsContainer)   app.stage.removeChild(s.asteroidsContainer);
   releaseGraphics(s.dockingTargetGfx);
 
-  s.skyGraphics           = null;
-  s.starsContainer        = null;
-  s.horizonGraphics       = null;
   s.groundGraphics        = null;
   s.surfaceItemsGraphics  = null;
   s.debrisContainer       = null;
   s.trailContainer        = null;
   s.biomeLabelContainer   = null;
-  s.hazeGraphics          = null;
   s.asteroidsContainer    = null;
-  s.weatherVisibility     = 0;
-  s.stars                 = [];
   s.trailSegments         = [];
   s.lastTrailTime         = null;
   s.plumeStates           = new Map();
