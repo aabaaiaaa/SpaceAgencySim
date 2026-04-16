@@ -170,7 +170,7 @@ function flushMicrotasks(): Promise<void> {
 // ---------------------------------------------------------------------------
 
 describe('main.ts startup — IDB availability check', () => {
-  it('shows fatal error and does not call initSettings when IDB is unavailable', async () => {
+  it('shows fatal error and does not call initSettings when IDB is unavailable @smoke', async () => {
     mocks.isIdbAvailable.mockReturnValue(false);
 
     // Dynamically import main.ts — this triggers the module-level main() call

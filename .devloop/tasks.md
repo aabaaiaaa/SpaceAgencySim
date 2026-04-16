@@ -25,7 +25,7 @@
 - **Verification**: `npx vitest run src/tests/collision.test.ts`
 
 ### TASK-005: Add @smoke tag to mainStartup.test.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-003
 - **Description**: In `src/tests/mainStartup.test.ts`, add ` @smoke` to the description string of the first test: change `'shows fatal error and does not call initSettings when IDB is unavailable'` to `'shows fatal error and does not call initSettings when IDB is unavailable @smoke'`.
 - **Verification**: `npx vitest run --testNamePattern "@smoke" src/tests/mainStartup.test.ts`
