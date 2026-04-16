@@ -20,6 +20,7 @@ import {
 } from './constants.ts';
 
 import { idbGet, idbSet } from './idbStorage.ts';
+import { logger } from './logger.ts';
 import { StorageQuotaError } from './saveload.ts';
 
 import type { DifficultySettings, MalfunctionMode as MalfunctionModeType } from './constants.ts';
@@ -278,7 +279,8 @@ function isValidEnvelope(value: unknown): value is SettingsEnvelope {
   if (typeof obj.version !== 'number') return false;
   if (obj.version < 1) return false;
   if (obj.version > SCHEMA_VERSION) {
-    console.warn(
+    logger.warn(
+      'settings',
       `Settings were saved with a newer schema version (${obj.version}) ` +
       `than this build supports (${SCHEMA_VERSION}). Using defaults.`,
     );

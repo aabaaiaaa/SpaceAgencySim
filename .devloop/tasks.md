@@ -121,7 +121,7 @@
 - **Verification**: `npx vitest run src/tests/hub.test.ts src/tests/mainmenu.test.ts` (or the nearest existing unit tests) passes with a new test that opens the modal, verifies focus moved to the primary button, closes, and verifies focus restored.
 
 ### TASK-021: Replace console.warn with logger.warn in settingsStore.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: At `src/core/settingsStore.ts:273`, replace the `console.warn(...)` call with `logger.warn('settings', ...)` using the existing `logger` import (add the import if not present). Preserve the message content. See requirements §5.2.
 - **Verification**: `grep -n "console.warn" src/core/settingsStore.ts` returns nothing; `npx vitest run src/tests/settingsStore.test.ts` passes.
