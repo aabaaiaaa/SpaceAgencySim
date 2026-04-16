@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 0,
+  "lastIteration": 1,
   "startedAt": "2026-04-16T15:21:22.622Z",
   "iteration": 18,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-001",
-    "taskTitle": "Extract showFatalError to src/ui/fatalError.ts",
-    "iterationNumber": 1,
-    "startedAt": "2026-04-16T15:21:22.643Z"
+    "taskId": "TASK-002",
+    "taskTitle": "Update main.ts to import showFatalError from new location",
+    "iterationNumber": 2,
+    "startedAt": "2026-04-16T15:23:35.351Z"
   }
 }

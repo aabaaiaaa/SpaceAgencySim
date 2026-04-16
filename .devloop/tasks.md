@@ -7,7 +7,7 @@
 - **Verification**: `npx tsc --noEmit src/ui/fatalError.ts` (no type errors)
 
 ### TASK-002: Update main.ts to import showFatalError from new location
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001
 - **Description**: In `src/main.ts`: (1) Remove the `showFatalError` function definition (lines 68-78) and its JSDoc comment (lines 63-67). (2) Add `import { showFatalError } from './ui/fatalError.ts';` to the imports section. (3) Verify both usages at line ~87 (IDB check) and line ~258 (catch handler) still reference `showFatalError` correctly — they should work unchanged since the function signature is identical. Do NOT remove the `export` from the main function.
 - **Verification**: `npx tsc --noEmit src/main.ts` (no type errors)
