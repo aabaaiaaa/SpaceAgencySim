@@ -119,7 +119,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/debugMode.test.ts` passes.
 
 ### TASK-018: Create src/tests/library.test.ts with round-trip tests
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-013
 - **Description**: Per requirements §3.2. Create `src/tests/library.test.ts`. Cover: (1) save craft → list includes it; (2) save → load → parts/stages/mass identical; (3) delete → list excludes it; (4) rename → new name round-trips and old name is absent; (5) duplicate-name save — document current behaviour in the test and assert it. Mock IDB if tests touch the storage layer. Tag one test `@smoke`.
 - **Verification**: `npx vitest run src/tests/library.test.ts` passes.
