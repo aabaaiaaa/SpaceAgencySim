@@ -343,7 +343,7 @@ export async function saveGame(state: GameState, slotIndex: number, saveName: st
     showPerfDashboard:  state.showPerfDashboard,
     malfunctionMode:    state.malfunctionMode as MalfunctionModeType,
   }).catch((err: unknown) => {
-    logger.warn('save', 'Settings sync failed during save', err);
+    logger.warn('save', 'Settings sync failed during save', { err });
   });
 
   const envelope: SaveEnvelope = {

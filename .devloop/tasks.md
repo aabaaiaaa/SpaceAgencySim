@@ -153,7 +153,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes. `grep -n "RocketAssembly = any" src/core/testFlightBuilder.ts` returns empty.
 
 ### TASK-023: Add logger.warn to swallowed settings-sync error in saveload.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §4.2. Open `src/core/saveload.ts:345–347` (the fire-and-forget `void saveSettings(...)` call). Replace with `.catch(err => logger.warn('save', 'Settings sync failed during save', { err }))`. Preserve the non-blocking semantics.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` passes. `npm run typecheck` passes.
