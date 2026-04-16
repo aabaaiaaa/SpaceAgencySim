@@ -49,7 +49,7 @@
 - **Verification**: `npx vitest run src/tests/mainStartup.test.ts`
 
 ### TASK-009: Add unit test for IDB connection-lost handler
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Add a test in `src/tests/idbStorage.test.ts` (in a new `describe` block named 'IDB connection-lost handler') that: (1) Registers a mock handler via `registerIdbErrorHandler(mockFn)`. (2) Performs an `idbSet` to force `openDB()` to run and cache `_db`. (3) Retrieves the cached DB's `onclose` handler and invokes it (simulating browser eviction). (4) Asserts the mock handler was called with a string containing 'unexpectedly closed'. (5) Asserts that a subsequent `idbSet`/`idbGet` attempts to reopen (doesn't use the stale connection). Import `registerIdbErrorHandler` from the module. The test may need to access internals through the `_resetDbForTesting` pattern — check what's already exported. Tag one test `@smoke` if it exercises a broad code path.
 - **Verification**: `npx vitest run src/tests/idbStorage.test.ts`

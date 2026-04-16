@@ -13,6 +13,7 @@ import {
   idbDelete,
   idbGetAllKeys,
   isIdbAvailable,
+  registerIdbErrorHandler,
   _resetDbForTesting,
 } from '../core/idbStorage.ts';
 
@@ -33,6 +34,7 @@ interface MockIdbFactory {
   open(_name: string, _version?: number): MockIDBRequest;
   _stores: Map<string, Map<string, unknown>>;
   _clear(): void;
+  _mockDb: { onclose: (() => void) | null };
 }
 
 class MockIDBRequest {
@@ -110,6 +112,7 @@ function createIdbMock(): MockIdbFactory {
     objectStoreNames = {
       contains(name: string): boolean { return stores.has(name); }
     };
+    onclose: (() => void) | null = null;
     createObjectStore(name: string): void {
       stores.set(name, new Map());
     }
@@ -135,6 +138,7 @@ function createIdbMock(): MockIdbFactory {
     },
     _stores: stores,
     _clear(): void { stores.clear(); },
+    _mockDb: mockDb,
   };
 
   return mockIndexedDB;
@@ -281,6 +285,37 @@ describe('idbStorage module', () => {
       vi.stubGlobal('indexedDB', undefined);
       _resetDbForTesting();
       await expect(idbGet('key')).rejects.toThrow(/not available/i);
+    });
+  });
+
+  describe('IDB connection-lost handler', () => {
+    it('notifies registered handler and reopens connection after onclose fires @smoke', async () => {
+      const handler = vi.fn();
+      registerIdbErrorHandler(handler);
+
+      // Force openDB() to run and cache _db.
+      await idbSet('before-close', 'value1');
+      expect(await idbGet('before-close')).toBe('value1');
+
+      // Start spying on open() so we can detect a reopen after onclose.
+      const openSpy = vi.spyOn(mockIdb, 'open');
+
+      // Invoke the onclose handler production code attached to the cached DB
+      // (simulates browser-initiated eviction / storage clear).
+      const cachedDb = mockIdb._mockDb;
+      expect(cachedDb.onclose).not.toBeNull();
+      cachedDb.onclose!();
+
+      // Error handler was notified with the expected message.
+      expect(handler).toHaveBeenCalledTimes(1);
+      const msg = handler.mock.calls[0][0] as string;
+      expect(msg).toContain('unexpectedly closed');
+
+      // A subsequent operation re-opens the connection rather than reusing
+      // the stale cached DB.
+      await idbSet('after-close', 'value2');
+      expect(openSpy).toHaveBeenCalled();
+      expect(await idbGet('after-close')).toBe('value2');
     });
   });
 });
