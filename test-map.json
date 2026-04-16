@@ -323,6 +323,7 @@
         "src/tests/surfaceOps.test.ts",
         "src/tests/techtree.test.ts",
         "src/tests/trackingStationTiers.test.ts",
+        "src/tests/ui-modalFocus.test.ts",
         "src/tests/vabTiers.test.ts",
         "src/tests/weather.test.ts"
       ],
@@ -1026,6 +1027,7 @@
       ],
       "e2e": [
         "e2e/context-menu.spec.ts",
+        "e2e/flight-hud-surface.spec.ts",
         "e2e/flight.spec.ts"
       ]
     },
@@ -1042,7 +1044,9 @@
       "sources": [
         "src/ui/hub.ts"
       ],
-      "unit": [],
+      "unit": [
+        "src/tests/ui-modalFocus.test.ts"
+      ],
       "e2e": [
         "e2e/hub-navigation.spec.ts",
         "e2e/newgame.spec.ts"
@@ -1086,7 +1090,9 @@
       "sources": [
         "src/ui/mainmenu.ts"
       ],
-      "unit": [],
+      "unit": [
+        "src/tests/ui-modalFocus.test.ts"
+      ],
       "e2e": [
         "e2e/newgame.spec.ts",
         "e2e/saveload.spec.ts"

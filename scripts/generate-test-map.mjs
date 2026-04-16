@@ -321,6 +321,7 @@ const E2E_SPEC_AREAS = {
   'e2e/fps-monitor.spec.ts':              ['core/perfMonitor', 'ui/settings'],
   'e2e/debug-mode.spec.ts':               ['ui/settings'],
   'e2e/context-menu.spec.ts':             ['core/parachute', 'ui/flightHud'],
+  'e2e/flight-hud-surface.spec.ts':       ['ui/flightHud'],
   'e2e/tutorial-revisions.spec.ts':       ['data/missions'],
   'e2e/keyboard-nav.spec.ts':             ['ui/flightController'],
   'e2e/tipping.spec.ts':                  ['core/physics'],

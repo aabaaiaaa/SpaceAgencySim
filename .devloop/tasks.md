@@ -15,7 +15,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` and manual inspection by searching `src/ui/flightHud.css` for `#flight-hud-surface` to confirm the new anchor is `right:` based rather than `left: 70px`.
 
 ### TASK-002: Add E2E bounding-box non-overlap test for Surface Ops panel
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001
 - **Description**: Per requirements §1.1 regression guard. Add `e2e/flight-hud-surface.spec.ts`. Test should: load a midGame fixture, start a flight, land the rocket (or use a fixture that lands), wait for `#flight-hud-surface` to become visible, then compute `getBoundingClientRect()` for both `#flight-hud-surface` and `#flight-left-panel` and assert the rects do NOT intersect. Tag the test `@smoke`. After the spec passes, add an entry for `'e2e/flight-hud-surface.spec.ts': ['ui/flightHud']` to `E2E_SPEC_AREAS` in `scripts/generate-test-map.mjs`.
 - **Verification**: `npx playwright test e2e/flight-hud-surface.spec.ts` passes.
