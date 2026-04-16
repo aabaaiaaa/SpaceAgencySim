@@ -7,7 +7,7 @@
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` passes with all existing tests, and typecheck/lint clean for the modified file: `npx tsc --noEmit` on the project succeeds.
 
 ### TASK-002: Detect QuotaExceededError in settingsStore.ts saveSettings
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001
 - **Description**: Mirror TASK-001 at `src/core/settingsStore.ts:202`. Reuse the `StorageQuotaError` class introduced in TASK-001 (import if it's in a different module). Other errors bubble. See requirements §1.1.
 - **Verification**: `npx vitest run src/tests/settingsStore.test.ts` passes.

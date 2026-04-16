@@ -20,6 +20,7 @@ import {
 } from './constants.ts';
 
 import { idbGet, idbSet } from './idbStorage.ts';
+import { StorageQuotaError } from './saveload.ts';
 
 import type { DifficultySettings, MalfunctionMode as MalfunctionModeType } from './constants.ts';
 import type { GameState } from './gameState.ts';
@@ -190,7 +191,7 @@ export function loadSettings(): PersistedSettings {
  * callers that do not need confirmation of the write can ignore the returned
  * Promise.
  */
-export function saveSettings(settings: PersistedSettings): Promise<void> {
+export async function saveSettings(settings: PersistedSettings): Promise<void> {
   // Update cache immediately so synchronous reads see the new values.
   _cache = { ...settings };
   _hasPersistedSettings = true;
@@ -199,7 +200,14 @@ export function saveSettings(settings: PersistedSettings): Promise<void> {
     version: SCHEMA_VERSION,
     settings,
   };
-  return idbSet(STORAGE_KEY, JSON.stringify(envelope));
+  try {
+    await idbSet(STORAGE_KEY, JSON.stringify(envelope));
+  } catch (err) {
+    if (err instanceof Error && err.name === 'QuotaExceededError') {
+      throw new StorageQuotaError('Settings save failed: storage quota exceeded', err);
+    }
+    throw err;
+  }
 }
 
 /**
