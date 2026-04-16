@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 22
-- **Completed**: 15
-- **Remaining**: 7
-- **Last Updated**: 2026-04-16T19:40:21.989Z
+- **Completed**: 16
+- **Remaining**: 6
+- **Last Updated**: 2026-04-16T19:43:20.474Z
 
 ## Iteration Log
 
@@ -142,4 +142,13 @@
 - **Exit Status**: success
 - **Tokens**: 1,555,518 total (33 in, 14,215 out, 48,881 cache-create, 1,492,389 cache-read)
 - **Cost**: $1.4072
+
+### Iteration 16 - 2026-04-16T19:43:20.473Z
+- **Task Attempted**: TASK-016
+- **Task Completed**: TASK-016
+- **Summary**: Completed Add dragCoefficient.ts to test-map.json and SOURCE_GROUPS
+- **Duration**: 2m 57s
+- **Exit Status**: success
+- **Tokens**: 1,016,878 total (22 in, 9,409 out, 58,106 cache-create, 949,341 cache-read)
+- **Cost**: $1.0732
 

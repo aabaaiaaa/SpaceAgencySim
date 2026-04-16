@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 14,
+  "lastIteration": 15,
   "startedAt": "2026-04-16T18:55:54.489Z",
   "iteration": 18,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-015",
-    "taskTitle": "Extract computePartCdA helper from physics.ts and staging.ts",
-    "iterationNumber": 15,
-    "startedAt": "2026-04-16T19:36:02.358Z"
+    "taskId": "TASK-016",
+    "taskTitle": "Add dragCoefficient.ts to test-map.json and SOURCE_GROUPS",
+    "iterationNumber": 16,
+    "startedAt": "2026-04-16T19:40:23.950Z"
   }
 }

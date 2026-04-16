@@ -91,7 +91,7 @@
 - **Verification**: `npx vitest run src/tests/physics.test.ts src/tests/staging.test.ts` passes; new `src/tests/dragCoefficient.test.ts` covers non-parachute parts, undeployed/partial/full parachute, and zero-density atmosphere.
 
 ### TASK-016: Add dragCoefficient.ts to test-map.json and SOURCE_GROUPS
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-015
 - **Description**: Add `src/core/dragCoefficient.ts` to `scripts/generate-test-map.mjs` SOURCE_GROUPS so `src/tests/dragCoefficient.test.ts` is discovered, then regenerate `test-map.json`. If a `throttleControl.ts` was introduced in TASK-006, do the same for it.
 - **Verification**: `node scripts/generate-test-map.mjs --dry-run` shows the new entries; running `node scripts/generate-test-map.mjs` updates `test-map.json`; `git diff test-map.json` shows the expected additions.

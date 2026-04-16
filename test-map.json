@@ -77,7 +77,8 @@
       ],
       "unit": [
         "src/tests/branchCoverage.test.ts",
-        "src/tests/collision.test.ts"
+        "src/tests/collision.test.ts",
+        "src/tests/staging.test.ts"
       ],
       "e2e": [
         "e2e/asteroid-belt.spec.ts",
@@ -172,6 +173,15 @@
         "e2e/orbital-operations.spec.ts"
       ]
     },
+    "core/dragCoefficient": {
+      "sources": [
+        "src/core/dragCoefficient.ts"
+      ],
+      "unit": [
+        "src/tests/dragCoefficient.test.ts"
+      ],
+      "e2e": []
+    },
     "core/finance": {
       "sources": [
         "src/core/finance.ts",
@@ -257,6 +267,7 @@
         "src/tests/debugMode.test.ts",
         "src/tests/designLibrary.test.ts",
         "src/tests/docking.test.ts",
+        "src/tests/dragCoefficient.test.ts",
         "src/tests/e2e-infrastructure.test.ts",
         "src/tests/ejector.test.ts",
         "src/tests/finance.test.ts",
@@ -471,6 +482,7 @@
       ],
       "unit": [
         "src/tests/branchCoverage.test.ts",
+        "src/tests/dragCoefficient.test.ts",
         "src/tests/legs.test.ts",
         "src/tests/parachute-deploy.test.ts",
         "src/tests/parachute-descent.test.ts",
@@ -665,6 +677,7 @@
         "src/tests/e2e-infrastructure.test.ts",
         "src/tests/idbStorage.test.ts",
         "src/tests/saveload.test.ts",
+        "src/tests/settingsStore.test.ts",
         "src/tests/storageErrors.test.ts"
       ],
       "e2e": [
@@ -737,6 +750,15 @@
       ],
       "unit": [
         "src/tests/e2e-infrastructure.test.ts"
+      ],
+      "e2e": []
+    },
+    "core/throttleControl": {
+      "sources": [
+        "src/core/throttleControl.ts"
+      ],
+      "unit": [
+        "src/tests/throttleControl.test.ts"
       ],
       "e2e": []
     },
@@ -1173,6 +1195,7 @@
         "src/ui/vab/_init.ts",
         "src/ui/vab/_inventory.ts",
         "src/ui/vab/_launchFlow.ts",
+        "src/ui/vab/_listenerTracker.ts",
         "src/ui/vab/_panels.ts",
         "src/ui/vab/_partsPanel.ts",
         "src/ui/vab/_scalebar.ts",
@@ -1184,7 +1207,8 @@
         "src/tests/ui-vabStaging.test.ts",
         "src/tests/ui-vabState.test.ts",
         "src/tests/ui-vabUndoActions.test.ts",
-        "src/tests/undoActions.test.ts"
+        "src/tests/undoActions.test.ts",
+        "src/tests/vabLifecycle.test.ts"
       ],
       "e2e": [
         "e2e/part-reconnection.spec.ts",

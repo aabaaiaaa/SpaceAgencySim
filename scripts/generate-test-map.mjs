@@ -192,6 +192,8 @@ const SOURCE_GROUPS = {
   'core/biomes':        ['src/core/biomes.ts', 'src/core/sciencemodule.ts', 'src/core/surfaceOps.ts'],
   'core/satellites':    ['src/core/satellites.ts', 'src/core/comms.ts'],
   'core/docking':       ['src/core/docking.ts', 'src/core/grabbing.ts'],
+  'core/dragCoefficient': ['src/core/dragCoefficient.ts'],
+  'core/throttleControl': ['src/core/throttleControl.ts'],
   'core/power':         ['src/core/power.ts', 'src/core/lifeSupport.ts'],
   'core/malfunction':   ['src/core/malfunction.ts', 'src/core/ejector.ts'],
   'core/finance':       ['src/core/finance.ts', 'src/core/period.ts'],
