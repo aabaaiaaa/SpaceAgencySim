@@ -4,6 +4,7 @@ import {
   VP_W, VP_H,
   FIRST_FLIGHT_MISSION, buildSaveEnvelope,
   seedAndLoadSave, startTestFlight,
+  dispatchKeyDown, dispatchKeyUp,
 } from './helpers.js';
 
 /**
@@ -32,12 +33,12 @@ test.describe('Tipping physics — ground-contact rotation', () => {
     const initAngle: number = await page.evaluate(() => window.__flightPs!.angle);
     expect(initAngle).toBeCloseTo(0, 1);
 
-    await page.keyboard.down('d');
+    await dispatchKeyDown(page, 'd');
     await page.waitForFunction(
       () => Math.abs(window.__flightPs?.angle ?? 0) > 0.4,
       { timeout: 5_000 },
     );
-    await page.keyboard.up('d');
+    await dispatchKeyUp(page, 'd');
 
     const angle: number = await page.evaluate(() => window.__flightPs!.angle);
     expect(angle).toBeGreaterThan(0);

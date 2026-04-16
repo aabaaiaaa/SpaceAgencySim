@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 7
-- **Remaining**: 97
-- **Last Updated**: 2026-04-16T22:39:07.883Z
+- **Completed**: 8
+- **Remaining**: 96
+- **Last Updated**: 2026-04-16T22:40:11.079Z
 
 ## Iteration Log
 
@@ -70,4 +70,13 @@
 - **Exit Status**: success
 - **Tokens**: 273,984 total (11 in, 1,635 out, 30,766 cache-create, 241,572 cache-read)
 - **Cost**: $0.3540
+
+### Iteration 8 - 2026-04-16T22:40:11.077Z
+- **Task Attempted**: TASK-008
+- **Task Completed**: TASK-008
+- **Summary**: Completed Migrate tipping.spec.ts to dispatchKeyDown / dispatchKeyUp
+- **Duration**: 1m 2s
+- **Exit Status**: success
+- **Tokens**: 414,559 total (14 in, 1,742 out, 31,690 cache-create, 381,113 cache-read)
+- **Cost**: $0.4322
 

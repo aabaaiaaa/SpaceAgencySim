@@ -55,7 +55,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes. Grep confirms `dispatchKeyDown` and `dispatchKeyUp` are exported from the barrel.
 
 ### TASK-008: Migrate tipping.spec.ts to dispatchKeyDown / dispatchKeyUp
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-007
 - **Description**: Per requirements §2.2. Open `e2e/tipping.spec.ts`. Replace `page.keyboard.down('d')` at line 35 and `page.keyboard.up('d')` at line 40 with `dispatchKeyDown(page, 'd')` and `dispatchKeyUp(page, 'd')`. Import from helpers barrel.
 - **Verification**: `npx playwright test e2e/tipping.spec.ts` passes.

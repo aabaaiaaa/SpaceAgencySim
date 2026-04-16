@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 6,
+  "lastIteration": 7,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-007",
-    "taskTitle": "Add dispatchKeyDown / dispatchKeyUp helpers in _keyboard.ts",
-    "iterationNumber": 7,
-    "startedAt": "2026-04-16T22:38:12.483Z"
+    "taskId": "TASK-008",
+    "taskTitle": "Migrate tipping.spec.ts to dispatchKeyDown / dispatchKeyUp",
+    "iterationNumber": 8,
+    "startedAt": "2026-04-16T22:39:09.570Z"
   }
 }
