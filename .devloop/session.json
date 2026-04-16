@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 2,
+  "lastIteration": 3,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-003",
-    "taskTitle": "Remove triggerAutoSave('post-flight') call in _postFlight.ts",
-    "iterationNumber": 3,
-    "startedAt": "2026-04-16T22:34:16.348Z"
+    "taskId": "TASK-004",
+    "taskTitle": "Verify no close-proximity auto-save triggers in _loop.ts / _menuActions.ts",
+    "iterationNumber": 4,
+    "startedAt": "2026-04-16T22:35:13.173Z"
   }
 }

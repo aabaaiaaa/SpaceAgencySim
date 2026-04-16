@@ -27,7 +27,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes and `npx vitest run src/tests/autoSave.test.ts` passes.
 
 ### TASK-004: Verify no close-proximity auto-save triggers in _loop.ts / _menuActions.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-003
 - **Description**: Per requirements §1.2. Grep for `triggerAutoSave` in `src/ui/flightController/_loop.ts` and `src/ui/flightController/_menuActions.ts`. If any call sites exist within ~5 seconds of the hub-return path (e.g., abort-flight flows), document them in a short comment block and confirm the review's single-toast debounce issue does not recur. No code changes expected unless a problem is found.
 - **Verification**: Grep output for `triggerAutoSave` across `src/ui/flightController/**` and `src/ui/` is listed in the task's final message. No close-proximity issues found.
