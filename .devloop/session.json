@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 1,
+  "lastIteration": 2,
   "startedAt": "2026-04-16T15:21:22.622Z",
   "iteration": 18,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-002",
-    "taskTitle": "Update main.ts to import showFatalError from new location",
-    "iterationNumber": 2,
-    "startedAt": "2026-04-16T15:23:35.351Z"
+    "taskId": "TASK-003",
+    "taskTitle": "Update mainStartup.test.ts mocks for fatalError extraction",
+    "iterationNumber": 3,
+    "startedAt": "2026-04-16T15:26:01.814Z"
   }
 }

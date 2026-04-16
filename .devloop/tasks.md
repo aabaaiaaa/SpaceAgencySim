@@ -13,7 +13,7 @@
 - **Verification**: `npx tsc --noEmit src/main.ts` (no type errors)
 
 ### TASK-003: Update mainStartup.test.ts mocks for fatalError extraction
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-002
 - **Description**: In `src/tests/mainStartup.test.ts`: (1) Add a hoisted mock for `showFatalError` in the `mocks` object: `showFatalError: vi.fn()`. (2) Add `vi.mock('../ui/fatalError.ts', () => ({ showFatalError: mocks.showFatalError }));` to the module mocks section. (3) Update the first test ('shows fatal error...') to assert `expect(mocks.showFatalError).toHaveBeenCalledTimes(1)` and that the call argument contains 'IndexedDB', instead of checking `document.body.appendChild`. (4) Update the second test ('calls initSettings...') to assert `expect(mocks.showFatalError).not.toHaveBeenCalled()`. (5) Update the third test ('creates a styled error overlay...') to import `showFatalError` from `'../ui/fatalError.ts'` instead of `'../main.ts'`, and test it directly (this test can keep using the DOM stub approach since it tests the function's DOM behavior). Keep all existing assertions that still apply.
 - **Verification**: `npx vitest run src/tests/mainStartup.test.ts`

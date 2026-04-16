@@ -41,6 +41,7 @@ const mocks = vi.hoisted(() => ({
   getPartById: vi.fn(),
   autoSaveImmediate: vi.fn(),
   isAutoSaveEnabled: vi.fn(),
+  showFatalError: vi.fn(),
   logger: { debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() },
 }));
 
@@ -112,6 +113,9 @@ vi.mock('../core/autoSave.ts', () => ({
   isAutoSaveEnabled: mocks.isAutoSaveEnabled,
   AUTO_SAVE_KEY: 'spaceAgencySave_auto',
 }));
+vi.mock('../ui/fatalError.ts', () => ({
+  showFatalError: mocks.showFatalError,
+}));
 
 // ---------------------------------------------------------------------------
 // Minimal DOM stubs for Node.js test environment
@@ -176,11 +180,9 @@ describe('main.ts startup — IDB availability check', () => {
     // initSettings should NOT have been called since main() returned early
     expect(mocks.initSettings).not.toHaveBeenCalled();
 
-    // showFatalError should have appended an error element to document.body
-    expect(document.body.appendChild).toHaveBeenCalledTimes(1);
-    const el = appendedElements[0];
-    expect(el).toBeDefined();
-    expect(el.textContent).toContain('IndexedDB');
+    // showFatalError should have been called with a message mentioning IndexedDB
+    expect(mocks.showFatalError).toHaveBeenCalledTimes(1);
+    expect(mocks.showFatalError.mock.calls[0][0]).toContain('IndexedDB');
   });
 
   it('calls initSettings when IDB is available', async () => {
@@ -193,19 +195,18 @@ describe('main.ts startup — IDB availability check', () => {
     expect(mocks.initSettings).toHaveBeenCalledTimes(1);
 
     // No fatal error should have been shown
-    expect(appendedElements).toHaveLength(0);
+    expect(mocks.showFatalError).not.toHaveBeenCalled();
   });
 });
 
 describe('showFatalError', () => {
   it('creates a styled error overlay and appends it to document.body', async () => {
-    // Import the exported function directly (module-level main() also runs,
-    // but with isIdbAvailable returning true by default it won't show an error)
-    mocks.isIdbAvailable.mockReturnValue(true);
-    const { showFatalError } = await import('../main.ts');
-    await flushMicrotasks();
+    // Import the real function from its new dedicated module (not the mock)
+    // We need to unmock fatalError.ts for this specific test to test actual DOM behavior
+    vi.doUnmock('../ui/fatalError.ts');
+    const { showFatalError } = await import('../ui/fatalError.ts');
 
-    // Clear any calls from the module-level main()
+    // Clear any prior state
     (document.body.appendChild as ReturnType<typeof vi.fn>).mockClear();
     appendedElements = [];
 
