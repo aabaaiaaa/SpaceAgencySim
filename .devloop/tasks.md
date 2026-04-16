@@ -13,7 +13,7 @@
 - **Verification**: `npx vitest run src/tests/settingsStore.test.ts` passes.
 
 ### TASK-003: Upgrade autoSave quota handling to distinguish quota from generic failure
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-001, TASK-002
 - **Description**: In `src/core/autoSave.ts` (around line 150), inside the existing try/catch, detect `StorageQuotaError` (or the raw `QuotaExceededError` equivalent) and surface a distinct user-visible message via the existing notification system ("Save storage full — consider deleting old saves"). Keep the existing generic-failure logging for other errors. See requirements §1.1.
 - **Verification**: `npx vitest run src/tests/autoSave.test.ts` passes, including a new test that simulates quota exhaustion and asserts the user-facing message.

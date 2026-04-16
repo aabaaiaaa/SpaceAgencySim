@@ -43,11 +43,12 @@ import {
   hasAutoSave,
   deleteAutoSave,
   AUTO_SAVE_KEY,
+  AUTO_SAVE_QUOTA_MESSAGE,
   _setSessionStartTimeForTesting,
   _resetAutoSaveSlotForTesting,
 } from '../core/autoSave.ts';
 
-import { compressSaveData, decompressSaveData } from '../core/saveload.ts';
+import { compressSaveData, decompressSaveData, StorageQuotaError } from '../core/saveload.ts';
 import { idbSet, idbDelete } from '../core/idbStorage.ts';
 import { logger } from '../core/logger.ts';
 import type { LogLevel } from '../core/logger.ts';
@@ -168,6 +169,31 @@ describe('performAutoSave', () => {
 
     expect(result.success).toBe(false);
     expect(result.error).toBe('IDB write failed');
+    expect(result.quotaExceeded).toBeFalsy();
+  });
+
+  it('surfaces a quota-specific user message when idbSet throws QuotaExceededError', async () => {
+    const state = freshState();
+    const quotaErr = new Error('The quota has been exceeded.');
+    quotaErr.name = 'QuotaExceededError';
+    vi.mocked(idbSet).mockRejectedValueOnce(quotaErr);
+
+    const result = await performAutoSave(state);
+
+    expect(result.success).toBe(false);
+    expect(result.quotaExceeded).toBe(true);
+    expect(result.error).toBe(AUTO_SAVE_QUOTA_MESSAGE);
+  });
+
+  it('surfaces a quota-specific user message when idbSet throws StorageQuotaError', async () => {
+    const state = freshState();
+    vi.mocked(idbSet).mockRejectedValueOnce(new StorageQuotaError('quota gone'));
+
+    const result = await performAutoSave(state);
+
+    expect(result.success).toBe(false);
+    expect(result.quotaExceeded).toBe(true);
+    expect(result.error).toBe(AUTO_SAVE_QUOTA_MESSAGE);
   });
 
   it('creates a deep clone of state in the envelope @smoke', async () => {

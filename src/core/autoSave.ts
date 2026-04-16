@@ -9,9 +9,13 @@
  */
 
 import { idbSet, idbGet, idbDelete, idbGetAllKeys } from './idbStorage.ts';
-import { compressSaveData, decompressSaveData, SAVE_VERSION } from './saveload.ts';
+import { compressSaveData, decompressSaveData, SAVE_VERSION, StorageQuotaError } from './saveload.ts';
+import { logger } from './logger.ts';
 
 import type { GameState } from './gameState.ts';
+
+/** User-facing message for quota-exceeded auto-save failures. */
+export const AUTO_SAVE_QUOTA_MESSAGE = 'Save storage full \u2014 consider deleting old saves';
 
 /** Prefix for save keys. */
 const MANUAL_SAVE_PREFIX = 'spaceAgencySave_';
@@ -126,7 +130,7 @@ async function _getAutoSaveKey(agencyName: string): Promise<string> {
  */
 export async function performAutoSave(
   state: GameState | null | undefined,
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; error?: string; quotaExceeded?: boolean }> {
   if (!state) return { success: false, error: 'No state provided' };
 
   // Accumulate elapsed session time.
@@ -150,6 +154,11 @@ export async function performAutoSave(
     await idbSet(saveKey, compressed);
   } catch (err: unknown) {
     const error = err as { name?: string; message?: string };
+    if (err instanceof StorageQuotaError || error?.name === 'QuotaExceededError') {
+      logger.warn('autoSave', 'Auto-save failed: storage quota exceeded', err);
+      return { success: false, error: AUTO_SAVE_QUOTA_MESSAGE, quotaExceeded: true };
+    }
+    logger.warn('autoSave', 'Auto-save failed', err);
     return { success: false, error: error?.message ?? 'Unknown error' };
   }
 
