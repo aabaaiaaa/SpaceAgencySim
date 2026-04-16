@@ -9,7 +9,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 ## Section 1 — Bug Fixes
 
 ### TASK-001: Reposition #flight-hud-surface to right-anchored position in flightHud.css
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §1.1. Edit `src/ui/flightHud.css` rules for `#flight-hud-surface` (around lines 645–655). Change from `left: 70px` to a right-anchored position (e.g., `right: 260px; bottom: 10px`) so the panel sits left of the objectives panel and clear of the time-warp panel. Remove `max-width: 200px` only if the new zone accommodates the buttons. Preserve the `display: none` collapse when not landed.
 - **Verification**: `npm run typecheck` and manual inspection by searching `src/ui/flightHud.css` for `#flight-hud-surface` to confirm the new anchor is `right:` based rather than `left: 70px`.

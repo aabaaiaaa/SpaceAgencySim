@@ -640,12 +640,12 @@
 #hud-band-warning.hidden { display: none; }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Surface Operations panel — bottom-left, visible only when landed
+   Surface Operations panel — bottom-right (left of objectives, clear of time-warp), visible only when landed
    ═══════════════════════════════════════════════════════════════════════════ */
 #flight-hud-surface {
   position: absolute;
   bottom: 10px;
-  left: 70px;
+  right: 260px;
   background: rgba(0, 8, 0, 0.78);
   border: 1px solid #486828;
   border-radius: 4px;
