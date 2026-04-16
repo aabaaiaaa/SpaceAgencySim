@@ -31,7 +31,7 @@
 - **Verification**: `npx vitest run --testNamePattern "@smoke" src/tests/mainStartup.test.ts`
 
 ### TASK-006: Add @smoke tag to previewLayout.test.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/tests/previewLayout.test.ts`, add ` @smoke` to the description string of the second test: change `'computes scale that fits multiple parts within preview bounds'` to `'computes scale that fits multiple parts within preview bounds @smoke'`.
 - **Verification**: `npx vitest run --testNamePattern "@smoke" src/tests/previewLayout.test.ts`

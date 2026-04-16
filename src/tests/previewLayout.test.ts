@@ -12,7 +12,7 @@ describe('computePreviewLayout', () => {
     expect(computePreviewLayout([], dims)).toBeNull();
   });
 
-  it('computes scale that fits multiple parts within preview bounds', () => {
+  it('computes scale that fits multiple parts within preview bounds @smoke', () => {
     const parts: PartRect[] = [
       { x: 0, y: 0, width: 20, height: 40 },
       { x: 50, y: 80, width: 20, height: 40 },

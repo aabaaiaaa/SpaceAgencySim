@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 4,
+  "lastIteration": 5,
   "startedAt": "2026-04-16T15:21:22.622Z",
   "iteration": 18,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-005",
-    "taskTitle": "Add @smoke tag to mainStartup.test.ts",
-    "iterationNumber": 5,
-    "startedAt": "2026-04-16T15:30:20.530Z"
+    "taskId": "TASK-006",
+    "taskTitle": "Add @smoke tag to previewLayout.test.ts",
+    "iterationNumber": 6,
+    "startedAt": "2026-04-16T15:31:11.563Z"
   }
 }
