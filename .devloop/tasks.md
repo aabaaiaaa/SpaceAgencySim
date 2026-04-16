@@ -125,7 +125,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/library.test.ts` passes.
 
 ### TASK-019: Update generator + test-map.json for library
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-018
 - **Description**: Per requirements §11. First edit `scripts/generate-test-map.mjs`: remove `'src/core/library.ts'` from the `SKIP_SOURCES` set (approx line 228). Then run `npm run test-map:generate` and verify `src/core/library.ts` now maps to `src/tests/library.test.ts` in `test-map.json`. Commit both the generator change and the regenerated `test-map.json`.
 - **Verification**: `grep -A 3 '"src/core/library.ts"' test-map.json` shows `src/tests/library.test.ts` in its `unit` list. `grep -n "src/core/library" scripts/generate-test-map.mjs` does not show it under SKIP_SOURCES.

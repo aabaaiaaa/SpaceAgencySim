@@ -225,7 +225,6 @@ const SKIP_SOURCES = new Set([
   'src/render/index.ts',
   'src/render/types.ts',       // internal render type definitions
   'src/core/transferObjects.ts', // internal helper
-  'src/core/library.ts',       // internal helper
   'src/core/debugSaves.ts',    // dev utility
   'src/ui/library.ts',         // internal helper
   'src/ui/debugSaves.ts',      // dev utility

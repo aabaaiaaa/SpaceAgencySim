@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 17,
+  "lastIteration": 18,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-018",
-    "taskTitle": "Create src/tests/library.test.ts with round-trip tests",
-    "iterationNumber": 18,
-    "startedAt": "2026-04-16T22:51:55.828Z"
+    "taskId": "TASK-019",
+    "taskTitle": "Update generator + test-map.json for library",
+    "iterationNumber": 19,
+    "startedAt": "2026-04-16T23:03:04.540Z"
   }
 }

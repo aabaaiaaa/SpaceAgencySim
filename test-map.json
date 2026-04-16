@@ -287,6 +287,7 @@
         "src/tests/instruments.test.ts",
         "src/tests/launchPadTiers.test.ts",
         "src/tests/legs.test.ts",
+        "src/tests/library.test.ts",
         "src/tests/lifeSupport.test.ts",
         "src/tests/logistics-layout.test.ts",
         "src/tests/malfunction.test.ts",
@@ -371,17 +372,23 @@
       ],
       "e2e": []
     },
+    "core/library": {
+      "sources": [
+        "src/core/library.ts"
+      ],
+      "unit": [
+        "src/tests/library.test.ts"
+      ],
+      "e2e": []
+    },
     "core/logger": {
       "sources": [
         "src/core/logger.ts"
       ],
       "unit": [
-        "src/tests/autoSave.test.ts",
         "src/tests/branchCoverage.test.ts",
-        "src/tests/debugMode.test.ts",
         "src/tests/logger.test.ts",
         "src/tests/saveload.test.ts",
-        "src/tests/storageErrors.test.ts",
         "src/tests/undoRedo.test.ts"
       ],
       "e2e": []
@@ -794,6 +801,7 @@
       "unit": [
         "src/tests/bodies.test.ts",
         "src/tests/hubs.test.ts",
+        "src/tests/library.test.ts",
         "src/tests/multiBodyLanding.test.ts",
         "src/tests/resources.test.ts"
       ],
