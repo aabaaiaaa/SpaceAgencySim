@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 4,
+  "lastIteration": 5,
   "startedAt": "2026-04-16T18:55:54.489Z",
   "iteration": 18,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-005",
-    "taskTitle": "Fix fire-and-forget saveSettings in saveGame",
-    "iterationNumber": 5,
-    "startedAt": "2026-04-16T19:05:45.033Z"
+    "taskId": "TASK-006",
+    "taskTitle": "Add setThrottleInstant core helper",
+    "iterationNumber": 6,
+    "startedAt": "2026-04-16T19:07:38.735Z"
   }
 }

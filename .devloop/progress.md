@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 22
-- **Completed**: 5
-- **Remaining**: 17
-- **Last Updated**: 2026-04-16T19:07:36.186Z
+- **Completed**: 6
+- **Remaining**: 16
+- **Last Updated**: 2026-04-16T19:09:22.244Z
 
 ## Iteration Log
 
@@ -52,4 +52,13 @@
 - **Exit Status**: success
 - **Tokens**: 799,334 total (20 in, 4,117 out, 67,722 cache-create, 727,475 cache-read)
 - **Cost**: $0.8900
+
+### Iteration 6 - 2026-04-16T19:09:22.235Z
+- **Task Attempted**: TASK-006
+- **Task Completed**: TASK-006
+- **Summary**: Completed Add setThrottleInstant core helper
+- **Duration**: 1m 43s
+- **Exit Status**: success
+- **Tokens**: 717,003 total (19 in, 3,504 out, 61,660 cache-create, 651,820 cache-read)
+- **Cost**: $0.7990
 

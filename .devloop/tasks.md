@@ -31,7 +31,7 @@
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` passes, including a new test that simulates a settings-write failure inside saveGame and asserts the main save still completes while the failure is logged.
 
 ### TASK-006: Add setThrottleInstant core helper
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Add a new function `setThrottleInstant(ps, value)` (in `src/core/physics.ts` or a new `src/core/throttleControl.ts`). When called, set `ps.throttle = value` and if `ps.throttleMode === 'twr'`, also set `ps.targetTWR` to `Infinity` for value=1 or `0` for value=0. Export it. No call sites updated yet. See requirements §2.1.
 - **Verification**: `npx vitest run src/tests/` (targeted at the new helper's test file) passes with a new test covering both throttle modes.
