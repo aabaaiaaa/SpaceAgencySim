@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 15,
+  "lastIteration": 16,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-016",
-    "taskTitle": "Remove per-file logger.setLevel('warn') from storageErrors.test.ts",
-    "iterationNumber": 16,
-    "startedAt": "2026-04-16T22:49:36.839Z"
+    "taskId": "TASK-017",
+    "taskTitle": "Remove per-file logger.setLevel('warn') from debugMode.test.ts",
+    "iterationNumber": 17,
+    "startedAt": "2026-04-16T22:50:46.652Z"
   }
 }

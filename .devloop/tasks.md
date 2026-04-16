@@ -113,7 +113,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/storageErrors.test.ts` passes.
 
 ### TASK-017: Remove per-file logger.setLevel('warn') from debugMode.test.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-013
 - **Description**: Per requirements §3.1. Same treatment, applied to `src/tests/debugMode.test.ts`.
 - **Verification**: `npx vitest run src/tests/debugMode.test.ts` passes.
