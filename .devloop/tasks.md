@@ -49,7 +49,7 @@
 - **Verification**: `npx vitest run src/tests/` targeted at existing VAB tests passes with no regression; `npx tsc --noEmit` passes.
 
 ### TASK-009: Route vab/_panels.ts window keydown listeners through tracker
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-008
 - **Description**: Replace the three bare `window.addEventListener('keydown', ...)` calls at `src/ui/vab/_panels.ts:354, 373, 396` with tracker-registered listeners so they are removed on VAB destroy. See requirements §2.2.
 - **Verification**: `npx vitest run src/tests/` existing VAB tests pass; grep confirms no `window.addEventListener` remains directly in `_panels.ts`.

@@ -44,6 +44,7 @@ import {
   recordDeletion,
   recordClearAll,
 } from './_undoActions.ts';
+import { getVabListenerTracker } from './_listenerTracker.ts';
 
 import type { GameState } from '../../core/gameState.ts';
 
@@ -349,9 +350,14 @@ export function bindButtons(root: HTMLElement): void {
  */
 export function bindKeyboardShortcuts(): void {
   const S = getVabState();
+  const tracker = getVabListenerTracker();
+  if (!tracker) throw new Error('VAB listener tracker not initialised');
+  const addKeydown = (handler: (e: KeyboardEvent) => void): void => {
+    tracker.add(window, 'keydown', handler as EventListener);
+  };
 
   // Delete / Backspace: remove selected part.
-  window.addEventListener('keydown', (e: KeyboardEvent) => {
+  addKeydown((e: KeyboardEvent) => {
     if ((e.code !== 'Delete' && e.code !== 'Backspace') || !S.selectedInstanceId || !S.assembly) return;
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
     e.preventDefault();
@@ -370,7 +376,7 @@ export function bindKeyboardShortcuts(): void {
   });
 
   // Ctrl+Z: undo. Ctrl+Y / Ctrl+Shift+Z: redo.
-  window.addEventListener('keydown', (e: KeyboardEvent) => {
+  addKeydown((e: KeyboardEvent) => {
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
     if (!S.assembly || !S.stagingConfig) return;
 
@@ -393,7 +399,7 @@ export function bindKeyboardShortcuts(): void {
   });
 
   // Spacebar: fire next stage during flight.
-  window.addEventListener('keydown', (e: KeyboardEvent) => {
+  addKeydown((e: KeyboardEvent) => {
     if (e.code !== 'Space' || !S.flightActive || !S.stagingConfig) return;
     e.preventDefault();
     fireStagingStep(S.stagingConfig);
