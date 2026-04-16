@@ -183,6 +183,8 @@ function resolveImport(specifier, importerAbsPath) {
 
 // Groups of related source files that share an area name
 const SOURCE_GROUPS = {
+  'app/main':           ['src/main.ts'],
+  'ui/fatalError':      ['src/ui/fatalError.ts'],
   'core/gameState':     ['src/core/gameState.ts', 'src/core/constants.ts'],
   'core/rocketbuilder': ['src/core/rocketbuilder.ts', 'src/core/rocketvalidator.ts'],
   'core/orbit':         ['src/core/orbit.ts', 'src/core/manoeuvre.ts'],

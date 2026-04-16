@@ -55,7 +55,7 @@
 - **Verification**: `npx vitest run src/tests/idbStorage.test.ts`
 
 ### TASK-010: Add src/main.ts to generate-test-map.mjs SOURCE_GROUPS
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `scripts/generate-test-map.mjs`, add an entry to the `SOURCE_GROUPS` object (around line 186): `'app/main': ['src/main.ts'],`. This ensures the test-map generator classifies `src/main.ts` imports properly and maps `mainStartup.test.ts` to the `app/main` area. Also add `'ui/fatalError': ['src/ui/fatalError.ts'],` to SOURCE_GROUPS since it's a standalone utility not grouped with other UI utilities.
 - **Verification**: `node scripts/generate-test-map.mjs --dry-run 2>&1 | grep -c "app/main"` should output 1
