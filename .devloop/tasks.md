@@ -85,7 +85,7 @@
 - **Verification**: `npx vitest run src/tests/staging.test.ts src/tests/collision.test.ts` passes, including a new test that simulates two sequential flights and asserts both counters/cooldowns are reset between them.
 
 ### TASK-015: Extract computePartCdA helper from physics.ts and staging.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Create `src/core/dragCoefficient.ts` exporting `computePartCdA(def, deployProgress, atmosphereDensity)`. Move the duplicated parachute-interpolation + drag-coefficient logic from `src/core/physics.ts:1660–1702` (`_computeDragForce`) and `src/core/staging.ts:946–974` (`_debrisDrag`) into this helper. Have both call sites use it. Preserve behaviour exactly — run the existing physics and staging tests to confirm no regression. See requirements §3.4.
 - **Verification**: `npx vitest run src/tests/physics.test.ts src/tests/staging.test.ts` passes; new `src/tests/dragCoefficient.test.ts` covers non-parachute parts, undeployed/partial/full parachute, and zero-density atmosphere.

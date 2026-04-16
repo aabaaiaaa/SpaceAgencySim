@@ -92,6 +92,7 @@ import { getWindForce } from './weather.ts';
 import { initPowerState, tickPower, recalcPowerState } from './power.ts';
 import { getOrbitalStateAtTime, orbitalStateToCartesian, computeOrbitalElements } from './orbit.ts';
 import { logger } from './logger.ts';
+import { computePartCdA } from './dragCoefficient.ts';
 
 import type { AltitudeBand, ControlMode as ControlModeType } from './constants.ts';
 import type { FlightState, FlightEvent, OrbitalElements, PowerState, GameState, InventoryPart } from './gameState.ts';
@@ -1668,35 +1669,16 @@ function _computeDragForce(ps: PhysicsState, assembly: RocketAssembly, density: 
     if (!placed) continue;
     const def: PartDef | undefined = getPartById(placed.partId);
     if (!def) continue;
-    const props  = def.properties ?? {};
-    const widthM: number = (def.width ?? 40) * SCALE_M_PER_PX;
-    const area: number   = Math.PI * (widthM / 2) ** 2; // stowed circular cross-section
 
-    if (def.type === PartType.PARACHUTE) {
-      // Stowed CdA — used when packed or failed.
-      const stowedCdA: number = (props.dragCoefficient ?? 0.05) * area;
-
-      // Deployed CdA — uses the real canopy diameter, not the stowed profile.
-      const deployedR: number   = (props.deployedDiameter ?? 10) / 2;
-      const deployedCd: number  = props.deployedCd ?? 0.75;
-      const deployedCdA: number = deployedCd * Math.PI * deployedR * deployedR;
-
-      // Linearly interpolate from stowed → deployed as the canopy opens.
-      // Scale by atmospheric density so chutes are ineffective near vacuum.
-      const progress: number     = _getChuteDeployProgress(ps, instanceId);
-      const densityScale: number = Math.min(1, density / LOW_DENSITY_THRESHOLD);
-      let   chuteCdA: number     = stowedCdA + (deployedCdA - stowedCdA) * progress * densityScale;
-
-      // Partial deploy malfunction: 50 % of normal deployed drag.
-      const cMalf = ps.malfunctions?.get(instanceId);
-      if (cMalf && !cMalf.recovered && cMalf.type === MalfunctionType.PARACHUTE_PARTIAL) {
-        chuteCdA = stowedCdA + (chuteCdA - stowedCdA) * PARTIAL_CHUTE_FACTOR;
-      }
-
-      totalCdA += chuteCdA;
-    } else {
-      totalCdA += (props.dragCoefficient ?? 0.2) * area;
+    // Partial-deploy malfunction scales the deployed fraction by PARTIAL_CHUTE_FACTOR,
+    // which is algebraically equivalent to scaling the deployProgress passed in.
+    let progress: number = _getChuteDeployProgress(ps, instanceId);
+    const cMalf = ps.malfunctions?.get(instanceId);
+    if (cMalf && !cMalf.recovered && cMalf.type === MalfunctionType.PARACHUTE_PARTIAL) {
+      progress *= PARTIAL_CHUTE_FACTOR;
     }
+
+    totalCdA += computePartCdA(def, progress, density);
   }
 
   return 0.5 * density * speed * speed * totalCdA;

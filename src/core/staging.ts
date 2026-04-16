@@ -38,13 +38,14 @@ import { getPartById }              from '../data/parts.ts';
 import { PartType }                 from './constants.ts';
 import { airDensity, SEA_LEVEL_DENSITY } from './atmosphere.ts';
 import { tickFuelSystem }           from './fuelsystem.ts';
-import { deployParachute, DEPLOY_DURATION, LOW_DENSITY_THRESHOLD } from './parachute.ts';
+import { deployParachute, DEPLOY_DURATION } from './parachute.ts';
 import { deployLandingLeg, getDeployedLegFootOffset } from './legs.ts';
 import { activateEjectorSeat } from './ejector.ts';
 import { activateScienceModule, activateInstrument, parseInstrumentKey } from './sciencemodule.ts';
 import { applySeparationImpulse, resetAsteroidCollisionCooldowns } from './collision.ts';
 import { getMalfunction } from './malfunction.ts';
 import { MalfunctionType } from './constants.ts';
+import { computePartCdA } from './dragCoefficient.ts';
 
 import type { PhysicsState, RocketAssembly } from './physics.ts';
 import type { FlightState, FlightEvent } from './gameState.ts';
@@ -975,21 +976,10 @@ function _debrisDrag(debris: DebrisState, assembly: RocketAssembly, density: num
     const def    = placed ? getPartById(placed.partId) : null;
     if (!def) continue;
 
-    const props  = (def.properties ?? {}) as Record<string, number>;
-    const widthM = (def.width ?? 40) * SCALE_M_PER_PX;
-    const area   = Math.PI * (widthM / 2) ** 2; // stowed circular cross-section
-
-    if (def.type === PartType.PARACHUTE) {
-      const stowedCdA   = (props.dragCoefficient ?? 0.05) * area;
-      const deployedR   = (props.deployedDiameter ?? 10) / 2;
-      const deployedCd  = props.deployedCd ?? 0.75;
-      const deployedCdA = deployedCd * Math.PI * deployedR * deployedR;
-      const progress     = _getDebrisChuteDeployProgress(debris, id);
-      const densityScale = Math.min(1, density / LOW_DENSITY_THRESHOLD);
-      totalCdA += stowedCdA + (deployedCdA - stowedCdA) * progress * densityScale;
-    } else {
-      totalCdA += (props.dragCoefficient ?? 0.2) * area;
-    }
+    const progress = def.type === PartType.PARACHUTE
+      ? _getDebrisChuteDeployProgress(debris, id)
+      : 0;
+    totalCdA += computePartCdA(def, progress, density);
   }
 
   return 0.5 * density * speed * speed * totalCdA;
