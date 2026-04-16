@@ -73,7 +73,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx playwright test e2e/keyboard-nav.spec.ts` passes fully. `grep -n "page.keyboard" e2e/keyboard-nav.spec.ts` returns empty.
 
 ### TASK-011: Verify migrated keyboard specs pass together
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-008, TASK-010
 - **Description**: No code changes. Run both migrated specs together.
 - **Verification**: `npx playwright test e2e/keyboard-nav.spec.ts e2e/tipping.spec.ts` passes.
