@@ -245,7 +245,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes.
 
 ### TASK-037: Audit src/ui/ for remaining raw addEventListener sites
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-034, TASK-035, TASK-036
 - **Description**: Per requirements §6.4. Run `grep -rn "addEventListener" src/ui/` and list all sites not routed through a `ListenerTracker` and not paired with an explicit `removeEventListener` in a visible cleanup path. Produce a task-result summary with the list. Don't migrate in this task — just enumerate.
 - **Verification**: The task's final message contains a bulleted list of remaining sites with file:line and a brief note about each.

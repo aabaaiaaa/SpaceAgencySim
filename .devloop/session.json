@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 35,
+  "lastIteration": 36,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-036",
-    "taskTitle": "Migrate listeners in library.ts through ListenerTracker",
-    "iterationNumber": 36,
-    "startedAt": "2026-04-16T23:54:47.181Z"
+    "taskId": "TASK-037",
+    "taskTitle": "Audit src/ui/ for remaining raw addEventListener sites",
+    "iterationNumber": 37,
+    "startedAt": "2026-04-16T23:56:11.259Z"
   }
 }

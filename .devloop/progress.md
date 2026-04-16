@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 36
-- **Remaining**: 68
-- **Last Updated**: 2026-04-16T23:56:09.105Z
+- **Completed**: 37
+- **Remaining**: 67
+- **Last Updated**: 2026-04-16T23:58:25.673Z
 
 ## Iteration Log
 
@@ -331,4 +331,13 @@
 - **Exit Status**: success
 - **Tokens**: 600,386 total (16 in, 2,981 out, 41,021 cache-create, 556,368 cache-read)
 - **Cost**: $0.6092
+
+### Iteration 37 - 2026-04-16T23:58:25.670Z
+- **Task Attempted**: TASK-037
+- **Task Completed**: TASK-037
+- **Summary**: Completed Audit src/ui/ for remaining raw addEventListener sites
+- **Duration**: 2m 14s
+- **Exit Status**: success
+- **Tokens**: 297,246 total (10 in, 7,509 out, 56,772 cache-create, 232,955 cache-read)
+- **Cost**: $0.6591
 
