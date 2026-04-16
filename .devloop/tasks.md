@@ -95,7 +95,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/logger.test.ts` (or any single test) passes with the new config. `npm run typecheck` passes.
 
 ### TASK-014: Remove per-file logger.setLevel('warn') from saveload.test.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-013
 - **Description**: Per requirements §3.1. Open `src/tests/saveload.test.ts`. Remove the `beforeEach(() => logger.setLevel('warn'))` block — the global setup now handles it. Remove the unused `logger` import if it becomes unused.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` passes.
