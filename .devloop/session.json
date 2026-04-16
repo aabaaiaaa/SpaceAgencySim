@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 5,
+  "lastIteration": 6,
   "startedAt": "2026-04-16T15:21:22.622Z",
   "iteration": 18,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-006",
-    "taskTitle": "Add @smoke tag to previewLayout.test.ts",
-    "iterationNumber": 6,
-    "startedAt": "2026-04-16T15:31:11.563Z"
+    "taskId": "TASK-007",
+    "taskTitle": "Add IDB connection-lost handler to idbStorage.ts",
+    "iterationNumber": 7,
+    "startedAt": "2026-04-16T15:32:02.771Z"
   }
 }

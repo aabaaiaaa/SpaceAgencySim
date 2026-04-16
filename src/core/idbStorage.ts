@@ -24,6 +24,8 @@ let _db: IDBDatabase | null = null;
 
 let _dbPromise: Promise<IDBDatabase> | null = null;
 
+let _onConnectionLost: ((msg: string) => void) | null = null;
+
 /**
  * Opens (or returns the cached) IndexedDB database connection.
  * Creates the object store on first open.
@@ -55,6 +57,16 @@ function openDB(): Promise<IDBDatabase> {
 
     request.onsuccess = () => {
       _db = request.result;
+      _db.onclose = () => {
+        _db = null;
+        _dbPromise = null;
+        if (_onConnectionLost) {
+          _onConnectionLost(
+            'The storage connection was unexpectedly closed. ' +
+            'Your recent progress may not be saved. Try refreshing the page.',
+          );
+        }
+      };
       _dbPromise = null;
       resolve(_db);
     };
@@ -78,6 +90,15 @@ function openDB(): Promise<IDBDatabase> {
  */
 export function isIdbAvailable(): boolean {
   return typeof indexedDB !== 'undefined';
+}
+
+/**
+ * Registers a handler to be called if the IndexedDB connection is
+ * unexpectedly closed mid-session (e.g. storage eviction, user clearing
+ * site data).
+ */
+export function registerIdbErrorHandler(handler: (msg: string) => void): void {
+  _onConnectionLost = handler;
 }
 
 /**
@@ -156,4 +177,5 @@ export function _resetDbForTesting(): void {
   }
   _db = null;
   _dbPromise = null;
+  _onConnectionLost = null;
 }

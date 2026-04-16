@@ -37,7 +37,7 @@
 - **Verification**: `npx vitest run --testNamePattern "@smoke" src/tests/previewLayout.test.ts`
 
 ### TASK-007: Add IDB connection-lost handler to idbStorage.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: In `src/core/idbStorage.ts`: (1) Add a module-level variable `let _onConnectionLost: ((msg: string) => void) | null = null;` after the existing module-level variables. (2) Export a registration function `registerIdbErrorHandler(handler: (msg: string) => void): void` that sets `_onConnectionLost = handler`. (3) In the `openDB()` function, after `_db = request.result;` (line 58), add a `_db.onclose` handler that resets `_db = null; _dbPromise = null;` and calls `_onConnectionLost` with the message: `'The storage connection was unexpectedly closed. Your recent progress may not be saved. Try refreshing the page.'`. (4) In `_resetDbForTesting()`, add `_onConnectionLost = null;` to prevent test callback leaks. See requirements.md section 5 for exact code.
 - **Verification**: `npx vitest run src/tests/idbStorage.test.ts`
