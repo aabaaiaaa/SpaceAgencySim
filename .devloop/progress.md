@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 19
-- **Remaining**: 85
-- **Last Updated**: 2026-04-16T23:04:14.467Z
+- **Completed**: 20
+- **Remaining**: 84
+- **Last Updated**: 2026-04-16T23:20:44.587Z
 
 ## Iteration Log
 
@@ -178,4 +178,13 @@
 - **Exit Status**: success
 - **Tokens**: 263,653 total (11 in, 1,101 out, 29,160 cache-create, 233,381 cache-read)
 - **Cost**: $0.3265
+
+### Iteration 20 - 2026-04-16T23:20:44.584Z
+- **Task Attempted**: TASK-020
+- **Task Completed**: TASK-020
+- **Summary**: Completed Add mission→finance smoke E2E test
+- **Duration**: 16m 27s
+- **Exit Status**: success
+- **Tokens**: 2,963,151 total (43 in, 13,177 out, 163,639 cache-create, 2,786,292 cache-read)
+- **Cost**: $2.7455
 

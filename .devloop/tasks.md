@@ -131,7 +131,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `grep -A 3 '"src/core/library.ts"' test-map.json` shows `src/tests/library.test.ts` in its `unit` list. `grep -n "src/core/library" scripts/generate-test-map.mjs` does not show it under SKIP_SOURCES.
 
 ### TASK-020: Add mission→finance smoke E2E test
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-013
 - **Description**: Per requirements §3.3. Create `e2e/mission-finance-loop.spec.ts` (or add a new `@smoke` test to an existing mission spec). Flow: load mid-game fixture → complete a specific mission (preferably via test-helper API rather than a full flight) → assert funds increased by the expected reward → assert a previously-unaffordable part in the catalog is now affordable. Runtime under 10 s.
 - **Verification**: `npx playwright test e2e/mission-finance-loop.spec.ts` passes (or the extended spec).
