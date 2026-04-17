@@ -521,7 +521,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/finance.test.ts src/tests/contracts.test.ts` passes.
 
 ### TASK-081: Extract src/core/constants/flight.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-080
 - **Description**: Per requirements §9. Move remaining flight/orbit/docking/power/malfunction/part-type constants to `src/core/constants/flight.ts`. At this point, `constants.ts` is a barrel of 5 topical files.
 - **Verification**: `npm run typecheck` passes. `npm run build` succeeds. `npm run test:smoke:unit` passes.

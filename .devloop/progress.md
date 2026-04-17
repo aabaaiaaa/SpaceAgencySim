@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 80
-- **Remaining**: 24
-- **Last Updated**: 2026-04-17T02:47:43.490Z
+- **Completed**: 81
+- **Remaining**: 23
+- **Last Updated**: 2026-04-17T02:51:14.933Z
 
 ## Iteration Log
 
@@ -727,4 +727,13 @@
 - **Exit Status**: success
 - **Tokens**: 2,636,088 total (31 in, 25,113 out, 99,762 cache-create, 2,511,182 cache-read)
 - **Cost**: $2.5071
+
+### Iteration 81 - 2026-04-17T02:51:14.929Z
+- **Task Attempted**: TASK-081
+- **Task Completed**: TASK-081
+- **Summary**: Completed Extract src/core/constants/flight.ts
+- **Duration**: 3m 29s
+- **Exit Status**: success
+- **Tokens**: 496,457 total (17 in, 12,678 out, 54,922 cache-create, 428,840 cache-read)
+- **Cost**: $0.8747
 

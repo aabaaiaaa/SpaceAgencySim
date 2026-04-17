@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 79,
+  "lastIteration": 80,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-080",
-    "taskTitle": "Extract src/core/constants/economy.ts",
-    "iterationNumber": 80,
-    "startedAt": "2026-04-17T02:40:37.452Z"
+    "taskId": "TASK-081",
+    "taskTitle": "Extract src/core/constants/flight.ts",
+    "iterationNumber": 81,
+    "startedAt": "2026-04-17T02:47:45.627Z"
   }
 }
