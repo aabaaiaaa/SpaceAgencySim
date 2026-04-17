@@ -92,12 +92,6 @@ import {
   updateThrottleFromTWR as _updateThrottleFromTWR,
   type ThrustResult,
 } from './physics/thrust.ts';
-import {
-  RCS_TORQUE_MULTIPLIER,
-  hasRcs as _hasRcs,
-  applyRcsAngularDamping,
-} from './physics/rcs.ts';
-
 import type { AltitudeBand, ControlMode as ControlModeType } from './constants.ts';
 import type { FlightState, FlightEvent, OrbitalElements, PowerState, GameState, InventoryPart } from './gameState.ts';
 
@@ -467,7 +461,7 @@ interface EjectedCrewEntry {
 }
 
 /** A 2D point in VAB local pixel coordinates. */
-interface Point2D {
+export interface Point2D {
   x: number;
   y: number;
 }
@@ -513,24 +507,17 @@ const TILT_SNAP_THRESHOLD: number = 0.005;
 const ANGULAR_VEL_SNAP_THRESHOLD: number = 0.05;
 
 // -- Airborne torque-based rotation constants --------------------------------
-/** N·m of torque applied by player A/D input while airborne. */
-const PLAYER_FLIGHT_TORQUE: number = 2000;
-/** Angular damping coefficient in atmosphere (proportional to density). */
-const AERO_ANGULAR_DAMPING: number = 0.02;
+// Airborne steering constants (PLAYER_FLIGHT_TORQUE, AERO_ANGULAR_DAMPING,
+// CHUTE_DIRECT_DAMPING, MAX_PLAYER_ANGULAR_ACCEL, MAX_CHUTE_ANGULAR_ACCEL)
+// moved to ./physics/steering.ts alongside applySteering.
 /** Tuning knob for parachute stabilization torque strength. */
 const CHUTE_TORQUE_SCALE: number = 3.0;
-/** Angular velocity decay rate (1/s) for deployed parachutes. */
-const CHUTE_DIRECT_DAMPING: number = 5.0;
-/** Maximum angular acceleration (rad/s²) from player input. */
-const MAX_PLAYER_ANGULAR_ACCEL: number = 2.0;
-/** Maximum angular acceleration (rad/s²) from parachute torques. */
-const MAX_CHUTE_ANGULAR_ACCEL: number = 50.0;
 
 /**
  * Look up the highest value of a crew skill among the flight's crew.
  * Uses ps._gameState (set by flightController) and flightState.crewIds.
  */
-function _getMaxCrewSkill(
+export function _getMaxCrewSkill(
   ps: PhysicsState,
   flightState: FlightState | null,
   skill: 'piloting' | 'engineering' | 'science',
@@ -554,7 +541,7 @@ function _getMaxCrewSkill(
  * Delegates to body-aware density when bodyId is present, otherwise
  * falls back to Earth's default model.
  */
-function _densityForBody(altitude: number, bodyId: string | undefined): number {
+export function _densityForBody(altitude: number, bodyId: string | undefined): number {
   if (bodyId && bodyId !== 'EARTH') {
     return airDensityForBody(altitude, bodyId);
   }
@@ -565,7 +552,7 @@ function _densityForBody(altitude: number, bodyId: string | undefined): number {
  * Return the atmosphere top altitude for a body.
  * Falls back to Earth's ATMOSPHERE_TOP if bodyId is not given.
  */
-function _atmosphereTopForBody(bodyId: string | undefined): number {
+export function _atmosphereTopForBody(bodyId: string | undefined): number {
   if (bodyId && bodyId !== 'EARTH') {
     return getAtmosphereTop(bodyId);
   }
@@ -1140,7 +1127,7 @@ function _computeTotalMass(ps: MassQueryable, assembly: RocketAssembly): number 
 /**
  * Compute the centre of mass in VAB local pixel coordinates.
  */
-function _computeCoMLocal(ps: MassQueryable, assembly: RocketAssembly): Point2D {
+export function _computeCoMLocal(ps: MassQueryable, assembly: RocketAssembly): Point2D {
   let totalMass = 0;
   let comX = 0;
   let comY = 0;
@@ -1223,7 +1210,7 @@ function _computeGroundContactPoint(ps: PhysicsState, assembly: RocketAssembly, 
  * I = sum(m_i × r_i²) where r_i is the distance from each part's centre to
  * the pivot, converted to metres.
  */
-function _computeMomentOfInertia(ps: MassQueryable, assembly: RocketAssembly, pivot: Point2D): number {
+export function _computeMomentOfInertia(ps: MassQueryable, assembly: RocketAssembly, pivot: Point2D): number {
   let I = 0;
 
   for (const instanceId of ps.activeParts) {
@@ -1315,7 +1302,7 @@ function _computeDragForce(ps: PhysicsState, assembly: RocketAssembly, density: 
  * part's VAB position relative to CoM.  This creates a pendulum-like restoring
  * torque that naturally orients the rocket with the parachute on top.
  */
-function _computeParachuteTorque(
+export function _computeParachuteTorque(
   ps: PhysicsState,
   assembly: RocketAssembly,
   com: Point2D,
@@ -1399,7 +1386,7 @@ const ASTEROID_TORQUE_FACTOR = 0.00002;
  * Returns 0 when no asteroid is captured, thrust is aligned, or engines are
  * not firing.
  */
-function _computeAsteroidTorque(
+export function _computeAsteroidTorque(
   ps: PhysicsState,
   assembly: RocketAssembly,
   thrustMagnitude: number,
@@ -1424,97 +1411,11 @@ function _computeAsteroidTorque(
 }
 
 // ---------------------------------------------------------------------------
-// Steering (private)
+// Steering — extracted to ./physics/steering.ts (includes parachute torque and
+// parachute-damping branches; _applyGroundedSteering is still defined below).
 // ---------------------------------------------------------------------------
 
-function _applySteering(
-  ps: PhysicsState,
-  assembly: RocketAssembly,
-  altitude: number,
-  dt: number,
-  bodyId: string | undefined,
-  flightState: FlightState,
-  thrustMagnitude: number = 0,
-): void {
-  // In RCS mode, rotation is disabled.
-  if (ps.controlMode === ControlMode.RCS) return;
-
-  // In DOCKING mode, A/D don't rotate — they're handled by _applyDockingMovement.
-  if (ps.controlMode === ControlMode.DOCKING) return;
-
-  const left: boolean  = ps._heldKeys.has('a') || ps._heldKeys.has('ArrowLeft');
-  const right: boolean = ps._heldKeys.has('d') || ps._heldKeys.has('ArrowRight');
-
-  // Grounded or landed: delegate to tipping physics (always runs for gravity torque).
-  if (ps.grounded || ps.landed) {
-    _applyGroundedSteering(ps, assembly, left, right, dt, bodyId);
-    return;
-  }
-
-  // --- Airborne torque-based rotation ---
-  const com: Point2D = _computeCoMLocal(ps, assembly);
-  const I: number = _computeMomentOfInertia(ps, assembly, com);
-  const density: number = _densityForBody(Math.max(0, ps.posY), bodyId);
-  const speed: number   = Math.hypot(ps.velX, ps.velY);
-  const atmoTop: number = _atmosphereTopForBody(bodyId);
-
-  // Player input torque — compute angular acceleration and cap it so light
-  // rockets don't spin uncontrollably.
-  // Piloting skill bonus: up to +30% torque at max skill.
-  const pilotingSkill: number = _getMaxCrewSkill(ps, flightState, 'piloting');
-  const pilotingBonus: number = 1 + (pilotingSkill / 100) * 0.3;
-  let baseTorque: number = PLAYER_FLIGHT_TORQUE * pilotingBonus;
-  if (altitude > atmoTop && _hasRcs(ps, assembly)) {
-    baseTorque *= RCS_TORQUE_MULTIPLIER;
-  }
-  let playerAlpha = 0;
-  if (right) playerAlpha += baseTorque / I;
-  if (left)  playerAlpha -= baseTorque / I;
-  playerAlpha = Math.max(-MAX_PLAYER_ANGULAR_ACCEL, Math.min(MAX_PLAYER_ANGULAR_ACCEL, playerAlpha));
-
-  // Parachute restoring torque (pendulum effect) — capped per angular accel
-  // to prevent integration blow-up on very light capsules.
-  let restoringTorque: number = _computeParachuteTorque(ps, assembly, com, density, speed);
-  let restoringAlpha: number = restoringTorque / I;
-  restoringAlpha = Math.max(-MAX_CHUTE_ANGULAR_ACCEL, Math.min(MAX_CHUTE_ANGULAR_ACCEL, restoringAlpha));
-
-  // Captured asteroid torque — when engines fire with an unaligned asteroid,
-  // the off-CoM thrust produces a rotational torque that spins the craft.
-  const asteroidAlpha: number = _computeAsteroidTorque(ps, assembly, thrustMagnitude);
-
-  const alpha: number = playerAlpha + restoringAlpha + asteroidAlpha;
-  ps.angularVelocity += alpha * dt;
-
-  // Parachute angular damping — applied as implicit exponential decay so it
-  // is unconditionally stable even for tiny moments of inertia.
-  if (density > 0 && ps.parachuteStates) {
-    let hasActiveChute = false;
-    for (const [, entry] of ps.parachuteStates) {
-      if (entry.state === 'deploying' || entry.state === 'deployed') {
-        hasActiveChute = true;
-        break;
-      }
-    }
-    if (hasActiveChute) {
-      const densityFrac: number = Math.min(1, density / LOW_DENSITY_THRESHOLD);
-      ps.angularVelocity *= Math.exp(-CHUTE_DIRECT_DAMPING * densityFrac * dt);
-    }
-  }
-
-  // Damping (when no input).
-  if (!left && !right) {
-    // Aerodynamic damping (proportional to density).
-    const aeroDamping: number = AERO_ANGULAR_DAMPING * density;
-    ps.angularVelocity -= aeroDamping * ps.angularVelocity * dt;
-
-    // RCS active braking in vacuum.
-    if (altitude > atmoTop && _hasRcs(ps, assembly)) {
-      applyRcsAngularDamping(ps, I, dt);
-    }
-  }
-
-  ps.angle += ps.angularVelocity * dt;
-}
+import { applySteering as _applySteering } from './physics/steering.ts';
 
 /** Returns true if any parachute is currently deploying or deployed. */
 function _hasActiveParachutes(ps: PhysicsState): boolean {
@@ -1550,7 +1451,7 @@ function _hasAsymmetricLegs(ps: PhysicsState, _assembly: RocketAssembly): boolea
  * a restoring or toppling torque depending on how far the CoM has moved past
  * the support base.  Player A/D input adds an additional torque.
  */
-function _applyGroundedSteering(
+export function _applyGroundedSteering(
   ps: PhysicsState,
   assembly: RocketAssembly,
   left: boolean,
