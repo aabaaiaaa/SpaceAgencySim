@@ -48,17 +48,18 @@ import './flightHud.css';
 import { markThrottleDirty } from './flightController/_loop.ts';
 import { setThrottleInstant } from '../core/throttleControl.ts';
 import { createListenerTracker, type ListenerTracker } from './listenerTracker.ts';
+import {
+  G0,
+  getFlightHudState,
+  setFlightHudState,
+  resetFlightHudState,
+  formatAltitude,
+  estimateApoapsis,
+  buildFuelTankList,
+} from './flightHud/_state.ts';
 import type { PhysicsState } from '../core/physics.ts';
 import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.ts';
 import type { FlightState, GameState } from '../core/gameState.ts';
-
-// ---------------------------------------------------------------------------
-// Physics constant
-// ---------------------------------------------------------------------------
-
-/** Standard gravity (m/s^2) — used for ballistic apoapsis estimate. */
-const G0: number = 9.81;
-
 
 // ---------------------------------------------------------------------------
 // Module state
@@ -89,17 +90,8 @@ let _onTimeWarpChange: ((level: number) => void) | null = null;
 /** Callback invoked when the player clicks "Abort to Hub" after repeated HUD errors. */
 let _onAbort: (() => void) | null = null;
 
-/** Count of consecutive _tick errors (reset to 0 on each successful frame). */
-let _consecutiveErrors: number = 0;
-
 /** Whether the error banner is currently visible. */
 let _errorBanner: HTMLElement | null = null;
-
-/** Current active time warp level (1, 2, 5, 10, or 50). */
-let _timeWarp: number = 1;
-
-/** Whether the warp buttons are locked out (e.g. during a staging sequence). */
-let _warpLocked: boolean = false;
 
 /** Surface operations panel. */
 let _elSurfacePanel: HTMLElement | null = null;
@@ -122,7 +114,6 @@ let _elStagingList: HTMLElement | null = null;    // left-panel staging containe
 let _elFuelList: HTMLElement | null = null;       // left-panel fuel list
 let _elObjList: HTMLElement | null = null;        // objectives panel (top-right, unchanged)
 let _elLaunchTip: HTMLElement | null = null;      // launch pad "press space" tip
-let _launchTipHidden: boolean = false;            // once hidden, stays hidden
 
 // Altitude tape elements:
 let _elAltTape: HTMLElement | null = null;        // altitude tape container
@@ -172,11 +163,8 @@ export function initFlightHud(
   _onTimeWarpChange = onTimeWarpChange ?? null;
   _onSurfaceAction  = onSurfaceAction ?? null;
   _onAbort          = onAbort ?? null;
-  _timeWarp         = 1;
-  _warpLocked       = false;
   _warpButtons      = [];
-  _launchTipHidden  = false;
-  _consecutiveErrors = 0;
+  resetFlightHudState();
   _errorBanner       = null;
   _listeners         = createListenerTracker();
 
@@ -246,10 +234,8 @@ export function destroyFlightHud(): void {
   _onTimeWarpChange = null;
   _onSurfaceAction  = null;
   _onAbort          = null;
-  _timeWarp         = 1;
-  _warpLocked       = false;
   _warpButtons      = [];
-  _consecutiveErrors = 0;
+  resetFlightHudState();
   _errorBanner       = null;
 
   _elThrottleFill  = null;
@@ -267,7 +253,6 @@ export function destroyFlightHud(): void {
   _elBiome         = null;
   _elObjList       = null;
   _elLaunchTip     = null;
-  _launchTipHidden = false;
 
   _elAltTape       = null;
   _elAltTapeTicks  = null;
@@ -294,7 +279,7 @@ export function destroyFlightHud(): void {
  * reason (button click, automatic reset, etc.).
  */
 export function setHudTimeWarp(level: number): void {
-  _timeWarp = level;
+  setFlightHudState({ timeWarp: level });
   for (const btn of _warpButtons) {
     const btnLevel = parseFloat(btn.dataset.warp ?? '1');
     btn.classList.toggle('active', btnLevel === level);
@@ -308,7 +293,7 @@ export function setHudTimeWarp(level: number): void {
  * rendered as disabled so the player cannot change the warp level.
  */
 export function lockTimeWarp(locked: boolean): void {
-  _warpLocked = locked;
+  setFlightHudState({ warpLocked: locked });
   for (const btn of _warpButtons) {
     btn.disabled = locked;
   }
@@ -670,7 +655,7 @@ function _buildTimeWarpPanel(): void {
     btn.dataset.warp    = String(level);
     btn.setAttribute('aria-label', level === 0 ? 'Pause' : `Time warp ${btnLabel}`);
     _listeners?.add(btn, 'click', () => {
-      if (_warpLocked) return;
+      if (getFlightHudState().warpLocked) return;
       if (_onTimeWarpChange) _onTimeWarpChange(level);
     });
     _warpButtons.push(btn);
@@ -685,7 +670,7 @@ function _buildTimeWarpPanel(): void {
  * Called by the flight controller after initFlightHud.
  */
 export function showLaunchTip(): void {
-  _launchTipHidden = false;
+  setFlightHudState({ launchTipHidden: false });
   if (_elLaunchTip) _elLaunchTip.hidden = false;
 }
 
@@ -693,7 +678,7 @@ export function showLaunchTip(): void {
  * Permanently hide the launch tip (e.g. after first spacebar press fires Stage 1).
  */
 export function hideLaunchTip(): void {
-  _launchTipHidden = true;
+  setFlightHudState({ launchTipHidden: true });
   if (_elLaunchTip) _elLaunchTip.hidden = true;
 }
 
@@ -940,11 +925,12 @@ function _tick(): void {
       _updateAltTape();
       _updateControlModeIndicator();
       _updateSurfacePanel();
-      _consecutiveErrors = 0;
+      setFlightHudState({ consecutiveErrors: 0 });
     } catch (err) {
-      _consecutiveErrors++;
-      logger.error('flightHud', `Tick error (${_consecutiveErrors} consecutive)`, { error: String(err) });
-      if (_consecutiveErrors >= _MAX_CONSECUTIVE_ERRORS && !_errorBanner) {
+      const next = getFlightHudState().consecutiveErrors + 1;
+      setFlightHudState({ consecutiveErrors: next });
+      logger.error('flightHud', `Tick error (${next} consecutive)`, { error: String(err) });
+      if (next >= _MAX_CONSECUTIVE_ERRORS && !_errorBanner) {
         _showErrorBanner();
       }
     }
@@ -974,7 +960,7 @@ function _showErrorBanner(): void {
   continueBtn.textContent = 'Try to Continue';
   continueBtn.className = 'error-banner-btn-continue';
   _listeners?.add(continueBtn, 'click', () => {
-    _consecutiveErrors = 0;
+    setFlightHudState({ consecutiveErrors: 0 });
     if (_errorBanner) { _errorBanner.remove(); _errorBanner = null; }
   });
 
@@ -1084,7 +1070,7 @@ function _updateLeftPanel(): void {
   if (_elApo) {
     const alt = Math.max(0, _ps!.posY ?? 0);
     const vy  = _ps!.velY ?? 0;
-    const apo = _estimateApoapsis(alt, vy);
+    const apo = estimateApoapsis(alt, vy);
     if (apo > alt + 10) {
       _elApo.textContent = apo >= 1000
         ? `${(apo / 1000).toFixed(1)} km`
@@ -1324,20 +1310,14 @@ function _updateStagingList(): void {
 function _updateFuelList(): void {
   if (!_elFuelList || !_ps || !_assembly) return;
 
-  const entries: { instanceId: string; fuelKg: number }[] = [];
-  for (const [instanceId, fuelKg] of _ps.fuelStore) {
-    if (!_ps.activeParts.has(instanceId)) continue;
-    if (fuelKg < 0.1) continue;
-    entries.push({ instanceId, fuelKg });
-  }
-  entries.sort((a, b) => b.fuelKg - a.fuelKg);
+  const rows = buildFuelTankList(_ps.fuelStore, _ps.activeParts, _assembly);
 
-  const fingerprint = entries.map((e) => `${e.instanceId}:${Math.round(e.fuelKg)}`).join('|');
+  const fingerprint = rows.map((r) => `${r.instanceId}:${Math.round(r.fuelKg)}`).join('|');
   if (_elFuelList.dataset.fp === fingerprint) return;
   _elFuelList.dataset.fp = fingerprint;
   _elFuelList.innerHTML  = '';
 
-  if (entries.length === 0) {
+  if (rows.length === 0) {
     const empty = document.createElement('div');
     empty.className = 'hud-empty';
     empty.textContent = 'Empty';
@@ -1345,11 +1325,7 @@ function _updateFuelList(): void {
     return;
   }
 
-  for (const { instanceId, fuelKg } of entries) {
-    const placed = _assembly!.parts.get(instanceId);
-    const def    = placed ? getPartById(placed.partId) : null;
-    const name   = def?.name ?? placed?.partId ?? instanceId;
-
+  for (const { name, fuelKg } of rows) {
     const row = document.createElement('div');
     row.className = 'flight-lp-fuel-row';
 
@@ -1359,7 +1335,7 @@ function _updateFuelList(): void {
 
     const kgEl = document.createElement('span');
     kgEl.className = 'flight-lp-fuel-kg';
-    kgEl.textContent = `${_fmtAlt(fuelKg)} kg`;
+    kgEl.textContent = `${formatAltitude(fuelKg)} kg`;
 
     row.appendChild(nameEl);
     row.appendChild(kgEl);
@@ -1426,11 +1402,11 @@ function _updateCrewList(): void {
  * Hide it once the rocket has left the pad or a stage has been fired.
  */
 function _updateLaunchTip(): void {
-  if (_launchTipHidden || !_elLaunchTip) return;
+  if (getFlightHudState().launchTipHidden || !_elLaunchTip) return;
   // Hide if rocket has moved or staging has advanced beyond stage 0.
   const launched = _ps && (!_ps.grounded || (_stagingConfig && _stagingConfig.currentStageIdx > 0));
   if (launched) {
-    _launchTipHidden = true;
+    setFlightHudState({ launchTipHidden: true });
     _elLaunchTip.hidden = true;
   }
 }
@@ -1545,37 +1521,4 @@ function _setThrottleForTWR1(): void {
   const remaining = weightN - srbThrust; // thrust needed from throttleable engines
   if (maxThrust <= 0) return;
   _ps.throttle = Math.min(1, Math.max(0, remaining / maxThrust));
-}
-
-// ---------------------------------------------------------------------------
-// Private — utilities
-// ---------------------------------------------------------------------------
-
-/**
- * Format a number with a thousands separator.
- */
-function _fmtAlt(n: number): string {
-  return Math.round(n).toLocaleString('en-US');
-}
-
-/**
- * Format a signed speed value (+NNN.N or -NNN.N).
- */
-function _fmtSigned(ms: number): string {
-  const sign = ms >= 0 ? '+' : '';
-  return `${sign}${ms.toFixed(1)}`;
-}
-
-/**
- * Estimate the apoapsis altitude using the ballistic parabolic equation.
- *
- * Ignores ongoing thrust and atmospheric drag — this is an instantaneous
- * "coasting" estimate suitable for a real-time HUD readout.
- *
- * Formula:  apoapsis = altitude + velY^2 / (2 x g)   (when velY > 0)
- * When descending (velY <= 0) the current altitude IS the apoapsis.
- */
-function _estimateApoapsis(altitude: number, velY: number): number {
-  if (velY <= 0) return altitude;
-  return altitude + (velY * velY) / (2 * G0);
 }

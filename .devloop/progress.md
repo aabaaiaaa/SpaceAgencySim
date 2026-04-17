@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 84
-- **Remaining**: 20
-- **Last Updated**: 2026-04-17T02:56:00.459Z
+- **Completed**: 85
+- **Remaining**: 19
+- **Last Updated**: 2026-04-17T03:00:44.138Z
 
 ## Iteration Log
 
@@ -763,4 +763,13 @@
 - **Exit Status**: success
 - **Tokens**: 1,082,145 total (21 in, 5,952 out, 62,826 cache-create, 1,013,346 cache-read)
 - **Cost**: $1.0482
+
+### Iteration 85 - 2026-04-17T03:00:44.133Z
+- **Task Attempted**: TASK-085
+- **Task Completed**: TASK-085
+- **Summary**: Completed Update flightHud.ts to use the new reducer
+- **Duration**: 4m 42s
+- **Exit Status**: success
+- **Tokens**: 4,223,730 total (48 in, 14,687 out, 111,360 cache-create, 4,097,635 cache-read)
+- **Cost**: $3.1122
 

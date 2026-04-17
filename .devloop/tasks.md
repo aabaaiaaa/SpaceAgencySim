@@ -549,7 +549,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes. The new file exists and exports the state API.
 
 ### TASK-085: Update flightHud.ts to use the new reducer
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-084
 - **Description**: Per requirements §10.1. In `src/ui/flightHud.ts`, replace the ad-hoc module-level state and pure helpers with calls to `getFlightHudState` / `setFlightHudState`. DOM wiring, event listeners, and PixiJS calls stay in `flightHud.ts`.
 - **Verification**: `npm run typecheck` passes. `npx playwright test e2e/flight.spec.ts` passes (the flight E2E exercises flightHud).
