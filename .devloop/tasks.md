@@ -469,7 +469,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `grep -B 1 -A 10 '"src/core/physics/' test-map.json` shows entries. The `core/physics` area includes sources `src/core/physics.ts` plus all new `src/core/physics/*.ts` and `src/core/physics/phases/*.ts` files.
 
 ### TASK-073: Add focused unit test for physics/gravity.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-072
 - **Description**: Per requirements §8 (tests only where new seams are usefully testable). Add `src/tests/physics-gravity.test.ts`. Cover flat-mode gravity, radial-mode gravity on Earth, radial-mode gravity on a non-Earth body (Mun) — catches a recurrence of the body-aware bug class.
 - **Verification**: `npx vitest run src/tests/physics-gravity.test.ts` passes.
