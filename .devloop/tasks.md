@@ -327,7 +327,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` passes.
 
 ### TASK-050: Move payload validation (any-typed guards) to saveEncoding.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-048
 - **Description**: Per requirements §7.2. Move the post-parse validators (the ones with `eslint-disable no-explicit-any` at `saveload.ts:804, 856`) to `saveEncoding.ts`. `saveload.ts` imports them.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` passes. `npm run lint` passes.

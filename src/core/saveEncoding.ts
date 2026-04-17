@@ -10,6 +10,7 @@
 
 import { compressToUTF16, decompressFromUTF16 } from 'lz-string';
 import { crc32 } from './crc32.ts';
+import { logger } from './logger.ts';
 
 export { crc32 } from './crc32.ts';
 
@@ -153,4 +154,175 @@ export function parseBinaryEnvelope(bytes: Uint8Array): string {
   // Decode payload as UTF-8.
   const decoder = new TextDecoder();
   return decoder.decode(payloadBytes);
+}
+
+// ---------------------------------------------------------------------------
+// Payload Validation (post-parse, any-typed guards)
+// ---------------------------------------------------------------------------
+
+/**
+ * Validates that an object looks like a serialised GameState.
+ * Checks types of all top-level required fields; rejects on the first error.
+ * Then validates critical nested structures, filtering out corrupted entries
+ * rather than failing the entire load.
+ *
+ * Exported with an underscore prefix so it can be tested independently;
+ * treat it as an internal implementation detail.
+ *
+ * @throws {Error} Describing the first validation failure found.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- validates untrusted deserialized JSON
+export function _validateState(state: any): void {
+  // Numeric top-level fields.
+  for (const field of ['money', 'playTimeSeconds']) {
+    if (typeof state[field] !== 'number') {
+      throw new Error(
+        `Import failed: state.${field} must be a number; got ${typeof state[field]}.`
+      );
+    }
+  }
+
+  // Loan object.
+  if (!state.loan || typeof state.loan !== 'object' || Array.isArray(state.loan)) {
+    throw new Error('Import failed: state.loan must be a plain object.');
+  }
+  if (typeof state.loan.balance !== 'number') {
+    throw new Error('Import failed: state.loan.balance must be a number.');
+  }
+  if (typeof state.loan.interestRate !== 'number') {
+    throw new Error('Import failed: state.loan.interestRate must be a number.');
+  }
+
+  // Array fields.
+  for (const field of ['crew', 'rockets', 'parts', 'flightHistory']) {
+    if (!Array.isArray(state[field])) {
+      throw new Error(`Import failed: state.${field} must be an array.`);
+    }
+  }
+
+  // Missions sub-object.
+  if (!state.missions || typeof state.missions !== 'object' || Array.isArray(state.missions)) {
+    throw new Error('Import failed: state.missions must be a plain object.');
+  }
+  for (const field of ['available', 'accepted', 'completed']) {
+    if (!Array.isArray(state.missions[field])) {
+      throw new Error(`Import failed: state.missions.${field} must be an array.`);
+    }
+  }
+
+  // Filter corrupted nested entries (shared with loadGame).
+  _validateNestedStructures(state);
+}
+
+/**
+ * Validates critical nested array structures within a game state,
+ * filtering out corrupted entries rather than failing the entire load/import.
+ * Logs a warning for each collection that had entries removed.
+ *
+ * Safe to call on partially-migrated state (missing arrays are skipped).
+ *
+ * Exported with an underscore prefix for testing; treat as internal.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- validates untrusted deserialized JSON
+export function _validateNestedStructures(state: any): void {
+  // Missions: accepted and completed entries must have id (string), title (string), reward (number).
+  if (state.missions && typeof state.missions === 'object') {
+    for (const bucket of ['accepted', 'completed']) {
+      if (!Array.isArray(state.missions[bucket])) continue;
+      const original = state.missions[bucket];
+      const filtered = original.filter((entry: Record<string, unknown>) => {
+        if (!entry || typeof entry !== 'object') return false;
+        if (typeof entry.id !== 'string') return false;
+        if (typeof entry.title !== 'string') return false;
+        if (typeof entry.reward !== 'number') return false;
+        return true;
+      });
+      if (filtered.length < original.length) {
+        const removed = original.length - filtered.length;
+        logger.warn('save', `Filtered ${removed} corrupted entries from missions.${bucket}`, {
+          originalCount: original.length,
+          keptCount: filtered.length,
+        });
+        state.missions[bucket] = filtered;
+      }
+    }
+  }
+
+  // Crew: each entry must have name (string), status (defined), skills (object).
+  if (Array.isArray(state.crew)) {
+    const original = state.crew;
+    const filtered = original.filter((entry: Record<string, unknown>) => {
+      if (!entry || typeof entry !== 'object') return false;
+      if (typeof entry.name !== 'string') return false;
+      if (entry.status === undefined || entry.status === null) return false;
+      if (!entry.skills || typeof entry.skills !== 'object' || Array.isArray(entry.skills)) return false;
+      return true;
+    });
+    if (filtered.length < original.length) {
+      const removed = original.length - filtered.length;
+      logger.warn('save', `Filtered ${removed} corrupted entries from crew`, {
+        originalCount: original.length,
+        keptCount: filtered.length,
+      });
+      state.crew = filtered;
+    }
+  }
+
+  // Orbital objects: each entry must have id (string), bodyId (string), elements (object).
+  if (Array.isArray(state.orbitalObjects)) {
+    const original = state.orbitalObjects;
+    const filtered = original.filter((entry: Record<string, unknown>) => {
+      if (!entry || typeof entry !== 'object') return false;
+      if (typeof entry.id !== 'string') return false;
+      if (typeof entry.bodyId !== 'string') return false;
+      if (!entry.elements || typeof entry.elements !== 'object' || Array.isArray(entry.elements)) return false;
+      return true;
+    });
+    if (filtered.length < original.length) {
+      const removed = original.length - filtered.length;
+      logger.warn('save', `Filtered ${removed} corrupted entries from orbitalObjects`, {
+        originalCount: original.length,
+        keptCount: filtered.length,
+      });
+      state.orbitalObjects = filtered;
+    }
+  }
+
+  // Saved designs: each entry must have name (string), parts (array).
+  if (Array.isArray(state.savedDesigns)) {
+    const original = state.savedDesigns;
+    const filtered = original.filter((entry: Record<string, unknown>) => {
+      if (!entry || typeof entry !== 'object') return false;
+      if (typeof entry.name !== 'string') return false;
+      if (!Array.isArray(entry.parts)) return false;
+      return true;
+    });
+    if (filtered.length < original.length) {
+      const removed = original.length - filtered.length;
+      logger.warn('save', `Filtered ${removed} corrupted entries from savedDesigns`, {
+        originalCount: original.length,
+        keptCount: filtered.length,
+      });
+      state.savedDesigns = filtered;
+    }
+  }
+
+  // Contracts active: each entry must have id (string), reward (number).
+  if (state.contracts && typeof state.contracts === 'object' && Array.isArray(state.contracts.active)) {
+    const original = state.contracts.active;
+    const filtered = original.filter((entry: Record<string, unknown>) => {
+      if (!entry || typeof entry !== 'object') return false;
+      if (typeof entry.id !== 'string') return false;
+      if (typeof entry.reward !== 'number') return false;
+      return true;
+    });
+    if (filtered.length < original.length) {
+      const removed = original.length - filtered.length;
+      logger.warn('save', `Filtered ${removed} corrupted entries from contracts.active`, {
+        originalCount: original.length,
+        keptCount: filtered.length,
+      });
+      state.contracts.active = filtered;
+    }
+  }
 }
