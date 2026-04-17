@@ -94,6 +94,7 @@ import {
 } from './physics/thrust.ts';
 import { tickOrbitPhase } from './physics/phases/orbitPhase.ts';
 import { tickTransferPhase } from './physics/phases/transferPhase.ts';
+import { tickCapturePhase } from './physics/phases/capturePhase.ts';
 import type { AltitudeBand, ControlMode as ControlModeType } from './constants.ts';
 import type { FlightState, FlightEvent, OrbitalElements, PowerState, GameState, InventoryPart } from './gameState.ts';
 
@@ -738,40 +739,7 @@ function _integrate(ps: PhysicsState, assembly: RocketAssembly, flightState: Fli
 
   // --- Phase-specific physics: CAPTURE uses radial gravity from destination ---
   // The craft is approaching a body and must burn to slow down.
-  if (flightState?.phase === FlightPhase.CAPTURE && bodyId) {
-    _updateThrottleFromTWR(ps, assembly, bodyId);
-    const totalMassC = _computeTotalMass(ps, assembly);
-    // Thrust (no atmosphere in deep approach).
-    let txc = 0, tyc = 0;
-    if (ps.firingEngines.size > 0) {
-      const tr = _computeThrust(ps, assembly, 0);
-      txc = tr.thrustX;
-      tyc = tr.thrustY;
-      // Asteroid torque during capture approach — spin from off-CoM thrust.
-      const captureThrustMag = Math.hypot(txc, tyc);
-      const captureAstTorque = _computeAsteroidTorque(ps, assembly, captureThrustMag);
-      if (captureAstTorque !== 0) {
-        ps.angularVelocity += captureAstTorque * FIXED_DT;
-        ps.angle += ps.angularVelocity * FIXED_DT;
-      }
-      tickFuelSystem(ps, assembly, FIXED_DT, 0);
-    }
-    // Radial gravity toward destination body centre.
-    const gravAccelC = _gravityForBody(bodyId, Math.max(0, ps.posY));
-    const Rc = (BODY_RADIUS[bodyId] ?? 6_371_000);
-    const rxc = ps.posX;
-    const ryc = ps.posY + Rc;
-    const rc = Math.hypot(rxc, ryc);
-    const gxc = -gravAccelC * totalMassC * rxc / rc;
-    const gyc = -gravAccelC * totalMassC * ryc / rc;
-    if (totalMassC > 0) {
-      ps.velX += ((txc + gxc) / totalMassC) * FIXED_DT;
-      ps.velY += ((tyc + gyc) / totalMassC) * FIXED_DT;
-    }
-    ps.posX += ps.velX * FIXED_DT;
-    ps.posY += ps.velY * FIXED_DT;
-    return;
-  }
+  if (tickCapturePhase(ps, FIXED_DT, { flightState, assembly, bodyId })) return;
 
   // --- 0. TWR-relative throttle conversion --------------------------------
   _updateThrottleFromTWR(ps, assembly, bodyId);
