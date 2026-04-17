@@ -649,7 +649,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: All three commands exit 0.
 
 ### TASK-101: Run full unit test suite
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-100
 - **Description**: Per requirements §12. Run `npm run test:unit`. All tests pass.
 - **Verification**: Exit 0. No skipped or failing tests.
