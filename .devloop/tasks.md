@@ -355,7 +355,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `src/core/physics/` directory exists. `npm run typecheck` passes (no behaviour change).
 
 ### TASK-054: Extract src/core/physics/gravity.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-053
 - **Description**: Per requirements §8, recommended extraction order step 1. Move `_gravityForBody()` (physics.ts line ~554) and any supporting gravity helpers to `src/core/physics/gravity.ts`. Export them. Update `physics.ts` to import them. Preserve all call-site behaviour.
 - **Verification**: `npx vitest run src/tests/physics.test.ts` passes. `npm run typecheck` passes.

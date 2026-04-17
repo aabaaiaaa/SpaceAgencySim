@@ -93,6 +93,7 @@ import { initPowerState, tickPower, recalcPowerState } from './power.ts';
 import { getOrbitalStateAtTime, orbitalStateToCartesian, computeOrbitalElements } from './orbit.ts';
 import { logger } from './logger.ts';
 import { computePartCdA } from './dragCoefficient.ts';
+import { G0, gravityForBody as _gravityForBody } from './physics/gravity.ts';
 
 import type { AltitudeBand, ControlMode as ControlModeType } from './constants.ts';
 import type { FlightState, FlightEvent, OrbitalElements, PowerState, GameState, InventoryPart } from './gameState.ts';
@@ -493,9 +494,6 @@ interface CornerEntry {
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Standard gravity (m/s²). */
-const G0: number = 9.81;
-
 /** Fixed physics timestep (seconds). */
 const FIXED_DT: number = 1 / 60;
 
@@ -540,24 +538,6 @@ const CHUTE_DIRECT_DAMPING: number = 5.0;
 const MAX_PLAYER_ANGULAR_ACCEL: number = 2.0;
 /** Maximum angular acceleration (rad/s²) from parachute torques. */
 const MAX_CHUTE_ANGULAR_ACCEL: number = 50.0;
-
-// ---------------------------------------------------------------------------
-// Multi-body gravity helper
-// ---------------------------------------------------------------------------
-
-/**
- * Compute gravitational acceleration at a given altitude above a celestial body.
- *
- * Uses inverse-square law: g = g₀ × (R / (R + h))²
- * Falls back to Earth's 9.81 m/s² if bodyId is undefined.
- */
-function _gravityForBody(bodyId: string | undefined, altitude: number): number {
-  const g0: number = bodyId ? getSurfaceGravity(bodyId) : G0;
-  const R: number = bodyId ? (BODY_RADIUS[bodyId] ?? 6_371_000) : 6_371_000;
-  const h: number = Math.max(0, altitude);
-  // Inverse-square: negligible effect at low altitudes, significant in orbit.
-  return g0 * (R * R) / ((R + h) * (R + h));
-}
 
 /**
  * Look up the highest value of a crew skill among the flight's crew.
