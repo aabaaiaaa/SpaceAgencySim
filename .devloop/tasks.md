@@ -379,7 +379,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/physics.test.ts` passes.
 
 ### TASK-058: Extract src/core/physics/thrust.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-057
 - **Description**: Per requirements §8. Identify thrust-computation helpers in `physics.ts` (thrust calculation, TWR lookups, throttle interpretation). Move to `src/core/physics/thrust.ts`. Careful: this interacts with fuel and mass — don't break the fuel → thrust → mass ordering in the integration loop.
 - **Verification**: `npx vitest run src/tests/physics.test.ts` passes.

@@ -49,7 +49,6 @@ import {
   airDensity,
   airDensityForBody,
   ATMOSPHERE_TOP,
-  SEA_LEVEL_DENSITY,
   updateHeat,
   updateSolarHeat,
 } from './atmosphere.ts';
@@ -81,13 +80,18 @@ import {
   checkMalfunctions,
   tickMalfunctions,
 } from './malfunction.ts';
-import { MalfunctionType, REDUCED_THRUST_FACTOR, PARTIAL_CHUTE_FACTOR } from './constants.ts';
+import { MalfunctionType, PARTIAL_CHUTE_FACTOR } from './constants.ts';
 import { getWindForce } from './weather.ts';
 import { tickPower, recalcPowerState } from './power.ts';
 import { getOrbitalStateAtTime, orbitalStateToCartesian, computeOrbitalElements } from './orbit.ts';
 import { logger } from './logger.ts';
 import { computePartCdA } from './dragCoefficient.ts';
 import { G0, gravityForBody as _gravityForBody } from './physics/gravity.ts';
+import {
+  computeThrust as _computeThrust,
+  updateThrottleFromTWR as _updateThrottleFromTWR,
+  type ThrustResult,
+} from './physics/thrust.ts';
 
 import type { AltitudeBand, ControlMode as ControlModeType } from './constants.ts';
 import type { FlightState, FlightEvent, OrbitalElements, PowerState, GameState, InventoryPart } from './gameState.ts';
@@ -457,12 +461,6 @@ interface EjectedCrewEntry {
   chuteTimer: number;
 }
 
-/** Result of thrust calculation. */
-interface ThrustResult {
-  thrustX: number;
-  thrustY: number;
-}
-
 /** A 2D point in VAB local pixel coordinates. */
 interface Point2D {
   x: number;
@@ -725,59 +723,6 @@ export function fireNextStage(
 
   const newDebris: DebrisState[] = activateCurrentStage(ps, assembly, stagingConfig, flightState);
   ps.debris.push(...newDebris);
-}
-
-// ---------------------------------------------------------------------------
-// TWR-relative throttle conversion (private)
-// ---------------------------------------------------------------------------
-
-/**
- * When in TWR throttle mode, compute the raw throttle needed to achieve
- * `ps.targetTWR` and write it to `ps.throttle`.
- */
-function _updateThrottleFromTWR(ps: PhysicsState, assembly: RocketAssembly, bodyId: string | undefined): void {
-  if (ps.throttleMode !== 'twr') return;
-
-  // Infinity means "max thrust"
-  if (ps.targetTWR === Infinity) {
-    ps.throttle = 1;
-    return;
-  }
-  if (ps.targetTWR <= 0) {
-    ps.throttle = 0;
-    return;
-  }
-
-  let totalMass        = 0;
-  let maxLiquidThrustN = 0;
-  let srbThrustN       = 0;
-
-  for (const [instanceId, placed] of assembly.parts) {
-    if (!ps.activeParts.has(instanceId)) continue;
-    const def: PartDef | undefined = getPartById(placed.partId);
-    if (!def) continue;
-
-    totalMass += (def.mass ?? 0) + (ps.fuelStore.get(instanceId) ?? 0);
-
-    if (ps.firingEngines.has(instanceId)) {
-      const thrustN: number = (def.properties?.thrust ?? 0) * 1_000; // kN → N
-      if (def.type === PartType.SOLID_ROCKET_BOOSTER) {
-        srbThrustN += thrustN;
-      } else {
-        maxLiquidThrustN += thrustN;
-      }
-    }
-  }
-
-  // Include captured body mass in TWR calculation.
-  totalMass += ps.capturedBody?.mass ?? 0;
-
-  if (maxLiquidThrustN <= 0) return; // can't throttle SRBs
-  if (totalMass <= 0) return;
-
-  const localG: number = _gravityForBody(bodyId, Math.max(0, ps.posY));
-  const needed: number = ps.targetTWR * totalMass * localG - srbThrustN;
-  ps.throttle = Math.max(0, Math.min(1, needed / maxLiquidThrustN));
 }
 
 // ---------------------------------------------------------------------------
@@ -1308,79 +1253,6 @@ function _computeMomentOfInertia(ps: MassQueryable, assembly: RocketAssembly, pi
   }
 
   return Math.max(1, I);
-}
-
-// ---------------------------------------------------------------------------
-// Thrust calculation (private)
-// ---------------------------------------------------------------------------
-
-/**
- * Compute the thrust force vector for the current integration step.
- *
- * Thrust is treated as acting purely along the rocket's orientation axis
- * (simplified symmetric thrust — no engine placement offsets).
- */
-function _computeThrust(ps: PhysicsState, assembly: RocketAssembly, density: number): ThrustResult {
-  const densityRatio: number = density / SEA_LEVEL_DENSITY; // 0 in vacuum, 1 at sea level
-
-  let totalThrustN = 0;
-  const exhausted: string[]  = [];
-
-  for (const instanceId of ps.firingEngines) {
-    // Skip parts that have been jettisoned.
-    if (!ps.activeParts.has(instanceId)) {
-      exhausted.push(instanceId);
-      continue;
-    }
-
-    const placed = assembly.parts.get(instanceId);
-    if (!placed) { exhausted.push(instanceId); continue; }
-
-    const def: PartDef | undefined = getPartById(placed.partId);
-    if (!def)   { exhausted.push(instanceId); continue; }
-
-    const props = def.properties ?? {};
-    const isSRB: boolean = def.type === PartType.SOLID_ROCKET_BOOSTER;
-
-    // Guard: SRBs that already have no fuel produce no thrust this step.
-    if (isSRB) {
-      const fuelLeft: number = ps.fuelStore.get(instanceId) ?? 0;
-      if (fuelLeft <= 0) {
-        exhausted.push(instanceId);
-        continue;
-      }
-    }
-
-    // Interpolate thrust between sea-level and vacuum values.
-    // Weather temperature affects ISP → indirectly scales effective thrust.
-    const ispMod: number     = ps.weatherIspModifier ?? 1.0;
-    const thrustSL: number   = (props.thrust    ?? 0) * 1_000 * ispMod; // kN → N, ISP-adjusted
-    const thrustVac: number  = (props.thrustVac ?? props.thrust ?? 0) * 1_000 * ispMod;
-    const rawThrustN: number = densityRatio * thrustSL + (1 - densityRatio) * thrustVac;
-
-    // Throttle: SRBs always at 100 %; liquid engines use current setting.
-    const throttleMult: number     = isSRB ? 1.0 : ps.throttle;
-    let   effectiveThrustN: number = rawThrustN * throttleMult;
-
-    // Apply reduced thrust from ENGINE_REDUCED_THRUST malfunction.
-    const malf = ps.malfunctions?.get(instanceId);
-    if (malf && !malf.recovered && malf.type === MalfunctionType.ENGINE_REDUCED_THRUST) {
-      effectiveThrustN *= REDUCED_THRUST_FACTOR;
-    }
-
-    totalThrustN += effectiveThrustN;
-  }
-
-  // Remove already-exhausted engines from the firing set.
-  for (const id of exhausted) {
-    ps.firingEngines.delete(id);
-  }
-
-  // Project thrust along the rocket's orientation axis.
-  const thrustX: number = totalThrustN * Math.sin(ps.angle);
-  const thrustY: number = totalThrustN * Math.cos(ps.angle);
-
-  return { thrustX, thrustY };
 }
 
 // ---------------------------------------------------------------------------
