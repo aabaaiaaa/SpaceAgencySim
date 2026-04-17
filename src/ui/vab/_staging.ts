@@ -17,6 +17,21 @@ import { airDensity } from '../../core/atmosphere.ts';
 import { computeStageDeltaV } from '../../core/stagingCalc.ts';
 import { getVabState } from './_state.ts';
 import { snapshotStaging, recordStagingChange } from './_undoActions.ts';
+import { getVabListenerTracker } from './_listenerTracker.ts';
+
+/**
+ * Register a DOM listener through the VAB tracker so it is cleaned up when
+ * the VAB is destroyed.
+ */
+function _addTracked(
+  target: EventTarget,
+  event: string,
+  handler: EventListenerOrEventListenerObject,
+  options?: boolean | AddEventListenerOptions,
+): void {
+  const tracker = getVabListenerTracker();
+  if (tracker) tracker.add(target, event, handler, options);
+}
 
 // ---------------------------------------------------------------------------
 // Forward references — set by _init.js to break circular deps
@@ -275,21 +290,22 @@ export function renderStagingPanel(): void {
   body.innerHTML = html.join('');
 
   // Re-attach button listeners.
-  body.querySelector('#vab-staging-add')?.addEventListener('click', () => {
+  const stagingAddBtn = body.querySelector('#vab-staging-add');
+  if (stagingAddBtn) _addTracked(stagingAddBtn, 'click', () => {
     addStageToConfig(S.stagingConfig!);
     renderStagingPanel();
   });
   const altSlider = body.querySelector('#vab-dv-alt-slider');
   if (altSlider) {
-    altSlider.addEventListener('input', (e: Event) => {
+    _addTracked(altSlider, 'input', ((e: Event) => {
       S.dvAltitude = parseInt((e.target as HTMLInputElement).value, 10);
       updateStagingDvValues(body);
-    });
+    }) as EventListener);
   }
 
   body.querySelectorAll('.vab-staging-del').forEach((btn) => {
     const el = btn as HTMLElement;
-    el.addEventListener('click', () => {
+    _addTracked(el, 'click', () => {
       const idx = parseInt(el.dataset.stageIndex ?? '0', 10);
       removeStageFromConfig(S.stagingConfig!, idx);
       renderStagingPanel();
@@ -303,7 +319,7 @@ export function renderStagingPanel(): void {
 export function setupStagingDnD(panelBody: HTMLElement): void {
   const S = getVabState();
 
-  panelBody.addEventListener('dragstart', (e: DragEvent) => {
+  _addTracked(panelBody, 'dragstart', ((e: DragEvent) => {
     const handle = (e.target as Element)?.closest?.('.vab-stage-drag-handle') as HTMLElement | null;
     if (handle) {
       const stageIdx = handle.dataset.stageIndex ?? '';
@@ -321,33 +337,33 @@ export function setupStagingDnD(panelBody: HTMLElement): void {
     e.dataTransfer!.setData('text/plain', `${instanceId}|${source}`);
     e.dataTransfer!.effectAllowed = 'move';
     chip.classList.add('dragging');
-  });
+  }) as EventListener);
 
-  panelBody.addEventListener('dragend', (e: DragEvent) => {
+  _addTracked(panelBody, 'dragend', ((e: DragEvent) => {
     const chip = (e.target as Element)?.closest?.('.vab-stage-chip');
     if (chip) chip.classList.remove('dragging');
     const stageEl = (e.target as Element)?.closest?.('.vab-staging-stage');
     if (stageEl) stageEl.classList.remove('dragging');
     panelBody.querySelectorAll('.drag-over').forEach((el) => el.classList.remove('drag-over'));
-  });
+  }) as EventListener);
 
-  panelBody.addEventListener('dragover', (e: DragEvent) => {
+  _addTracked(panelBody, 'dragover', ((e: DragEvent) => {
     const zone = (e.target as Element)?.closest?.('.vab-staging-zone, .vab-staging-stage');
     if (!zone) return;
     e.preventDefault();
     e.dataTransfer!.dropEffect = 'move';
     zone.classList.add('drag-over');
-  });
+  }) as EventListener);
 
-  panelBody.addEventListener('dragleave', (e: DragEvent) => {
+  _addTracked(panelBody, 'dragleave', ((e: DragEvent) => {
     const zone = (e.target as Element)?.closest?.('.vab-staging-zone, .vab-staging-stage');
     if (!zone) return;
     if (!zone.contains(e.relatedTarget as Node)) {
       zone.classList.remove('drag-over');
     }
-  });
+  }) as EventListener);
 
-  panelBody.addEventListener('drop', (e: DragEvent) => {
+  _addTracked(panelBody, 'drop', ((e: DragEvent) => {
     if (!S.stagingConfig) return;
 
     const raw = e.dataTransfer!.getData('text/plain');
@@ -403,5 +419,5 @@ export function setupStagingDnD(panelBody: HTMLElement): void {
     recordStagingChange(stagingBefore);
     renderStagingPanel();
     _runAndRenderValidationFn();
-  });
+  }) as EventListener);
 }

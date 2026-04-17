@@ -35,6 +35,7 @@ import {
   repositionSatellite,
   getRepositionTargets,
 } from '../core/satellites.ts';
+import { createListenerTracker, type ListenerTracker } from './listenerTracker.ts';
 import './satelliteOps.css';
 
 // ---------------------------------------------------------------------------
@@ -71,6 +72,7 @@ interface NetworkSummary {
 let _overlay: HTMLDivElement | null = null;
 let _state: GameState | null = null;
 let _onBack: (() => void) | null = null;
+let _listeners: ListenerTracker | null = null;
 
 // ---------------------------------------------------------------------------
 // Satellite type display helpers
@@ -108,6 +110,7 @@ export function initSatelliteOpsUI(
 ): void {
   _state = state;
   _onBack = onBack;
+  _listeners = createListenerTracker();
 
   _overlay = document.createElement('div');
   _overlay.id = 'sat-ops-overlay';
@@ -120,6 +123,10 @@ export function initSatelliteOpsUI(
  * Remove the Satellite Operations Centre overlay.
  */
 export function destroySatelliteOpsUI(): void {
+  if (_listeners) {
+    _listeners.removeAll();
+    _listeners = null;
+  }
   if (_overlay) {
     _overlay.remove();
     _overlay = null;
@@ -137,6 +144,8 @@ function _render(): void {
 
   const summary = getNetworkSummary(_state) as NetworkSummary;
 
+  // Clear previously-registered render-scoped listeners before rebuilding DOM.
+  if (_listeners) _listeners.removeAll();
   _overlay.innerHTML = '';
 
   // Header.
@@ -146,7 +155,7 @@ function _render(): void {
   const backBtn = document.createElement('button');
   backBtn.id = 'sat-ops-back-btn';
   backBtn.textContent = '\u2190 Hub';
-  backBtn.addEventListener('click', () => {
+  _listeners?.add(backBtn, 'click', () => {
     const onBack = _onBack; // capture before destroy nulls it
     destroySatelliteOpsUI();
     if (onBack) onBack();
@@ -608,7 +617,7 @@ function _renderSatCard(
     const checkbox = document.createElement('input');
     checkbox.type = 'checkbox';
     checkbox.checked = sat.autoMaintain;
-    checkbox.addEventListener('change', () => {
+    _listeners?.add(checkbox, 'change', () => {
       setAutoMaintenance(_state!, sat.id, checkbox.checked);
       _render();
     });
@@ -623,7 +632,7 @@ function _renderSatCard(
       const leaseBtn = document.createElement('button');
       leaseBtn.className = 'sat-lease-btn' + (sat.leased ? ' active' : '');
       leaseBtn.textContent = sat.leased ? 'End Lease' : 'Lease';
-      leaseBtn.addEventListener('click', () => {
+      _listeners?.add(leaseBtn, 'click', () => {
         setSatelliteLease(_state!, sat.id, !sat.leased);
         _render();
       });
@@ -637,7 +646,7 @@ function _renderSatCard(
         const reposBtn = document.createElement('button');
         reposBtn.className = 'sat-reposition-btn';
         reposBtn.textContent = `Reposition ($${((SATELLITE_REPOSITION_COST as Record<string, number>).SAME_BODY / 1000).toFixed(0)}k)`;
-        reposBtn.addEventListener('click', () => {
+        _listeners?.add(reposBtn, 'click', () => {
           _showRepositionDropdown(card, sat, targets, reposBtn);
         });
         controls.appendChild(reposBtn);
@@ -648,7 +657,7 @@ function _renderSatCard(
     const decommBtn = document.createElement('button');
     decommBtn.className = 'sat-decommission-btn';
     decommBtn.textContent = 'Decommission';
-    decommBtn.addEventListener('click', () => {
+    _listeners?.add(decommBtn, 'click', () => {
       decommissionSatellite(_state!, sat.id);
       _render();
     });
@@ -691,7 +700,7 @@ function _showRepositionDropdown(
     select.appendChild(opt);
   }
 
-  select.addEventListener('change', () => {
+  _listeners?.add(select, 'change', () => {
     if (!select.value) return;
     const result = repositionSatellite(_state!, sat.id, select.value);
     if (!result.success) {

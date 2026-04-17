@@ -206,7 +206,7 @@ export function initFlightHud(
       markThrottleDirty();
     }
   };
-  window.addEventListener('keydown', _keyHandler);
+  _listeners.add(window, 'keydown', _keyHandler as EventListener);
 
   // Start the update loop.
   _rafId = requestAnimationFrame(_tick);
@@ -224,10 +224,8 @@ export function destroyFlightHud(): void {
     _rafId = null;
   }
 
-  if (_keyHandler) {
-    window.removeEventListener('keydown', _keyHandler);
-    _keyHandler = null;
-  }
+  // _keyHandler is tracked by _listeners below.
+  _keyHandler = null;
 
   if (_listeners) {
     _listeners.removeAll();

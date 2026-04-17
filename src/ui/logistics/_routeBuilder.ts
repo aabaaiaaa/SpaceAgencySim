@@ -18,6 +18,20 @@ import {
   formatResourceType,
 } from './_state.ts';
 import { formatLocation } from './_routeMap.ts';
+import { getLogisticsListenerTracker } from './_listenerTracker.ts';
+
+/**
+ * Register a DOM listener through the logistics tracker.
+ */
+function _addTracked(
+  target: EventTarget,
+  event: string,
+  handler: EventListenerOrEventListenerObject,
+  options?: boolean | AddEventListenerOptions,
+): void {
+  const tracker = getLogisticsListenerTracker();
+  if (tracker) tracker.add(target, event, handler, options);
+}
 
 // ---------------------------------------------------------------------------
 // Route Builder Panel
@@ -68,7 +82,7 @@ export function renderBuilderPanel(): HTMLDivElement {
     defaultOpt.selected = true;
   }
 
-  resourceSelect.addEventListener('change', () => {
+  _addTracked(resourceSelect, 'change', () => {
     getLogisticsState().builderResourceType = resourceSelect.value || null;
   });
 
@@ -89,7 +103,7 @@ export function renderBuilderPanel(): HTMLDivElement {
   nameInput.className = 'logistics-builder-input';
   nameInput.placeholder = 'e.g. Lunar Water Run';
   nameInput.value = ls.builderRouteName;
-  nameInput.addEventListener('input', () => {
+  _addTracked(nameInput, 'input', () => {
     getLogisticsState().builderRouteName = nameInput.value;
   });
 
@@ -173,7 +187,7 @@ export function renderBuilderPanel(): HTMLDivElement {
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'logistics-builder-cancel-btn';
   cancelBtn.textContent = 'Cancel';
-  cancelBtn.addEventListener('click', () => {
+  _addTracked(cancelBtn, 'click', () => {
     resetBuilderState();
     triggerRender();
   });
@@ -182,7 +196,7 @@ export function renderBuilderPanel(): HTMLDivElement {
   const confirmBtn = document.createElement('button');
   confirmBtn.className = 'logistics-builder-confirm-btn';
   confirmBtn.textContent = 'Create Route';
-  confirmBtn.addEventListener('click', () => {
+  _addTracked(confirmBtn, 'click', () => {
     const currentLs = getLogisticsState();
     // Validate inputs
     const errors: string[] = [];

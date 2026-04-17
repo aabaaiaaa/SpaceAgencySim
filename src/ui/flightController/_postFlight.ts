@@ -14,11 +14,22 @@ import { refreshTopBar } from '../topbar.ts';
 import { getFCState } from './_state.ts';
 import { stopFlightScene, startFlightScene } from './_init.ts';
 import { showUnlockNotification } from '../missionControl/_missionsTab.ts';
+import { getFlightControllerListenerTracker } from './_listenerTracker.ts';
 
 import type { PhysicsState } from '../../core/physics.ts';
 import type { RocketAssembly } from '../../core/rocketbuilder.ts';
 import type { FlightState, GameState, FlightEvent } from '../../core/gameState.ts';
 import type { Hub } from '../../core/hubTypes.ts';
+
+/** Register a DOM listener through the flight-controller tracker if available. */
+function _addTracked(
+  target: EventTarget,
+  event: string,
+  handler: EventListenerOrEventListenerObject,
+): void {
+  const tracker = getFlightControllerListenerTracker();
+  if (tracker) tracker.add(target, event, handler);
+}
 
 // ---------------------------------------------------------------------------
 // Flight event formatting helpers
@@ -136,7 +147,7 @@ function _showHubRecoveryDialog(
     btn.className = 'hub-recovery-btn';
     btn.textContent = `${hub.name} (${hub.bodyId})`;
     btn.dataset.hubId = hub.id;
-    btn.addEventListener('click', () => {
+    _addTracked(btn, 'click', () => {
       overlay.remove();
       onSelect(hub.id);
     });
@@ -458,7 +469,7 @@ export function showPostFlightSummary(
     restartBtn.id    = 'post-flight-restart-btn';
     restartBtn.title = 'Rebuild the rocket and restart this flight from the launch pad.';
 
-    restartBtn.addEventListener('click', () => {
+    _addTracked(restartBtn, 'click', () => {
       if (totalRocketCost > 0 && state) {
         state.money = (state.money ?? 0) - totalRocketCost;
       }
@@ -526,7 +537,7 @@ export function showPostFlightSummary(
     const continueBtn: HTMLButtonElement = _pfBtn('Continue Flying', null, 'pf-btn-secondary');
     continueBtn.id    = 'post-flight-continue-btn';
     continueBtn.title = 'Close this summary and continue controlling the landed rocket.';
-    continueBtn.addEventListener('click', () => {
+    _addTracked(continueBtn, 'click', () => {
       s.summaryShown = false;
       overlay.remove();
       const hud = document.getElementById('flight-hud') as HTMLElement | null;
@@ -540,7 +551,7 @@ export function showPostFlightSummary(
     const adjustBtn: HTMLButtonElement = _pfBtn('Adjust Build', costStr, 'pf-btn-secondary');
     adjustBtn.id    = 'post-flight-adjust-btn';
     adjustBtn.title = 'Return to the Vehicle Assembly Building with this rocket loaded so you can tweak and re-launch.';
-    adjustBtn.addEventListener('click', () => {
+    _addTracked(adjustBtn, 'click', () => {
       if (totalRocketCost > 0 && state) {
         state.money = (state.money ?? 0) - totalRocketCost;
       }
@@ -602,7 +613,7 @@ export function showPostFlightSummary(
     if (onFlightEnd) onFlightEnd(state, returnResults);
   };
 
-  returnBtn.addEventListener('click', () => {
+  _addTracked(returnBtn, 'click', () => {
     // Hub-aware recovery: check for surface hubs on the landing body.
     const landingBodyId = flightState?.bodyId ?? 'EARTH';
     if (isLanded && state) {
@@ -629,9 +640,9 @@ export function showPostFlightSummary(
   content.appendChild(buttonsEl);
 
   // Backdrop-click handling.
-  content.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
+  _addTracked(content, 'click', ((e: MouseEvent) => e.stopPropagation()) as EventListener);
   if (!isCrashed) {
-    overlay.addEventListener('click', () => {
+    _addTracked(overlay, 'click', () => {
       s.summaryShown = false;
       overlay.remove();
       const hud = document.getElementById('flight-hud') as HTMLElement | null;

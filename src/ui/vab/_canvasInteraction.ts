@@ -57,6 +57,20 @@ import { getVabListenerTracker } from './_listenerTracker.ts';
 
 import type { GameState } from '../../core/gameState.ts';
 
+/**
+ * Register a DOM listener through the VAB tracker so it is cleaned up when
+ * the VAB is destroyed.
+ */
+function _addTracked(
+  target: EventTarget,
+  event: string,
+  handler: EventListenerOrEventListenerObject,
+  options?: boolean | AddEventListenerOptions,
+): void {
+  const tracker = getVabListenerTracker();
+  if (tracker) tracker.add(target, event, handler, options);
+}
+
 // ---------------------------------------------------------------------------
 // Forward references — set by _init.js to break circular deps
 // ---------------------------------------------------------------------------
@@ -335,7 +349,8 @@ function showPartContextMenu(placed: PlacedPart, clientX: number, clientY: numbe
   S.ctxMenu.style.top  = `${clientY}px`;
   S.ctxMenu.removeAttribute('hidden');
 
-  S.ctxMenu.querySelector('#vab-ctx-remove')?.addEventListener('click', () => {
+  const ctxRemoveBtn = S.ctxMenu.querySelector('#vab-ctx-remove');
+  if (ctxRemoveBtn) _addTracked(ctxRemoveBtn, 'click', () => {
     S.ctxMenu!.setAttribute('hidden', '');
     const stagingBefore = snapshotStaging();
     const costRefund = getPartById(placed.partId)?.cost ?? 0;
@@ -349,7 +364,8 @@ function showPartContextMenu(placed: PlacedPart, clientX: number, clientY: numbe
   }, { once: true });
 
   if (mirrorId) {
-    S.ctxMenu.querySelector('#vab-ctx-remove-both')?.addEventListener('click', () => {
+    const ctxRemoveBothBtn = S.ctxMenu.querySelector('#vab-ctx-remove-both');
+    if (ctxRemoveBothBtn) _addTracked(ctxRemoveBothBtn, 'click', () => {
       S.ctxMenu!.setAttribute('hidden', '');
       const stagingBefore = snapshotStaging();
       const mirrorPlaced = S.assembly!.parts.get(mirrorId);
@@ -718,7 +734,7 @@ export function setupCanvas(canvasArea: HTMLElement): void {
   let lastX = 0;
   let lastY = 0;
 
-  canvasArea.addEventListener('pointerdown', (e: PointerEvent) => {
+  _addTracked(canvasArea, 'pointerdown', ((e: PointerEvent) => {
     if (e.button !== 0) return;
 
     const { worldX, worldY } = vabScreenToWorld(e.clientX, e.clientY);
@@ -736,9 +752,9 @@ export function setupCanvas(canvasArea: HTMLElement): void {
     lastY = e.clientY;
     canvasArea.setPointerCapture(e.pointerId);
     canvasArea.classList.add('panning');
-  });
+  }) as EventListener);
 
-  canvasArea.addEventListener('pointermove', (e: PointerEvent) => {
+  _addTracked(canvasArea, 'pointermove', ((e: PointerEvent) => {
     if (S.pendingPickup) {
       const dx = e.clientX - S.pendingPickup.startX;
       const dy = e.clientY - S.pendingPickup.startY;
@@ -766,7 +782,7 @@ export function setupCanvas(canvasArea: HTMLElement): void {
     vabPanCamera(dx, dy);
     drawScaleTicks();
     updateOffscreenIndicators();
-  });
+  }) as EventListener);
 
   const _stopPan = (_e: PointerEvent): void => {
     if (S.pendingPickup) {
@@ -777,25 +793,25 @@ export function setupCanvas(canvasArea: HTMLElement): void {
     panning = false;
     canvasArea.classList.remove('panning');
   };
-  canvasArea.addEventListener('pointerup',     _stopPan);
-  canvasArea.addEventListener('pointercancel', () => {
+  _addTracked(canvasArea, 'pointerup',     _stopPan as EventListener);
+  _addTracked(canvasArea, 'pointercancel', (() => {
     S.pendingPickup = null;
     panning = false;
     canvasArea.classList.remove('panning');
-  });
+  }) as EventListener);
 
   // Right-click context menu for placed parts.
-  canvasArea.addEventListener('contextmenu', (e: MouseEvent) => {
+  _addTracked(canvasArea, 'contextmenu', ((e: MouseEvent) => {
     e.preventDefault();
     const { worldX, worldY } = vabScreenToWorld(e.clientX, e.clientY);
     const hit = hitTestPlacedPart(worldX, worldY);
     if (hit) {
       showPartContextMenu(hit, e.clientX, e.clientY);
     }
-  });
+  }) as EventListener);
 
   // Scroll-wheel zoom.
-  canvasArea.addEventListener('wheel', (e: WheelEvent) => {
+  _addTracked(canvasArea, 'wheel', ((e: WheelEvent) => {
     e.preventDefault();
     const factor = e.deltaY < 0 ? 1.1 : 0.9;
     const { zoom } = vabGetCamera();
@@ -805,5 +821,5 @@ export function setupCanvas(canvasArea: HTMLElement): void {
     updateScaleBarExtents();
     updateOffscreenIndicators();
     syncZoomSlider();
-  }, { passive: false });
+  }) as EventListener, { passive: false });
 }

@@ -724,28 +724,34 @@ function _showCrewDialog(
 
   document.body.appendChild(overlay);
 
-  overlay.addEventListener('pointerdown', (e: Event) => {
+  _listeners?.add(overlay, 'pointerdown', (e: Event) => {
     if (e.target === overlay) overlay.remove();
   });
 
-  overlay.querySelector('.lp-crew-cancel-btn')?.addEventListener('click', () => {
-    overlay.remove();
-  });
+  const cancelBtn = overlay.querySelector('.lp-crew-cancel-btn');
+  if (cancelBtn) {
+    _listeners?.add(cancelBtn, 'click', () => {
+      overlay.remove();
+    });
+  }
 
-  overlay.querySelector('.lp-crew-confirm-btn')?.addEventListener('click', () => {
-    const selects = overlay.querySelectorAll('.lp-crew-seat-select');
-    const crewIds: string[] = [];
-    const seen    = new Set<string>();
-    for (const sel of selects) {
-      const id = (sel as HTMLSelectElement).value;
-      if (id && !seen.has(id)) {
-        crewIds.push(id);
-        seen.add(id);
+  const confirmBtn = overlay.querySelector('.lp-crew-confirm-btn');
+  if (confirmBtn) {
+    _listeners?.add(confirmBtn, 'click', () => {
+      const selects = overlay.querySelectorAll('.lp-crew-seat-select');
+      const crewIds: string[] = [];
+      const seen    = new Set<string>();
+      for (const sel of selects) {
+        const id = (sel as HTMLSelectElement).value;
+        if (id && !seen.has(id)) {
+          crewIds.push(id);
+          seen.add(id);
+        }
       }
-    }
-    overlay.remove();
-    _doLaunch(crewIds, design, assembly, stagingConfig);
-  });
+      overlay.remove();
+      _doLaunch(crewIds, design, assembly, stagingConfig);
+    });
+  }
 }
 
 /**

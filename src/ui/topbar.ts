@@ -374,7 +374,7 @@ function _openDropdown(): void {
       btn.setAttribute('role', 'menuitem');
       btn.textContent = item.label;
       if (item.title) btn.title = item.title;
-      btn.addEventListener('click', (e: MouseEvent) => {
+      _tracker.add(btn, 'click', (e: Event) => {
         e.stopPropagation();
         _closeDropdown();
         item.onClick();
@@ -394,7 +394,7 @@ function _openDropdown(): void {
       btn.setAttribute('role', 'menuitem');
       btn.textContent = item.label;
       if (item.id) btn.id = item.id;
-      btn.addEventListener('click', (e: MouseEvent) => {
+      _tracker.add(btn, 'click', (e: Event) => {
         e.stopPropagation();
         _closeDropdown();
         item.onClick();
@@ -433,7 +433,7 @@ function _openDropdown(): void {
     btn.className = 'topbar-dropdown-item' + (item.danger ? ' danger' : '');
     btn.setAttribute('role', 'menuitem');
     btn.textContent = item.label;
-    btn.addEventListener('click', (e: MouseEvent) => {
+    _tracker.add(btn, 'click', (e: Event) => {
       e.stopPropagation();
       _closeDropdown();
       void item.action();
@@ -442,7 +442,7 @@ function _openDropdown(): void {
   }
 
   // Arrow key navigation within the dropdown.
-  menu.addEventListener('keydown', (e: KeyboardEvent) => {
+  _tracker.add(menu, 'keydown', ((e: KeyboardEvent) => {
     const items = Array.from(menu.querySelectorAll('.topbar-dropdown-item')) as HTMLElement[];
     if (items.length === 0) return;
 
@@ -458,7 +458,7 @@ function _openDropdown(): void {
       const prev = idx > 0 ? idx - 1 : items.length - 1;
       items[prev].focus();
     }
-  });
+  }) as EventListener);
 
   document.body.appendChild(menu);
 
@@ -675,7 +675,7 @@ function _openLoanModal(): void {
   modal.setAttribute('role', 'dialog');
   modal.setAttribute('aria-modal', 'true');
   modal.setAttribute('aria-label', 'Loan Details');
-  modal.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
+  _tracker.add(modal, 'click', (e: Event) => e.stopPropagation());
 
   // Title row
   modal.appendChild(_makeTitleRow('Loan Details', () => backdrop.remove()));
@@ -690,7 +690,7 @@ function _openLoanModal(): void {
   // Borrow More section
   modal.appendChild(_buildBorrowSection());
 
-  backdrop.addEventListener('click', () => backdrop.remove());
+  _tracker.add(backdrop, 'click', () => backdrop.remove());
   backdrop.appendChild(modal);
   document.body.appendChild(backdrop);
 }
@@ -780,7 +780,7 @@ function _buildPaySection(): HTMLDivElement {
   feedback.className = 'loan-feedback';
   feedback.id = 'pay-feedback';
 
-  btn.addEventListener('click', () => {
+  _tracker.add(btn, 'click', () => {
     const amount: number = parseFloat(input.value);
     if (!_state) return;
 
@@ -862,7 +862,7 @@ function _buildBorrowSection(): HTMLDivElement {
   feedback.className = 'loan-feedback';
   feedback.id = 'borrow-feedback';
 
-  btn.addEventListener('click', () => {
+  _tracker.add(btn, 'click', () => {
     const amount: number = parseFloat(input.value);
     if (!_state) return;
 
@@ -919,7 +919,7 @@ async function _openSaveSlotPicker(): Promise<void> {
   modal.setAttribute('role', 'dialog');
   modal.setAttribute('aria-modal', 'true');
   modal.setAttribute('aria-label', 'Save Game');
-  modal.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
+  _tracker.add(modal, 'click', (e: Event) => e.stopPropagation());
 
   modal.appendChild(_makeTitleRow('Save Game', () => backdrop.remove()));
 
@@ -973,7 +973,7 @@ async function _openSaveSlotPicker(): Promise<void> {
 
     // Capture slot index in closure
     const slotIndex: number = i;
-    card.addEventListener('click', () => {
+    _tracker.add(card, 'click', () => {
       const saveName: string = _state!.agencyName || 'New Save';
       void import('./vab.ts').then(({ syncVabToGameState }) => {
         syncVabToGameState();
@@ -986,7 +986,7 @@ async function _openSaveSlotPicker(): Promise<void> {
     modal.appendChild(card);
   }
 
-  backdrop.addEventListener('click', () => backdrop.remove());
+  _tracker.add(backdrop, 'click', () => backdrop.remove());
   backdrop.appendChild(modal);
   document.body.appendChild(backdrop);
 }
@@ -1005,7 +1005,7 @@ async function _doLoadGame(): Promise<void> {
   modal.setAttribute('role', 'dialog');
   modal.setAttribute('aria-modal', 'true');
   modal.setAttribute('aria-label', 'Load Game');
-  modal.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
+  _tracker.add(modal, 'click', (e: Event) => e.stopPropagation());
 
   modal.appendChild(_makeTitleRow('Load Game', () => backdrop.remove()));
 
@@ -1073,7 +1073,7 @@ async function _doLoadGame(): Promise<void> {
     if (slot && slot.version === SAVE_VERSION) {
       const slotIndex: number = i;
       card.style.cursor = 'pointer';
-      card.addEventListener('click', () => {
+      _tracker.add(card, 'click', () => {
         _confirmAndLoad(slotIndex, backdrop);
       });
     } else if (!slot) {
@@ -1092,7 +1092,7 @@ async function _doLoadGame(): Promise<void> {
     modal.appendChild(empty);
   }
 
-  backdrop.addEventListener('click', () => backdrop.remove());
+  _tracker.add(backdrop, 'click', () => backdrop.remove());
   backdrop.appendChild(modal);
   document.body.appendChild(backdrop);
 }
@@ -1108,7 +1108,7 @@ function _confirmAndLoad(slotIndex: number, loadBackdrop: HTMLElement): void {
   modal.className = 'topbar-modal';
   modal.setAttribute('role', 'alertdialog');
   modal.setAttribute('aria-modal', 'true');
-  modal.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
+  _tracker.add(modal, 'click', (e: Event) => e.stopPropagation());
 
   modal.appendChild(_makeTitleRow('Load Game', () => backdrop.remove()));
 
@@ -1123,13 +1123,13 @@ function _confirmAndLoad(slotIndex: number, loadBackdrop: HTMLElement): void {
   const cancelBtn: HTMLButtonElement = document.createElement('button');
   cancelBtn.className = 'confirm-btn confirm-btn-cancel';
   cancelBtn.textContent = 'Cancel';
-  cancelBtn.addEventListener('click', () => backdrop.remove());
+  _tracker.add(cancelBtn, 'click', () => backdrop.remove());
 
   const confirmBtn: HTMLButtonElement = document.createElement('button');
   confirmBtn.className = 'confirm-btn confirm-btn-primary';
   confirmBtn.dataset.testid = 'load-confirm-btn';
   confirmBtn.textContent = 'Load Game';
-  confirmBtn.addEventListener('click', () => {
+  _tracker.add(confirmBtn, 'click', () => {
     backdrop.remove();
     void loadGame(slotIndex).then((loadedState) => {
       reconcileParts(loadedState);
@@ -1146,7 +1146,7 @@ function _confirmAndLoad(slotIndex: number, loadBackdrop: HTMLElement): void {
   btnRow.appendChild(confirmBtn);
   modal.appendChild(btnRow);
 
-  backdrop.addEventListener('click', () => backdrop.remove());
+  _tracker.add(backdrop, 'click', () => backdrop.remove());
   backdrop.appendChild(modal);
   document.body.appendChild(backdrop);
 }
@@ -1184,7 +1184,7 @@ function _openSandboxSettings(): void {
   modal.setAttribute('role', 'dialog');
   modal.setAttribute('aria-modal', 'true');
   modal.setAttribute('aria-label', 'Sandbox Settings');
-  modal.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
+  _tracker.add(modal, 'click', (e: Event) => e.stopPropagation());
 
   modal.appendChild(_makeTitleRow('Sandbox Settings', () => backdrop.remove()));
 
@@ -1200,7 +1200,7 @@ function _openSandboxSettings(): void {
   malfCheck.type = 'checkbox';
   malfCheck.checked = settings.malfunctionsEnabled;
   malfCheck.className = 'topbar-checkbox';
-  malfCheck.addEventListener('change', () => {
+  _tracker.add(malfCheck, 'change', () => {
     if (_state?.sandboxSettings) _state.sandboxSettings.malfunctionsEnabled = malfCheck.checked;
   });
   malfLabel.appendChild(malfCheck);
@@ -1214,7 +1214,7 @@ function _openSandboxSettings(): void {
   wxCheck.type = 'checkbox';
   wxCheck.checked = settings.weatherEnabled;
   wxCheck.className = 'topbar-checkbox';
-  wxCheck.addEventListener('change', () => {
+  _tracker.add(wxCheck, 'change', () => {
     if (_state?.sandboxSettings) _state.sandboxSettings.weatherEnabled = wxCheck.checked;
   });
   wxLabel.appendChild(wxCheck);
@@ -1227,10 +1227,10 @@ function _openSandboxSettings(): void {
   closeBtn.className = 'confirm-btn confirm-btn-cancel';
   closeBtn.textContent = 'Close';
   closeBtn.style.marginTop = '8px';
-  closeBtn.addEventListener('click', () => backdrop.remove());
+  _tracker.add(closeBtn, 'click', () => backdrop.remove());
   modal.appendChild(closeBtn);
 
-  backdrop.addEventListener('click', () => backdrop.remove());
+  _tracker.add(backdrop, 'click', () => backdrop.remove());
   backdrop.appendChild(modal);
   document.body.appendChild(backdrop);
 }
@@ -1245,7 +1245,7 @@ function _doExitToMenu(): void {
   modal.setAttribute('role', 'alertdialog');
   modal.setAttribute('aria-modal', 'true');
   modal.setAttribute('aria-label', 'Exit to Menu');
-  modal.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
+  _tracker.add(modal, 'click', (e: Event) => e.stopPropagation());
 
   modal.appendChild(_makeTitleRow('Exit to Menu', () => backdrop.remove()));
 
@@ -1261,13 +1261,13 @@ function _doExitToMenu(): void {
   const cancelBtn: HTMLButtonElement = document.createElement('button');
   cancelBtn.className = 'confirm-btn confirm-btn-cancel';
   cancelBtn.textContent = 'Stay';
-  cancelBtn.addEventListener('click', () => backdrop.remove());
+  _tracker.add(cancelBtn, 'click', () => backdrop.remove());
 
   const confirmBtn: HTMLButtonElement = document.createElement('button');
   confirmBtn.className = 'confirm-btn confirm-btn-danger';
   confirmBtn.textContent = 'Exit to Menu';
   confirmBtn.dataset.testid = 'exit-confirm-btn';
-  confirmBtn.addEventListener('click', () => {
+  _tracker.add(confirmBtn, 'click', () => {
     backdrop.remove();
     if (_onExitToMenu) _onExitToMenu();
   });
@@ -1276,7 +1276,7 @@ function _doExitToMenu(): void {
   btnRow.appendChild(confirmBtn);
   modal.appendChild(btnRow);
 
-  backdrop.addEventListener('click', () => backdrop.remove());
+  _tracker.add(backdrop, 'click', () => backdrop.remove());
   backdrop.appendChild(modal);
   document.body.appendChild(backdrop);
 }
@@ -1310,7 +1310,7 @@ function _makeTitleRow(title: string, onClose: () => void): HTMLDivElement {
   closeBtn.className = 'topbar-modal-close';
   closeBtn.textContent = '\u2715';
   closeBtn.title = 'Close';
-  closeBtn.addEventListener('click', onClose);
+  _tracker.add(closeBtn, 'click', onClose);
 
   row.appendChild(h2);
   row.appendChild(closeBtn);

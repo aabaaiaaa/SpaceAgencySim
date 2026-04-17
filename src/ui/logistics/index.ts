@@ -20,7 +20,28 @@ import {
 } from './_state.ts';
 import { renderMiningTab } from './_miningSites.ts';
 import { renderRoutesTab } from './_routeTable.ts';
+import {
+  initLogisticsListenerTracker,
+  destroyLogisticsListenerTracker,
+  getLogisticsListenerTracker,
+} from './_listenerTracker.ts';
 import '../logistics.css';
+
+/**
+ * Register a DOM listener through the logistics tracker so it is cleaned up
+ * when the Logistics panel closes. If the tracker is somehow unavailable,
+ * the registration is skipped — a missed listener is preferable to a leaked
+ * one.
+ */
+function _addTracked(
+  target: EventTarget,
+  event: string,
+  handler: EventListenerOrEventListenerObject,
+  options?: boolean | AddEventListenerOptions,
+): void {
+  const tracker = getLogisticsListenerTracker();
+  if (tracker) tracker.add(target, event, handler, options);
+}
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -30,6 +51,8 @@ import '../logistics.css';
  * Open the Logistics Center panel.
  */
 export function openLogisticsPanel(state: GameState, parentEl: HTMLElement): void {
+  initLogisticsListenerTracker();
+
   const overlay = document.createElement('div');
   overlay.id = 'logistics-overlay';
   overlay.className = 'facility-overlay';
@@ -63,6 +86,7 @@ export function closeLogisticsPanel(): void {
     expandedRouteIds: new Set<string>(),
   });
   resetBuilderState();
+  destroyLogisticsListenerTracker();
 }
 
 // ---------------------------------------------------------------------------
@@ -82,7 +106,7 @@ function _render(): void {
   backBtn.id = 'logistics-back-btn';
   backBtn.className = 'btn-ghost';
   backBtn.textContent = '\u2190 Hub';
-  backBtn.addEventListener('click', () => {
+  _addTracked(backBtn, 'click', () => {
     closeLogisticsPanel();
   });
   header.appendChild(backBtn);
@@ -107,7 +131,7 @@ function _render(): void {
     const tab = document.createElement('button');
     tab.className = 'facility-tab' + (def.id === ls.activeTab ? ' active' : '');
     tab.textContent = def.label;
-    tab.addEventListener('click', () => {
+    _addTracked(tab, 'click', () => {
       setLogisticsState({ activeTab: def.id });
       _render();
     });

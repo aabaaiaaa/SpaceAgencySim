@@ -57,6 +57,7 @@ import type { RocketAssembly }                                from '../core/rock
 import type { FlightState, FlightEvent }                        from '../core/gameState.ts';
 import { getFCState }                                          from './flightController/_state.ts';
 import { resyncWorkerState }                                   from './flightController/_workerBridge.ts';
+import { createListenerTracker, type ListenerTracker }         from './listenerTracker.ts';
 
 
 // ---------------------------------------------------------------------------
@@ -82,11 +83,8 @@ function _resyncAfterAction(ps: PhysicsState, assembly: RocketAssembly, flightSt
 /** The context menu DOM element. */
 let _menu: HTMLDivElement | null = null;
 
-/** contextmenu event handler reference. */
-let _contextMenuHandler: ((e: MouseEvent) => void) | null = null;
-
-/** document click handler for closing the menu. */
-let _outsideClickHandler: ((e: MouseEvent) => void) | null = null;
+/** Module-scoped tracker for window/document/menu-item listeners. */
+let _listeners: ListenerTracker | null = null;
 
 /** Getter for the current physics state. */
 let _getPs: (() => PhysicsState | null) | null = null;
@@ -115,6 +113,7 @@ export function initFlightContextMenu(
   _getPs          = getPs;
   _getAssembly    = getAssembly;
   _getFlightState = getFlightState;
+  _listeners      = createListenerTracker();
 
   // Create the menu DOM element.
   _menu = document.createElement('div');
@@ -123,12 +122,10 @@ export function initFlightContextMenu(
   document.body.appendChild(_menu);
 
   // Right-click -> show menu.
-  _contextMenuHandler = _onContextMenu;
-  window.addEventListener('contextmenu', _contextMenuHandler as EventListener);
+  _listeners.add(window, 'contextmenu', _onContextMenu as EventListener);
 
   // Click anywhere outside -> close menu.
-  _outsideClickHandler = _onOutsideClick;
-  document.addEventListener('click', _outsideClickHandler as EventListener, true);
+  _listeners.add(document, 'click', _onOutsideClick as EventListener, true);
 
 
 }
@@ -139,13 +136,9 @@ export function initFlightContextMenu(
  * Removes the menu DOM element and all event listeners.
  */
 export function destroyFlightContextMenu(): void {
-  if (_contextMenuHandler) {
-    window.removeEventListener('contextmenu', _contextMenuHandler as EventListener);
-    _contextMenuHandler = null;
-  }
-  if (_outsideClickHandler) {
-    document.removeEventListener('click', _outsideClickHandler as EventListener, true);
-    _outsideClickHandler = null;
+  if (_listeners) {
+    _listeners.removeAll();
+    _listeners = null;
   }
   if (_menu) {
     _menu.remove();
@@ -601,10 +594,15 @@ function _makeButton(label: string, onClick: (() => void) | null): HTMLButtonEle
   btn.className   = 'fctx-item';
   btn.textContent = label;
   if (onClick) {
-    btn.addEventListener('click', (e: MouseEvent) => {
-      e.stopPropagation();
+    const handler = (e: Event): void => {
+      (e as MouseEvent).stopPropagation();
       onClick();
-    }, { once: true });
+    };
+    if (_listeners) {
+      _listeners.add(btn, 'click', handler, { once: true });
+    } else {
+      btn.addEventListener('click', handler, { once: true });
+    }
   }
   return btn;
 }

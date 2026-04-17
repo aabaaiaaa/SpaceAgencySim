@@ -48,6 +48,20 @@ import { getVabListenerTracker } from './_listenerTracker.ts';
 
 import type { GameState } from '../../core/gameState.ts';
 
+/**
+ * Register a DOM listener through the VAB tracker so it is cleaned up when
+ * the VAB is destroyed.
+ */
+function _addTracked(
+  target: EventTarget,
+  event: string,
+  handler: EventListenerOrEventListenerObject,
+  options?: boolean | AddEventListenerOptions,
+): void {
+  const tracker = getVabListenerTracker();
+  if (tracker) tracker.add(target, event, handler, options);
+}
+
 // ---------------------------------------------------------------------------
 // Forward references — set by _init.js to break circular deps
 // ---------------------------------------------------------------------------
@@ -192,22 +206,26 @@ export function bindButtons(root: HTMLElement): void {
   const S = getVabState();
 
   // ── "Hub" button ──
-  root.querySelector('#vab-back-btn')?.addEventListener('click', () => {
+  const backBtn = root.querySelector('#vab-back-btn');
+  if (backBtn) _addTracked(backBtn, 'click', () => {
     if (S.onBack) S.onBack();
   });
 
   // ── "Inventory" toggle ──
-  root.querySelector('#vab-btn-inventory')?.addEventListener('click', () => {
+  const invBtn = root.querySelector('#vab-btn-inventory');
+  if (invBtn) _addTracked(invBtn, 'click', () => {
     togglePanel('inventory', () => renderInventoryPanel());
   });
 
-  root.querySelector('#vab-inventory-close')?.addEventListener('click', () => {
+  const invCloseBtn = root.querySelector('#vab-inventory-close');
+  if (invCloseBtn) _addTracked(invCloseBtn, 'click', () => {
     S.openPanels.delete('inventory');
     recomputePanelPositions();
   });
 
   // Inventory panel: refurbish / scrap actions (event delegation).
-  root.querySelector('#vab-inventory-body')?.addEventListener('click', (e: Event) => {
+  const invBody = root.querySelector('#vab-inventory-body');
+  if (invBody) _addTracked(invBody, 'click', (e: Event) => {
     const btn = (e.target as HTMLElement)?.closest?.('.vab-inv-btn') as HTMLElement | null;
     if (!btn || !S.gameState) return;
     const invId = btn.dataset.invId;
@@ -231,21 +249,25 @@ export function bindButtons(root: HTMLElement): void {
   });
 
   // ── "Rocket Engineer" toggle ──
-  root.querySelector('#vab-btn-engineer')?.addEventListener('click', () => {
+  const engBtn = root.querySelector('#vab-btn-engineer');
+  if (engBtn) _addTracked(engBtn, 'click', () => {
     togglePanel('engineer', () => _renderEngineerPanelFn());
   });
 
-  root.querySelector('#vab-engineer-close')?.addEventListener('click', () => {
+  const engCloseBtn = root.querySelector('#vab-engineer-close');
+  if (engCloseBtn) _addTracked(engCloseBtn, 'click', () => {
     S.openPanels.delete('engineer');
     recomputePanelPositions();
   });
 
   // ── "Staging" toggle ──
-  root.querySelector('#vab-btn-staging')?.addEventListener('click', () => {
+  const stgBtn = root.querySelector('#vab-btn-staging');
+  if (stgBtn) _addTracked(stgBtn, 'click', () => {
     togglePanel('staging', () => _renderStagingPanelFn());
   });
 
-  root.querySelector('#vab-staging-close')?.addEventListener('click', () => {
+  const stgCloseBtn = root.querySelector('#vab-staging-close');
+  if (stgCloseBtn) _addTracked(stgCloseBtn, 'click', () => {
     S.openPanels.delete('staging');
     recomputePanelPositions();
   });
@@ -254,14 +276,15 @@ export function bindButtons(root: HTMLElement): void {
   const symmetryBtn = root.querySelector('#vab-btn-symmetry') as HTMLButtonElement | null;
   if (symmetryBtn) {
     symmetryBtn.setAttribute('aria-pressed', String(S.symmetryMode));
-    symmetryBtn.addEventListener('click', () => {
+    _addTracked(symmetryBtn, 'click', () => {
       S.symmetryMode = !S.symmetryMode;
       symmetryBtn.setAttribute('aria-pressed', String(S.symmetryMode));
     });
   }
 
   // ── Clear All ──
-  root.querySelector('#vab-btn-clear-all')?.addEventListener('click', () => {
+  const clearAllBtn = root.querySelector('#vab-btn-clear-all');
+  if (clearAllBtn) _addTracked(clearAllBtn, 'click', () => {
     if (!S.assembly || S.assembly.parts.size === 0) return;
     if (!confirm('Remove all parts? This will refund their cost.')) return;
     // Compute total cost for undo and snapshot staging.
@@ -292,7 +315,8 @@ export function bindButtons(root: HTMLElement): void {
   });
 
   // ── Undo ──
-  root.querySelector('#vab-btn-undo')?.addEventListener('click', () => {
+  const undoBtn = root.querySelector('#vab-btn-undo');
+  if (undoBtn) _addTracked(undoBtn, 'click', () => {
     if (!canUndo() || !S.assembly || !S.stagingConfig) return;
     undoAction();
     syncStagingWithAssembly(S.assembly, S.stagingConfig);
@@ -300,7 +324,8 @@ export function bindButtons(root: HTMLElement): void {
   });
 
   // ── Redo ──
-  root.querySelector('#vab-btn-redo')?.addEventListener('click', () => {
+  const redoBtn = root.querySelector('#vab-btn-redo');
+  if (redoBtn) _addTracked(redoBtn, 'click', () => {
     if (!canRedo() || !S.assembly || !S.stagingConfig) return;
     redoAction();
     syncStagingWithAssembly(S.assembly, S.stagingConfig);
@@ -308,34 +333,40 @@ export function bindButtons(root: HTMLElement): void {
   });
 
   // ── Save design ──
-  root.querySelector('#vab-btn-save')?.addEventListener('click', () => {
+  const saveBtn = root.querySelector('#vab-btn-save');
+  if (saveBtn) _addTracked(saveBtn, 'click', () => {
     void _handleSaveDesignFn();
   });
 
   // ── Load design ──
-  root.querySelector('#vab-btn-load')?.addEventListener('click', () => {
+  const loadBtn = root.querySelector('#vab-btn-load');
+  if (loadBtn) _addTracked(loadBtn, 'click', () => {
     _handleLoadDesignFn();
   });
 
   // ── Launch ──
-  root.querySelector('#vab-btn-launch')?.addEventListener('click', () => {
+  const launchBtn = root.querySelector('#vab-btn-launch');
+  if (launchBtn) _addTracked(launchBtn, 'click', () => {
     if (!S.lastValidation?.canLaunch) return;
     _handleLaunchClickedFn();
   });
 
   // ── Fit (zoom-to-fit) button ──
-  root.querySelector('#vab-btn-fit')?.addEventListener('click', () => {
+  const fitBtn = root.querySelector('#vab-btn-fit');
+  if (fitBtn) _addTracked(fitBtn, 'click', () => {
     doZoomToFit();
   });
 
   // ── Auto-zoom checkbox ──
-  root.querySelector('#vab-chk-autozoom')?.addEventListener('change', (e: Event) => {
+  const autoZoomChk = root.querySelector('#vab-chk-autozoom');
+  if (autoZoomChk) _addTracked(autoZoomChk, 'change', (e: Event) => {
     S.autoZoomEnabled = (e.target as HTMLInputElement).checked;
     if (S.autoZoomEnabled) doZoomToFit();
   });
 
   // ── Zoom slider ──
-  root.querySelector('#vab-zoom-slider')?.addEventListener('input', (e: Event) => {
+  const zoomSlider = root.querySelector('#vab-zoom-slider');
+  if (zoomSlider) _addTracked(zoomSlider, 'input', (e: Event) => {
     const value = parseFloat((e.target as HTMLInputElement).value);
     const c = getRocketCenter();
     vabSetZoomCentred(value, c.x, c.y);

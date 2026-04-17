@@ -10,6 +10,23 @@ import { getMissionControlTier } from '../../core/contracts.ts';
 import { MCC_TIER_FEATURES } from '../../core/constants.ts';
 import { getPartById } from '../../data/parts.ts';
 import { getMCState } from './_state.ts';
+import { getMissionControlListenerTracker } from './_listenerTracker.ts';
+
+/**
+ * Register a DOM listener through the Mission Control tracker so it gets
+ * cleaned up when the panel is torn down. If the tracker is somehow
+ * unavailable (should never happen: sub-modules only render while Mission
+ * Control is active) the registration is skipped — a missed listener is
+ * preferable to a leaked one.
+ */
+function _addTracked(
+  target: EventTarget,
+  event: string,
+  handler: EventListenerOrEventListenerObject,
+): void {
+  const tracker = getMissionControlListenerTracker();
+  if (tracker) tracker.add(target, event, handler);
+}
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -125,7 +142,7 @@ export function renderShell(): void {
   const backBtn = document.createElement('button');
   backBtn.id = 'mission-control-back-btn';
   backBtn.textContent = '\u2190 Hub';
-  backBtn.addEventListener('click', () => {
+  _addTracked(backBtn, 'click', () => {
     const onBack = mc.onBack; // capture before destroy nulls it
     if (_destroyHandler) _destroyHandler();
     if (onBack) onBack();
@@ -168,7 +185,7 @@ export function renderShell(): void {
     btn.className = 'mc-tab' + (tab.id === mc.activeTab ? ' active' : '');
     btn.dataset.tabId = tab.id;
     btn.textContent = tab.label;
-    btn.addEventListener('click', () => {
+    _addTracked(btn, 'click', () => {
       if (_tabSwitchHandler) _tabSwitchHandler(tab.id);
     });
     tabBar.appendChild(btn);

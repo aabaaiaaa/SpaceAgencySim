@@ -17,6 +17,7 @@ import {
 import { FacilityId, RD_LAB_TIER_LABELS } from '../core/constants.ts';
 import { getFacilityTier } from '../core/construction.ts';
 import { refreshTopBar } from './topbar.ts';
+import { createListenerTracker, type ListenerTracker } from './listenerTracker.ts';
 import './rdLab.css';
 import type { GameState } from '../core/gameState.ts';
 
@@ -28,6 +29,7 @@ let _state: GameState | null = null;
 let _onBack: (() => void) | null = null;
 let _overlay: HTMLDivElement | null = null;
 let _activeBranch: string = TechBranch.PROPULSION;
+let _listeners: ListenerTracker | null = null;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -44,6 +46,7 @@ export function initRdLabUI(
   _state = state;
   _onBack = onBack;
   _activeBranch = TechBranch.PROPULSION;
+  _listeners = createListenerTracker();
 
   _overlay = document.createElement('div');
   _overlay.id = 'rd-overlay';
@@ -56,6 +59,10 @@ export function initRdLabUI(
  * Remove the R&D Lab overlay.
  */
 export function destroyRdLabUI(): void {
+  if (_listeners) {
+    _listeners.removeAll();
+    _listeners = null;
+  }
   if (_overlay) {
     _overlay.remove();
     _overlay = null;
@@ -70,6 +77,8 @@ export function destroyRdLabUI(): void {
 
 function _render(): void {
   if (!_overlay || !_state) return;
+  // Clear previously-registered listeners before rebuilding DOM.
+  if (_listeners) _listeners.removeAll();
   _overlay.innerHTML = '';
 
   // Header
@@ -79,7 +88,7 @@ function _render(): void {
   const backBtn: HTMLButtonElement = document.createElement('button');
   backBtn.id = 'rd-back-btn';
   backBtn.textContent = '\u2190 Hub';
-  backBtn.addEventListener('click', () => {
+  _listeners?.add(backBtn, 'click', () => {
     const cb = _onBack;
     destroyRdLabUI();
     if (cb) cb();
@@ -113,7 +122,7 @@ function _render(): void {
     tab.className = 'rd-tab' + (branch === _activeBranch ? ' active' : '');
     tab.textContent = BRANCH_NAMES[branch];
     tab.dataset.branch = branch;
-    tab.addEventListener('click', () => {
+    _listeners?.add(tab, 'click', () => {
       _activeBranch = branch;
       _render();
     });
@@ -223,7 +232,7 @@ function _renderBranch(content: HTMLDivElement): void {
         btn.className = 'rd-research-btn';
         btn.textContent = 'Research';
         btn.dataset.nodeId = node.id;
-        btn.addEventListener('click', () => _handleResearch(node.id));
+        _listeners?.add(btn, 'click', () => _handleResearch(node.id));
         card.appendChild(btn);
       } else if (node.reason) {
         const reason: HTMLDivElement = document.createElement('div');

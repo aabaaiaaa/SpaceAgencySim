@@ -17,6 +17,11 @@ import { renderAvailableTab, renderAcceptedTab, renderCompletedTab } from './_mi
 import { renderContractsBoardTab, renderActiveContractsTab } from './_contractsTab.ts';
 import { renderChallengesTab } from './_challengesTab.ts';
 import { renderAchievementsTab } from './_achievementsTab.ts';
+import {
+  initMissionControlListenerTracker,
+  getMissionControlListenerTracker,
+  destroyMissionControlListenerTracker,
+} from './_listenerTracker.ts';
 
 // ---------------------------------------------------------------------------
 // Tab dispatch
@@ -57,6 +62,10 @@ export function initMissionControlUI(
     creatorFormOpen: false,
   });
 
+  // Create a module-scoped tracker for all Mission Control listeners. Must be
+  // done before renderShell / tab renders so sub-modules can register through it.
+  initMissionControlListenerTracker();
+
   // Recalculate mission unlock state on every open.
   getUnlockedMissions(state);
 
@@ -80,18 +89,16 @@ export function initMissionControlUI(
     destroyMissionControlUI();
     if (onBack) onBack();
   };
-  document.addEventListener('keydown', onEscape);
-  setMCState({ _escapeHandler: onEscape });
+  getMissionControlListenerTracker()?.add(document, 'keydown', onEscape as EventListener);
 }
 
 /**
  * Remove the Mission Control overlay from the DOM.
  */
 export function destroyMissionControlUI(): void {
+  // All listeners (including the escape handler) are cleared via the tracker.
+  destroyMissionControlListenerTracker();
   const mc = getMCState();
-  if (mc._escapeHandler) {
-    document.removeEventListener('keydown', mc._escapeHandler);
-  }
   if (mc.overlay) {
     mc.overlay.remove();
   }

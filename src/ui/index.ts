@@ -17,6 +17,7 @@ import './design-tokens.css';
 import { triggerAutoSave } from './autoSaveToast.ts';
 import { showLoadingIndicator, hideLoadingIndicator } from './loadingIndicator.ts';
 import { showNotification } from './notification.ts';
+import { createListenerTracker, type ListenerTracker } from './listenerTracker.ts';
 
 // ---------------------------------------------------------------------------
 // Cached dynamic-import module references
@@ -103,6 +104,21 @@ let _logisticsOpen: boolean = false;
  * main menu without needing it passed through every callback.
  */
 let _container: HTMLElement | null = null;
+
+/** Module-scoped listener tracker for navigation-level listeners (e.g. cloned back buttons). */
+let _listeners: ListenerTracker | null = null;
+
+function _getListeners(): ListenerTracker {
+  if (!_listeners) _listeners = createListenerTracker();
+  return _listeners;
+}
+
+function _clearListeners(): void {
+  if (_listeners) {
+    _listeners.removeAll();
+    _listeners = null;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -232,6 +248,7 @@ function _handleExitToMenu(): void {
     _cachedLogistics?.closeLogisticsPanel();
     _logisticsOpen = false;
   }
+  _clearListeners();
 
   // Wipe any remaining screen overlays from the container.
   if (_container) {
@@ -268,6 +285,7 @@ function _handleLoadGame(loadedState: GameState): void {
   if (_libraryOpen)        { _cachedLibrary?.destroyLibraryUI();         _libraryOpen = false; }
   if (_rdLabOpen)          { _cachedRdLab?.destroyRdLabUI();           _rdLabOpen = false; }
   if (_logisticsOpen)      { _cachedLogistics?.closeLogisticsPanel();      _logisticsOpen = false; }
+  _clearListeners();
 
   if (_container) {
     _container.innerHTML = '';
@@ -585,9 +603,10 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
           // Clone to remove existing listeners
           const newBtn = backBtn.cloneNode(true) as HTMLElement;
           backBtn.replaceWith(newBtn);
-          newBtn.addEventListener('click', () => {
+          _getListeners().add(newBtn, 'click', () => {
             _cachedLogistics?.closeLogisticsPanel();
             _logisticsOpen = false;
+            _clearListeners();
             setCurrentScreen('hub');
             showHubScene();
             initHubUI(container, state, (dest: string) => {

@@ -34,6 +34,21 @@ import { buildRocketCard } from '../rocketCardUtil.ts';
 import { getVabState } from './_state.ts';
 import { fmt$ } from './_partsPanel.ts';
 import { clearUndoRedo } from '../../core/undoRedo.ts';
+import { getVabListenerTracker } from './_listenerTracker.ts';
+
+/**
+ * Register a DOM listener through the VAB tracker so it is cleaned up when
+ * the VAB is destroyed.
+ */
+function _addTracked(
+  target: EventTarget,
+  event: string,
+  handler: EventListenerOrEventListenerObject,
+  options?: boolean | AddEventListenerOptions,
+): void {
+  const tracker = getVabListenerTracker();
+  if (tracker) tracker.add(target, event, handler, options);
+}
 
 // ---------------------------------------------------------------------------
 // Forward references — set by _init.js to break circular deps
@@ -139,13 +154,14 @@ export async function handleSaveDesign(): Promise<void> {
       saveNameCounter.classList.toggle('warning', len >= 55);
     }
   };
-  nameInput?.addEventListener('input', updateSaveNameCounter);
+  if (nameInput) _addTracked(nameInput, 'input', updateSaveNameCounter);
 
-  overlay.addEventListener('pointerdown', (e: PointerEvent) => {
+  _addTracked(overlay, 'pointerdown', ((e: PointerEvent) => {
     if (e.target === overlay) overlay.remove();
-  });
+  }) as EventListener);
 
-  overlay.querySelector('#vab-save-cancel')?.addEventListener('click', () => overlay.remove());
+  const saveCancelBtn = overlay.querySelector('#vab-save-cancel');
+  if (saveCancelBtn) _addTracked(saveCancelBtn, 'click', () => overlay.remove());
 
   const doSave = async (): Promise<void> => {
     const name = nameInput?.value.trim() || defaultName;
@@ -173,10 +189,11 @@ export async function handleSaveDesign(): Promise<void> {
     showToast('Design saved.');
   };
 
-  overlay.querySelector('#vab-save-confirm')?.addEventListener('click', () => { void doSave(); });
-  nameInput?.addEventListener('keydown', (e: KeyboardEvent) => {
+  const saveConfirmBtn = overlay.querySelector('#vab-save-confirm');
+  if (saveConfirmBtn) _addTracked(saveConfirmBtn, 'click', () => { void doSave(); });
+  if (nameInput) _addTracked(nameInput, 'keydown', ((e: KeyboardEvent) => {
     if (e.key === 'Enter') void doSave();
-  });
+  }) as EventListener);
 }
 
 /**
@@ -223,7 +240,7 @@ export function handleLoadDesign(): void {
   allBtn.type = 'button';
   allBtn.className = 'vab-lib-group-btn active';
   allBtn.textContent = 'All';
-  allBtn.addEventListener('click', () => {
+  _addTracked(allBtn, 'click', () => {
     activeGroupId = null;
     _updateGroupBtns();
     void renderList();
@@ -236,7 +253,7 @@ export function handleLoadDesign(): void {
     btn.className = 'vab-lib-group-btn';
     btn.textContent = gd.label;
     btn.dataset.groupId = gd.id;
-    btn.addEventListener('click', () => {
+    _addTracked(btn, 'click', () => {
       activeGroupId = activeGroupId === gd.id ? null : gd.id;
       _updateGroupBtns();
       void renderList();
@@ -295,7 +312,7 @@ export function handleLoadDesign(): void {
     }
   };
 
-  searchInput.addEventListener('input', () => { void renderList(); });
+  _addTracked(searchInput, 'input', () => { void renderList(); });
 
   void renderList();
 
@@ -303,7 +320,7 @@ export function handleLoadDesign(): void {
   closeBtn.className = 'vab-load-close';
   closeBtn.type = 'button';
   closeBtn.textContent = 'Close';
-  closeBtn.addEventListener('click', () => overlay.remove());
+  _addTracked(closeBtn, 'click', () => overlay.remove());
   overlay.appendChild(closeBtn);
 
   document.body.appendChild(overlay);
@@ -375,31 +392,31 @@ function buildLibraryCard(
   if (compat.status === 'red') {
     loadBtn.title = 'Some parts are locked — rocket will fail validation until all parts are unlocked';
   }
-  loadBtn.addEventListener('click', (e: MouseEvent) => {
+  _addTracked(loadBtn, 'click', ((e: MouseEvent) => {
     e.stopPropagation();
     loadDesignIntoVab(design);
     overlay.remove();
-  });
+  }) as EventListener);
   actionsEl.appendChild(loadBtn);
 
   const dupBtn = document.createElement('button');
   dupBtn.type = 'button';
   dupBtn.textContent = 'Duplicate';
-  dupBtn.addEventListener('click', (e: MouseEvent) => {
+  _addTracked(dupBtn, 'click', ((e: MouseEvent) => {
     e.stopPropagation();
     const copy = duplicateDesign(design, S.gameState!);
     void saveDesignToLibrary(S.gameState!, copy).then(() => {
       void rerender();
       showToast('Design duplicated.');
     });
-  });
+  }) as EventListener);
   actionsEl.appendChild(dupBtn);
 
   const delBtn = document.createElement('button');
   delBtn.type = 'button';
   delBtn.className = 'vab-load-card-delete-btn';
   delBtn.textContent = 'Delete';
-  delBtn.addEventListener('click', (e: MouseEvent) => {
+  _addTracked(delBtn, 'click', ((e: MouseEvent) => {
     e.stopPropagation();
     if (!confirm(`Delete "${design.name}"?`)) return;
     void deleteDesignFromLibrary(S.gameState!, design.id).then(() => {
@@ -409,7 +426,7 @@ function buildLibraryCard(
       }
       void rerender();
     });
-  });
+  }) as EventListener);
   actionsEl.appendChild(delBtn);
 
   const existingActions = card.querySelector('.rocket-card-actions');

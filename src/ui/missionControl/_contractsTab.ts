@@ -9,7 +9,21 @@ import { acceptContract, cancelContract, getContractCaps, getActiveConflicts, ge
 import { CONTRACT_CATEGORY_ICONS, MCC_TIER_FEATURES, getReputationTier } from '../../core/constants.ts';
 import { getMCState } from './_state.ts';
 import { fmtCash, getContent } from './_shell.ts';
+import { getMissionControlListenerTracker } from './_listenerTracker.ts';
 import { logger } from '../../core/logger.ts';
+
+/**
+ * Register a DOM listener through the Mission Control tracker so it gets
+ * cleaned up when the panel is torn down.
+ */
+function _addTracked(
+  target: EventTarget,
+  event: string,
+  handler: EventListenerOrEventListenerObject,
+): void {
+  const tracker = getMissionControlListenerTracker();
+  if (tracker) tracker.add(target, event, handler);
+}
 
 /**
  * Extended contract shape that includes bonus objectives, bonus reward,
@@ -253,7 +267,7 @@ function _buildContractBoardCard(contract: ExtendedContract, canAcceptMore: bool
   if (!canAcceptMore) {
     acceptBtn.title = 'Active contract limit reached.';
   }
-  acceptBtn.addEventListener('click', () => _handleAcceptContract(contract.id));
+  _addTracked(acceptBtn, 'click', () => _handleAcceptContract(contract.id));
   acceptRow.appendChild(acceptBtn);
 
   if (!canAcceptMore) {
@@ -466,7 +480,7 @@ function _buildActiveContractCard(contract: ExtendedContract): HTMLElement {
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'mc-cancel-btn';
   cancelBtn.textContent = `Cancel (${fmtCash(contract.penaltyFee)} penalty)`;
-  cancelBtn.addEventListener('click', () => _handleCancelContract(contract.id));
+  _addTracked(cancelBtn, 'click', () => _handleCancelContract(contract.id));
   card.appendChild(cancelBtn);
 
   return card;

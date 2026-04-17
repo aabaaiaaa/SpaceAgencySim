@@ -21,6 +21,20 @@ import {
 } from './_state.ts';
 import { renderRouteMap, formatLocation } from './_routeMap.ts';
 import { renderBuilderPanel } from './_routeBuilder.ts';
+import { getLogisticsListenerTracker } from './_listenerTracker.ts';
+
+/**
+ * Register a DOM listener through the logistics tracker.
+ */
+function _addTracked(
+  target: EventTarget,
+  event: string,
+  handler: EventListenerOrEventListenerObject,
+  options?: boolean | AddEventListenerOptions,
+): void {
+  const tracker = getLogisticsListenerTracker();
+  if (tracker) tracker.add(target, event, handler, options);
+}
 
 // ---------------------------------------------------------------------------
 // Routes Tab (main entry)
@@ -44,7 +58,7 @@ export function renderRoutesTab(): void {
     const createBtn = document.createElement('button');
     createBtn.className = 'logistics-builder-create-btn';
     createBtn.textContent = '+ Create Route';
-    createBtn.addEventListener('click', () => {
+    _addTracked(createBtn, 'click', () => {
       getLogisticsState().builderMode = true;
       triggerRender();
     });
@@ -118,7 +132,7 @@ function _renderRoutesTable(routes: Route[]): HTMLTableElement {
     expandBtn.className = 'btn-ghost logistics-expand-btn';
     const isExpanded = ls.expandedRouteIds.has(route.id);
     expandBtn.textContent = `${isExpanded ? '\u25BC' : '\u25B6'} ${route.legs.length} leg${route.legs.length !== 1 ? 's' : ''}`;
-    expandBtn.addEventListener('click', () => {
+    _addTracked(expandBtn, 'click', () => {
       const currentLs = getLogisticsState();
       if (currentLs.expandedRouteIds.has(route.id)) {
         currentLs.expandedRouteIds.delete(route.id);
@@ -161,7 +175,7 @@ function _renderRoutesTable(routes: Route[]): HTMLTableElement {
     const btn = document.createElement('button');
     btn.className = `logistics-route-status-btn status-${route.status}`;
     btn.textContent = route.status.charAt(0).toUpperCase() + route.status.slice(1);
-    btn.addEventListener('click', () => {
+    _addTracked(btn, 'click', () => {
       if (route.status === 'active') {
         setRouteStatus(route, 'paused');
       } else if (route.status === 'paused') {
@@ -207,7 +221,7 @@ function _renderRoutesTable(routes: Route[]): HTMLTableElement {
         minusBtn.className = 'btn-ghost logistics-craft-btn';
         minusBtn.textContent = '\u2212';
         minusBtn.disabled = leg.craftCount <= 1;
-        minusBtn.addEventListener('click', () => {
+        _addTracked(minusBtn, 'click', () => {
           if (leg.craftCount > 1) {
             leg.craftCount--;
             route.throughputPerPeriod = calculateRouteThroughput(route.legs);
@@ -225,7 +239,7 @@ function _renderRoutesTable(routes: Route[]): HTMLTableElement {
         const plusBtn = document.createElement('button');
         plusBtn.className = 'btn-ghost logistics-craft-btn';
         plusBtn.textContent = '+';
-        plusBtn.addEventListener('click', () => {
+        _addTracked(plusBtn, 'click', () => {
           addCraftToLeg(route, leg.id);
           triggerRender();
         });

@@ -9,6 +9,7 @@
 
 import type { GameState } from '../core/gameState.ts';
 import { isAutoSaveEnabled, performAutoSave } from '../core/autoSave.ts';
+import { createListenerTracker, type ListenerTracker } from './listenerTracker.ts';
 import './autoSaveToast.css';
 
 // ---------------------------------------------------------------------------
@@ -24,6 +25,7 @@ const AUTO_SAVE_DELAY_MS = 3000;
 
 let _activeToast: HTMLElement | null = null;
 let _pendingTimer: number | null = null;
+let _listeners: ListenerTracker | null = null;
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -70,7 +72,9 @@ export function triggerAutoSave(state: GameState, _trigger?: string): void {
 
   let cancelled = false;
 
-  cancelBtn.addEventListener('click', () => {
+  if (_listeners) _listeners.removeAll();
+  _listeners = createListenerTracker();
+  _listeners.add(cancelBtn, 'click', () => {
     cancelled = true;
     if (_pendingTimer !== null) {
       clearTimeout(_pendingTimer);
@@ -130,6 +134,10 @@ export async function autoSaveImmediate(state: GameState): Promise<{ success: bo
 
 function _removeToast(): void {
   if (!_activeToast) return;
+  if (_listeners) {
+    _listeners.removeAll();
+    _listeners = null;
+  }
   _activeToast.classList.add('fade-out');
   const el = _activeToast;
   _activeToast = null;
@@ -143,6 +151,10 @@ export function _cancelPendingAutoSave(): void {
   if (_pendingTimer !== null) {
     clearTimeout(_pendingTimer);
     _pendingTimer = null;
+  }
+  if (_listeners) {
+    _listeners.removeAll();
+    _listeners = null;
   }
   if (_activeToast) {
     _activeToast.remove();

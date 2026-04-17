@@ -41,6 +41,7 @@ import { getAllParts } from '../data/parts.ts';
 import { TECH_NODES } from '../data/techtree.ts';
 import { logger } from '../core/logger.ts';
 import { escapeHtml } from './escapeHtml.ts';
+import { createListenerTracker, type ListenerTracker } from './listenerTracker.ts';
 import './mainmenu.css';
 import type { GameState, SandboxSettings } from '../core/gameState.ts';
 import type { SaveSlotSummary } from '../core/saveload.ts';
@@ -218,6 +219,9 @@ let _overlay: HTMLElement | null = null;
 /** Callback invoked when the player has chosen a game to play. */
 let _onGameReady: ((state: GameState) => void) | null = null;
 
+/** Tracks all event listeners registered by the main menu so they can be bulk-removed on destroy. */
+let _listeners: ListenerTracker | null = null;
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -227,6 +231,7 @@ let _onGameReady: ((state: GameState) => void) | null = null;
  */
 export async function initMainMenu(container: HTMLElement, onGameReady: (state: GameState) => void): Promise<void> {
   _onGameReady = onGameReady;
+  _listeners = createListenerTracker();
 
   // Create overlay element.
   _overlay = document.createElement('div');
@@ -316,7 +321,7 @@ function _renderLoadScreen(overlay: HTMLElement, saves: (SaveSlotSummary | null)
   overlay.appendChild(screen);
 
   // Wire up global actions.
-  screen.querySelector('#mm-new-game-btn')!.addEventListener('click', () => {
+  _listeners?.add(screen.querySelector('#mm-new-game-btn')!, 'click', () => {
     void _switchScreen('newgame', true);
   });
 
@@ -395,7 +400,7 @@ function _buildSaveCard(summary: SaveSlotSummary): HTMLDivElement {
   `;
 
   // Wire card-level actions.
-  card.addEventListener('click', (e: MouseEvent) => {
+  _listeners?.add(card, 'click', ((e: MouseEvent) => {
     const btn = (e.target as HTMLElement).closest('[data-action]') as HTMLElement | null;
     if (!btn) return;
     const action: string | undefined = btn.dataset.action;
@@ -404,7 +409,7 @@ function _buildSaveCard(summary: SaveSlotSummary): HTMLDivElement {
     if (action === 'load')   { void _handleLoad(slot, key); }
     if (action === 'export') { void _handleExport(slot, key); }
     if (action === 'delete') { _handleDeleteConfirm(slot, summary.saveName, key); }
-  });
+  }) as EventListener);
 
   return card;
 }
@@ -519,10 +524,10 @@ function _renderNewGameScreen(overlay: HTMLElement, canGoBack: boolean): void {
       }
     };
 
-    opt.addEventListener('click', selectOption);
+    _listeners?.add(opt, 'click', selectOption);
 
     // Keyboard activation: Enter or Space selects the option.
-    opt.addEventListener('keydown', (e: Event) => {
+    _listeners?.add(opt, 'keydown', (e: Event) => {
       const ke = e as KeyboardEvent;
       if (ke.key === 'Enter' || ke.key === ' ') {
         ke.preventDefault();
@@ -538,17 +543,17 @@ function _renderNewGameScreen(overlay: HTMLElement, canGoBack: boolean): void {
     nameCounter.textContent = `${len} / 48`;
     nameCounter.classList.toggle('warning', len >= 43);
   };
-  nameInput.addEventListener('input', updateNameCounter);
+  _listeners?.add(nameInput, 'input', updateNameCounter);
 
   // Focus the name field immediately.
   setTimeout(() => nameInput.focus(), 50);
 
   // Allow pressing Enter to start.
-  nameInput.addEventListener('keydown', (e: KeyboardEvent) => {
+  _listeners?.add(nameInput, 'keydown', ((e: KeyboardEvent) => {
     if (e.key === 'Enter') startBtn.click();
-  });
+  }) as EventListener);
 
-  startBtn.addEventListener('click', () => {
+  _listeners?.add(startBtn, 'click', () => {
     const agencyName: string = nameInput.value.trim();
     if (!agencyName) {
       _showMessage(errorDiv, 'Please enter an agency name.', 'error');
@@ -564,7 +569,7 @@ function _renderNewGameScreen(overlay: HTMLElement, canGoBack: boolean): void {
   });
 
   if (backBtn) {
-    backBtn.addEventListener('click', () => void _switchScreen('load', false));
+    _listeners?.add(backBtn, 'click', () => void _switchScreen('load', false));
   }
 }
 
@@ -736,9 +741,9 @@ function _wireImportButton(screen: HTMLElement): void {
   const importBtn   = screen.querySelector('#mm-import-btn') as HTMLButtonElement;
   const fileInput   = screen.querySelector('#mm-import-file-input') as HTMLInputElement;
 
-  importBtn.addEventListener('click', () => fileInput.click());
+  _listeners?.add(importBtn, 'click', () => fileInput.click());
 
-  fileInput.addEventListener('change', () => {
+  _listeners?.add(fileInput, 'change', () => {
     const file: File | undefined = fileInput.files?.[0];
     if (!file) return;
     fileInput.value = ''; // Reset so the same file can be re-imported.
@@ -782,6 +787,10 @@ function _beginGame(state: GameState): void {
       _overlay.parentNode.removeChild(_overlay);
     }
     _overlay = null;
+    if (_listeners) {
+      _listeners.removeAll();
+      _listeners = null;
+    }
     if (_onGameReady) {
       _onGameReady(state);
     }
@@ -813,7 +822,6 @@ export function _showConfirmModal(title: string, body: string, confirmText: stri
   document.body.appendChild(backdrop);
 
   const remove = (): void => {
-    document.removeEventListener('keydown', onEscape);
     backdrop.remove();
     if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) {
       previouslyFocused.focus();
@@ -823,16 +831,16 @@ export function _showConfirmModal(title: string, body: string, confirmText: stri
   const onEscape = (e: KeyboardEvent): void => {
     if (e.key === 'Escape') remove();
   };
-  document.addEventListener('keydown', onEscape);
+  _listeners?.add(document, 'keydown', onEscape as EventListener);
 
-  backdrop.querySelector('#mm-modal-confirm')!.addEventListener('click', () => {
+  _listeners?.add(backdrop.querySelector('#mm-modal-confirm')!, 'click', () => {
     remove();
     void onConfirm();
   });
-  backdrop.querySelector('#mm-modal-cancel')!.addEventListener('click', remove);
-  backdrop.addEventListener('click', (e: MouseEvent) => {
+  _listeners?.add(backdrop.querySelector('#mm-modal-cancel')!, 'click', remove);
+  _listeners?.add(backdrop, 'click', ((e: MouseEvent) => {
     if (e.target === backdrop) remove();
-  });
+  }) as EventListener);
 
   // Focus the primary action (confirm) button on open.
   (backdrop.querySelector('#mm-modal-confirm') as HTMLElement)?.focus();

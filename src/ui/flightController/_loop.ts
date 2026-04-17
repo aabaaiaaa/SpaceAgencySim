@@ -33,6 +33,7 @@ import { tickDockingSystem, updateDockingHud } from './_docking.ts';
 import { checkHubDocking } from './_hubDocking.ts';
 import { showPostFlightSummary } from './_postFlight.ts';
 import { handleAbortReturnToAgency } from './_menuActions.ts';
+import { getFlightControllerListenerTracker } from './_listenerTracker.ts';
 import {
   isWorkerReady,
   hasWorkerError,
@@ -472,19 +473,22 @@ function _showLoopErrorBanner(s: ReturnType<typeof getFCState>): void {
   const continueBtn: HTMLButtonElement = document.createElement('button');
   continueBtn.textContent = 'Try to Continue';
   continueBtn.className = 'error-banner-btn-continue';
-  continueBtn.addEventListener('click', () => {
+  const tracker = getFlightControllerListenerTracker();
+  const continueHandler = (): void => {
     s.loopConsecutiveErrors = 0;
     if (s.loopErrorBanner) { s.loopErrorBanner.remove(); s.loopErrorBanner = null; }
-  });
+  };
+  tracker?.add(continueBtn, 'click', continueHandler);
 
   const abortBtn: HTMLButtonElement = document.createElement('button');
   abortBtn.textContent = 'Abort to Hub';
   abortBtn.dataset.testid = 'loop-error-abort-btn';
   abortBtn.className = 'error-banner-btn-abort';
-  abortBtn.addEventListener('click', () => {
+  const abortHandler = (): void => {
     if (s.loopErrorBanner) { s.loopErrorBanner.remove(); s.loopErrorBanner = null; }
     handleAbortReturnToAgency();
-  });
+  };
+  tracker?.add(abortBtn, 'click', abortHandler);
 
   btnRow.appendChild(continueBtn);
   btnRow.appendChild(abortBtn);

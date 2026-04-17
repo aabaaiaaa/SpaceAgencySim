@@ -11,6 +11,7 @@ import { getPartById } from '../data/parts.ts';
 import { PartType } from '../core/constants.ts';
 import { computePreviewLayout } from '../core/previewLayout.ts';
 import type { PartRect } from '../core/previewLayout.ts';
+import type { ListenerTracker } from './listenerTracker.ts';
 import './rocketCardUtil.css';
 import type { RocketDesign } from '../core/gameState.ts';
 import type { PartDef } from '../data/parts.ts';
@@ -144,8 +145,17 @@ export interface RocketCardAction {
 
 /**
  * Build a rocket design card element.
+ *
+ * If `tracker` is provided, any action-button click listeners are registered
+ * through it so callers can bulk-remove them on teardown. If omitted (the
+ * default, and what tests pass), listeners are attached directly — fine for
+ * single-use ephemeral cards or unit tests.
  */
-export function buildRocketCard(design: RocketDesign, actions: RocketCardAction[]): HTMLDivElement {
+export function buildRocketCard(
+  design: RocketDesign,
+  actions: RocketCardAction[],
+  tracker?: ListenerTracker,
+): HTMLDivElement {
   const card: HTMLDivElement = document.createElement('div');
   card.className = 'rocket-card';
   card.dataset.rocketId = design.id;
@@ -191,10 +201,11 @@ export function buildRocketCard(design: RocketDesign, actions: RocketCardAction[
       btn.type = 'button';
       btn.textContent = action.label;
       if (action.className) btn.className = action.className;
-      btn.addEventListener('click', (e: MouseEvent) => {
-        e.stopPropagation();
+      const clickHandler = (e: Event): void => {
+        (e as MouseEvent).stopPropagation();
         action.onClick();
-      });
+      };
+      tracker?.add(btn, 'click', clickHandler);
       actionsEl.appendChild(btn);
     }
     card.appendChild(actionsEl);

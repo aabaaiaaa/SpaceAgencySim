@@ -38,7 +38,11 @@ import {
 } from './_menuActions.ts';
 import { logger } from '../../core/logger.ts';
 import { initPhysicsWorker, resyncWorkerState, terminatePhysicsWorker } from './_workerBridge.ts';
-import { initFlightControllerListenerTracker, destroyFlightControllerListenerTracker } from './_listenerTracker.ts';
+import {
+  initFlightControllerListenerTracker,
+  destroyFlightControllerListenerTracker,
+  getFlightControllerListenerTracker,
+} from './_listenerTracker.ts';
 
 import type { PhysicsState } from '../../core/physics.ts';
 import type { RocketAssembly, StagingConfig, PlacedPart } from '../../core/rocketbuilder.ts';
@@ -312,8 +316,11 @@ export async function startFlightScene(
   // Bind keyboard handlers.
   s.keydownHandler = onKeyDown;
   s.keyupHandler   = onKeyUp;
-  window.addEventListener('keydown', s.keydownHandler);
-  window.addEventListener('keyup',   s.keyupHandler);
+  const _tracker = getFlightControllerListenerTracker();
+  if (_tracker) {
+    _tracker.add(window, 'keydown', s.keydownHandler as EventListener);
+    _tracker.add(window, 'keyup',   s.keyupHandler as EventListener);
+  }
 
   // Start the render + physics loop.
   s.lastTs = performance.now();
@@ -366,14 +373,11 @@ export function stopFlightScene(): void {
   terminatePhysicsWorker();
   s.workerReady = false;
 
-  if (s.keydownHandler) {
-    window.removeEventListener('keydown', s.keydownHandler);
-    s.keydownHandler = null;
-  }
-  if (s.keyupHandler) {
-    window.removeEventListener('keyup', s.keyupHandler);
-    s.keyupHandler = null;
-  }
+  // Window keydown/keyup handlers are now tracked by the
+  // flight-controller listener tracker and removed via
+  // destroyFlightControllerListenerTracker() below.
+  s.keydownHandler = null;
+  s.keyupHandler = null;
 
   destroyFpsMonitor();
   destroyPerfDashboard();

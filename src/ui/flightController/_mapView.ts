@@ -37,6 +37,7 @@ import { resyncWorkerState } from './_workerBridge.ts';
 import { escapeHtml } from '../escapeHtml.ts';
 import { setActiveHub, getHub } from '../../core/hubs.ts';
 import { CELESTIAL_BODIES } from '../../data/bodies.ts';
+import { getFlightControllerListenerTracker } from './_listenerTracker.ts';
 
 // Re-export setMapTarget for use by _docking.js.
 export { setMapTarget };
@@ -58,6 +59,17 @@ let _selectedHubId: string | null = null;
 
 /** Listener reference so we can remove it when the map HUD is destroyed. */
 let _hubClickListener: ((e: Event) => void) | null = null;
+
+/** Small helper: register through the flight-controller tracker if available. */
+function _addTracked(
+  target: EventTarget,
+  event: string,
+  handler: EventListenerOrEventListenerObject,
+  options?: boolean | AddEventListenerOptions,
+): void {
+  const tracker = getFlightControllerListenerTracker();
+  if (tracker) tracker.add(target, event, handler, options);
+}
 
 /**
  * Handle a `map-hub-click` custom event dispatched by the render layer.
@@ -330,16 +342,16 @@ export function handleRenameAsteroid(): void {
     close();
   }
 
-  document.getElementById('rename-asteroid-cancel')!.addEventListener('click', close);
-  document.getElementById('rename-asteroid-confirm')!.addEventListener('click', confirm);
-  input.addEventListener('keydown', (ev: KeyboardEvent) => {
+  _addTracked(document.getElementById('rename-asteroid-cancel')!, 'click', close);
+  _addTracked(document.getElementById('rename-asteroid-confirm')!, 'click', confirm);
+  _addTracked(input, 'keydown', ((ev: KeyboardEvent) => {
     if (ev.key === 'Enter') { ev.preventDefault(); confirm(); }
     if (ev.key === 'Escape') { ev.preventDefault(); close(); }
     ev.stopPropagation(); // prevent game keyboard handler from firing
-  });
-  overlay.addEventListener('click', (ev: MouseEvent) => {
+  }) as EventListener);
+  _addTracked(overlay, 'click', ((ev: MouseEvent) => {
     if (ev.target === overlay) close();
-  });
+  }) as EventListener);
 }
 
 // ---------------------------------------------------------------------------
@@ -391,7 +403,7 @@ export function buildMapHud(): void {
   warpBtn.id = 'map-warp-btn';
   warpBtn.className = 'hidden';
   warpBtn.textContent = 'Warp to Target';
-  warpBtn.addEventListener('click', handleWarpToTarget);
+  _addTracked(warpBtn, 'click', handleWarpToTarget);
   hud.appendChild(warpBtn);
 
   // Rename asteroid button (shown when targeting a persistent asteroid).
@@ -399,7 +411,7 @@ export function buildMapHud(): void {
   renameBtn.id = 'map-rename-btn';
   renameBtn.className = 'hidden';
   renameBtn.textContent = 'Rename Asteroid';
-  renameBtn.addEventListener('click', handleRenameAsteroid);
+  _addTracked(renameBtn, 'click', handleRenameAsteroid);
   hud.appendChild(renameBtn);
 
   s.mapHud = hud;
@@ -409,7 +421,7 @@ export function buildMapHud(): void {
   // Register hub-click listener for the map.
   if (_hubClickListener) window.removeEventListener('map-hub-click', _hubClickListener);
   _hubClickListener = _onHubClick;
-  window.addEventListener('map-hub-click', _hubClickListener);
+  _addTracked(window, 'map-hub-click', _hubClickListener);
   _selectedHubId = null;
 
   updateMapHud();

@@ -12,8 +12,23 @@ import {
 } from '../../core/partInventory.ts';
 import { getActiveHub, getImportTaxMultiplier } from '../../core/hubs.ts';
 import { getVabState } from './_state.ts';
+import { getVabListenerTracker } from './_listenerTracker.ts';
 
 import type { GameState } from '../../core/gameState.ts';
+
+/**
+ * Register a DOM listener through the VAB tracker so it is cleaned up when
+ * the VAB is destroyed.
+ */
+function _addTracked(
+  target: EventTarget,
+  event: string,
+  handler: EventListenerOrEventListenerObject,
+  options?: boolean | AddEventListenerOptions,
+): void {
+  const tracker = getVabListenerTracker();
+  if (tracker) tracker.add(target, event, handler, options);
+}
 
 // ---------------------------------------------------------------------------
 // Part-type display helpers
@@ -309,7 +324,7 @@ export function setupPanelDrag(
   partsPanel: HTMLElement,
   startDrag: (partId: string, instanceId: string | null, clientX: number, clientY: number) => void,
 ): void {
-  partsPanel.addEventListener('pointerdown', (e: PointerEvent) => {
+  _addTracked(partsPanel, 'pointerdown', ((e: PointerEvent) => {
     if (e.button !== 0) return;
     const card = (e.target as HTMLElement)?.closest?.('.vab-part-card') as HTMLElement | null;
     if (!card) return;
@@ -318,10 +333,10 @@ export function setupPanelDrag(
 
     e.preventDefault();
     startDrag(partId, null, e.clientX, e.clientY);
-  });
+  }) as EventListener);
 
   // Keyboard: Enter/Space on a part card shows its detail panel.
-  partsPanel.addEventListener('keydown', (e: KeyboardEvent) => {
+  _addTracked(partsPanel, 'keydown', ((e: KeyboardEvent) => {
     if (e.key !== 'Enter' && e.key !== ' ') return;
     const card = (e.target as HTMLElement)?.closest?.('.vab-part-card') as HTMLElement | null;
     if (!card) return;
@@ -329,5 +344,5 @@ export function setupPanelDrag(
     if (!partId) return;
     e.preventDefault();
     showPartDetail(partId);
-  });
+  }) as EventListener);
 }

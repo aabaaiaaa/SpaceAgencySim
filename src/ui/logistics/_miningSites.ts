@@ -18,6 +18,20 @@ import {
   formatModuleType,
   formatResourceType,
 } from './_state.ts';
+import { getLogisticsListenerTracker } from './_listenerTracker.ts';
+
+/**
+ * Register a DOM listener through the logistics tracker.
+ */
+function _addTracked(
+  target: EventTarget,
+  event: string,
+  handler: EventListenerOrEventListenerObject,
+  options?: boolean | AddEventListenerOptions,
+): void {
+  const tracker = getLogisticsListenerTracker();
+  if (tracker) tracker.add(target, event, handler, options);
+}
 
 // ---------------------------------------------------------------------------
 // Mining Sites Tab
@@ -67,7 +81,7 @@ export function renderMiningTab(): void {
     const item = document.createElement('div');
     item.className = 'logistics-sidebar-item' + (bodyId === getLogisticsState().selectedBodyId ? ' active' : '');
     item.textContent = bodyId;
-    item.addEventListener('click', () => {
+    _addTracked(item, 'click', () => {
       setLogisticsState({ selectedBodyId: bodyId });
       triggerRender();
     });
@@ -207,7 +221,7 @@ function _renderModuleList(site: MiningSite): HTMLUListElement {
         noneOpt.selected = true;
       }
 
-      select.addEventListener('change', () => {
+      _addTracked(select, 'change', () => {
         const value = select.value;
         if (value) {
           setRefineryRecipe(site, mod.id, value);

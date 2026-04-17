@@ -15,6 +15,21 @@ import { startFlightScene } from '../flightController.ts';
 import { showReturnResultsOverlay } from '../hub.ts';
 import { getVabState } from './_state.ts';
 import { getActiveHub } from '../../core/hubs.ts';
+import { getVabListenerTracker } from './_listenerTracker.ts';
+
+/**
+ * Register a DOM listener through the VAB tracker so it is cleaned up when
+ * the VAB is destroyed.
+ */
+function _addTracked(
+  target: EventTarget,
+  event: string,
+  handler: EventListenerOrEventListenerObject,
+  options?: boolean | AddEventListenerOptions,
+): void {
+  const tracker = getVabListenerTracker();
+  if (tracker) tracker.add(target, event, handler, options);
+}
 
 // ---------------------------------------------------------------------------
 // Forward references — set by _init.js to break circular deps
@@ -107,18 +122,20 @@ function showVabWeatherWarning(): void {
   overlay.appendChild(dialog);
   document.body.appendChild(overlay);
 
-  overlay.querySelector('#vab-weather-cancel')?.addEventListener('click', () => {
+  const weatherCancelBtn = overlay.querySelector('#vab-weather-cancel');
+  if (weatherCancelBtn) _addTracked(weatherCancelBtn, 'click', () => {
     overlay.remove();
   });
 
-  overlay.querySelector('#vab-weather-proceed')?.addEventListener('click', () => {
+  const weatherProceedBtn = overlay.querySelector('#vab-weather-proceed');
+  if (weatherProceedBtn) _addTracked(weatherProceedBtn, 'click', () => {
     overlay.remove();
     proceedVabLaunch();
   });
 
-  overlay.addEventListener('pointerdown', (e: PointerEvent) => {
+  _addTracked(overlay, 'pointerdown', ((e: PointerEvent) => {
     if (e.target === overlay) overlay.remove();
-  });
+  }) as EventListener);
 }
 
 /**
@@ -184,15 +201,17 @@ function showCrewDialog(totalSeats: number): void {
 
   document.body.appendChild(overlay);
 
-  overlay.addEventListener('pointerdown', (e: PointerEvent) => {
+  _addTracked(overlay, 'pointerdown', ((e: PointerEvent) => {
     if (e.target === overlay) overlay.remove();
-  });
+  }) as EventListener);
 
-  overlay.querySelector('#vab-crew-cancel')?.addEventListener('click', () => {
+  const crewCancelBtn = overlay.querySelector('#vab-crew-cancel');
+  if (crewCancelBtn) _addTracked(crewCancelBtn, 'click', () => {
     overlay.remove();
   });
 
-  overlay.querySelector('#vab-crew-confirm')?.addEventListener('click', () => {
+  const crewConfirmBtn = overlay.querySelector('#vab-crew-confirm');
+  if (crewConfirmBtn) _addTracked(crewConfirmBtn, 'click', () => {
     const selects  = overlay.querySelectorAll('.vab-crew-seat-select');
     const crewIds: string[]  = [];
     const seen     = new Set<string>();
@@ -315,7 +334,8 @@ export function showLaunchInitiatedOverlay(): void {
 
   document.body.appendChild(banner);
 
-  banner.querySelector('#vab-launch-dismiss')?.addEventListener('click', () => {
+  const launchDismissBtn = banner.querySelector('#vab-launch-dismiss');
+  if (launchDismissBtn) _addTracked(launchDismissBtn, 'click', () => {
     if (S.gameState) S.gameState.currentFlight = null;
     banner.remove();
   });

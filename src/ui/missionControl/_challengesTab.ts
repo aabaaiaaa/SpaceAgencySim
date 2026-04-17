@@ -14,6 +14,22 @@ import {
 } from '../../core/customChallenges.ts';
 import { getMCState } from './_state.ts';
 import { fmtCash, getContent } from './_shell.ts';
+import { getMissionControlListenerTracker } from './_listenerTracker.ts';
+
+/**
+ * Register a DOM listener through the Mission Control tracker so it gets
+ * cleaned up when the panel is torn down. Import/export dialogs created by
+ * this tab are also torn down through the tracker so that closing Mission
+ * Control while a dialog is open doesn't leak its listeners.
+ */
+function _addTracked(
+  target: EventTarget,
+  event: string,
+  handler: EventListenerOrEventListenerObject,
+): void {
+  const tracker = getMissionControlListenerTracker();
+  if (tracker) tracker.add(target, event, handler);
+}
 
 // ---------------------------------------------------------------------------
 // Medal helpers
@@ -88,7 +104,7 @@ export function renderChallengesTab(): void {
 
   const createBtn = document.createElement('button');
   createBtn.textContent = '+ Create Challenge';
-  createBtn.addEventListener('click', () => {
+  _addTracked(createBtn, 'click', () => {
     mc.creatorFormOpen = !mc.creatorFormOpen;
     renderChallengesTab();
   });
@@ -96,7 +112,7 @@ export function renderChallengesTab(): void {
 
   const importBtn = document.createElement('button');
   importBtn.textContent = 'Import JSON';
-  importBtn.addEventListener('click', () => _showImportDialog());
+  _addTracked(importBtn, 'click', () => _showImportDialog());
   toolbar.appendChild(importBtn);
 
   content.appendChild(toolbar);
@@ -233,7 +249,7 @@ export function renderChallengesTab(): void {
       const abandonBtn = document.createElement('button');
       abandonBtn.className = 'mc-challenge-abandon-btn';
       abandonBtn.textContent = 'Abandon';
-      abandonBtn.addEventListener('click', () => {
+      _addTracked(abandonBtn, 'click', () => {
         abandonChallenge(mc.state!);
         renderChallengesTab();
       });
@@ -242,7 +258,7 @@ export function renderChallengesTab(): void {
       const acceptBtn = document.createElement('button');
       acceptBtn.className = 'mc-challenge-accept-btn';
       acceptBtn.textContent = result ? 'Replay' : 'Accept';
-      acceptBtn.addEventListener('click', () => {
+      _addTracked(acceptBtn, 'click', () => {
         const res = acceptChallenge(mc.state!, ch.id);
         if (res.success) {
           renderChallengesTab();
@@ -256,7 +272,7 @@ export function renderChallengesTab(): void {
       const exportBtn = document.createElement('button');
       exportBtn.className = 'mc-challenge-export-btn';
       exportBtn.textContent = 'Export';
-      exportBtn.addEventListener('click', () => {
+      _addTracked(exportBtn, 'click', () => {
         const json = exportChallengeJSON(ch);
         _showExportDialog(json);
       });
@@ -265,7 +281,7 @@ export function renderChallengesTab(): void {
       const delBtn = document.createElement('button');
       delBtn.className = 'mc-challenge-delete-btn';
       delBtn.textContent = 'Delete';
-      delBtn.addEventListener('click', () => {
+      _addTracked(delBtn, 'click', () => {
         deleteCustomChallenge(mc.state!, ch.id);
         renderChallengesTab();
       });
@@ -331,7 +347,7 @@ function _buildCreatorForm(): HTMLElement {
   addObjBtn.className = 'mc-creator-add-obj';
   addObjBtn.textContent = '+ Add Objective';
   addObjBtn.type = 'button';
-  addObjBtn.addEventListener('click', () => {
+  _addTracked(addObjBtn, 'click', () => {
     const container = document.getElementById('cc-obj-container');
     if (container) {
       const idx = container.children.length;
@@ -399,14 +415,14 @@ function _buildCreatorForm(): HTMLElement {
   submitBtn.className = 'mc-creator-submit';
   submitBtn.textContent = 'Create';
   submitBtn.type = 'button';
-  submitBtn.addEventListener('click', () => _handleCreateSubmit());
+  _addTracked(submitBtn, 'click', () => _handleCreateSubmit());
   actions.appendChild(submitBtn);
 
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'mc-creator-cancel';
   cancelBtn.textContent = 'Cancel';
   cancelBtn.type = 'button';
-  cancelBtn.addEventListener('click', () => {
+  _addTracked(cancelBtn, 'click', () => {
     const mc = getMCState();
     mc.creatorFormOpen = false;
     renderChallengesTab();
@@ -434,7 +450,7 @@ function _buildObjectiveRow(idx: number): HTMLElement {
     opt.textContent = meta.label;
     typeSelect.appendChild(opt);
   }
-  typeSelect.addEventListener('change', () => {
+  _addTracked(typeSelect, 'change', () => {
     // Rebuild target fields when type changes
     _rebuildObjTargetFields(row, typeSelect.value);
   });
@@ -450,7 +466,7 @@ function _buildObjectiveRow(idx: number): HTMLElement {
   removeBtn.className = 'mc-creator-obj-remove';
   removeBtn.textContent = 'X';
   removeBtn.type = 'button';
-  removeBtn.addEventListener('click', () => row.remove());
+  _addTracked(removeBtn, 'click', () => row.remove());
   row.appendChild(removeBtn);
 
   // Initialize target fields for the default type
@@ -605,7 +621,7 @@ function _showImportDialog(): void {
   const importBtn = document.createElement('button');
   importBtn.className = 'mc-creator-submit';
   importBtn.textContent = 'Import';
-  importBtn.addEventListener('click', () => {
+  _addTracked(importBtn, 'click', () => {
     const mc = getMCState();
     if (!mc.state) return;
     const result = importChallengeJSON(mc.state, textarea.value);
@@ -621,16 +637,16 @@ function _showImportDialog(): void {
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'mc-creator-cancel';
   cancelBtn.textContent = 'Cancel';
-  cancelBtn.addEventListener('click', () => overlay.remove());
+  _addTracked(cancelBtn, 'click', () => overlay.remove());
   actions.appendChild(cancelBtn);
 
   dialog.appendChild(actions);
   overlay.appendChild(dialog);
 
   // Close on backdrop click
-  overlay.addEventListener('click', (e: MouseEvent) => {
+  _addTracked(overlay, 'click', ((e: MouseEvent) => {
     if (e.target === overlay) overlay.remove();
-  });
+  }) as EventListener);
 
   document.body.appendChild(overlay);
 }
@@ -665,7 +681,7 @@ function _showExportDialog(json: string): void {
   const copyBtn = document.createElement('button');
   copyBtn.className = 'mc-creator-submit';
   copyBtn.textContent = 'Copy to Clipboard';
-  copyBtn.addEventListener('click', () => {
+  _addTracked(copyBtn, 'click', () => {
     textarea.select();
     void navigator.clipboard.writeText(json).then(() => {
       copyBtn.textContent = 'Copied!';
@@ -677,15 +693,15 @@ function _showExportDialog(json: string): void {
   const closeBtn = document.createElement('button');
   closeBtn.className = 'mc-creator-cancel';
   closeBtn.textContent = 'Close';
-  closeBtn.addEventListener('click', () => overlay.remove());
+  _addTracked(closeBtn, 'click', () => overlay.remove());
   actions.appendChild(closeBtn);
 
   dialog.appendChild(actions);
   overlay.appendChild(dialog);
 
-  overlay.addEventListener('click', (e: MouseEvent) => {
+  _addTracked(overlay, 'click', ((e: MouseEvent) => {
     if (e.target === overlay) overlay.remove();
-  });
+  }) as EventListener);
 
   document.body.appendChild(overlay);
 }

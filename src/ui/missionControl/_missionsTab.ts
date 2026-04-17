@@ -13,7 +13,24 @@ import { GameMode } from '../../core/constants.ts';
 import { refreshTopBarMissions } from '../topbar.ts';
 import { getMCState } from './_state.ts';
 import { fmtCash, fmtDate, buildRewardsEl, isTutorialPhase, getContent } from './_shell.ts';
+import { getMissionControlListenerTracker } from './_listenerTracker.ts';
 import { logger } from '../../core/logger.ts';
+
+/**
+ * Register a DOM listener through the Mission Control tracker so it gets
+ * cleaned up when the panel is torn down. If the tracker is somehow
+ * unavailable (should never happen: tab renders only fire while Mission
+ * Control is active) the registration is skipped — a missed listener is
+ * preferable to a leaked one.
+ */
+function _addTracked(
+  target: EventTarget,
+  event: string,
+  handler: EventListenerOrEventListenerObject,
+): void {
+  const tracker = getMissionControlListenerTracker();
+  if (tracker) tracker.add(target, event, handler);
+}
 
 // ---------------------------------------------------------------------------
 // Pathway badge + mission catalog lookup helpers
@@ -165,7 +182,7 @@ function _buildAvailableMissionCard(
     acceptBtn.title = 'Complete your current mission before accepting a new one.';
   }
 
-  acceptBtn.addEventListener('click', () => _handleAccept(mission.id));
+  _addTracked(acceptBtn, 'click', () => _handleAccept(mission.id));
   acceptRow.appendChild(acceptBtn);
 
   // Show a contextual notice during the tutorial when blocked.
@@ -274,7 +291,7 @@ export function showUnlockNotification(facilityId: string | null, partIds: strin
   const btn = document.createElement('button');
   btn.className = 'confirm-btn confirm-btn-primary';
   btn.textContent = 'Continue';
-  btn.addEventListener('click', dismiss);
+  _addTracked(btn, 'click', dismiss);
   btnRow.appendChild(btn);
 
   modal.appendChild(btnRow);

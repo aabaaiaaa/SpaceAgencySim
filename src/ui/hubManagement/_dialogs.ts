@@ -13,6 +13,7 @@ import {
   getPanelState,
   getHubId,
   getBackdrop,
+  getPanelListeners,
   formatMoney,
   refreshPanel,
   hideHubManagementPanel,
@@ -36,9 +37,12 @@ export function showReactivateConfirmation(info: HubManagementInfo): void {
   // Make the panel position relative for the overlay
   panel.style.position = 'relative';
 
+  const listeners = getPanelListeners();
+
   const overlay = document.createElement('div');
   overlay.className = 'hub-mgmt-confirm-overlay';
-  overlay.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
+  const stopProp = (e: Event): void => (e as MouseEvent).stopPropagation();
+  listeners?.add(overlay, 'click', stopProp);
 
   const box = document.createElement('div');
   box.className = 'hub-mgmt-confirm-box';
@@ -57,12 +61,13 @@ export function showReactivateConfirmation(info: HubManagementInfo): void {
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'btn-secondary';
   cancelBtn.textContent = 'Cancel';
-  cancelBtn.addEventListener('click', () => overlay.remove());
+  const cancelHandler = (): void => overlay.remove();
+  listeners?.add(cancelBtn, 'click', cancelHandler);
 
   const confirmBtn = document.createElement('button');
   confirmBtn.className = 'btn-primary';
   confirmBtn.textContent = 'Confirm';
-  confirmBtn.addEventListener('click', () => {
+  const confirmHandler = (): void => {
     const state = getPanelState();
     const hubId = getHubId();
     if (!state || !hubId) return;
@@ -70,7 +75,8 @@ export function showReactivateConfirmation(info: HubManagementInfo): void {
     if (success) {
       refreshPanel();
     }
-  });
+  };
+  listeners?.add(confirmBtn, 'click', confirmHandler);
 
   buttons.appendChild(cancelBtn);
   buttons.appendChild(confirmBtn);
@@ -99,9 +105,12 @@ export function showAbandonConfirmation(): void {
   // Make the panel position relative for the overlay
   panel.style.position = 'relative';
 
+  const listeners = getPanelListeners();
+
   const overlay = document.createElement('div');
   overlay.className = 'hub-mgmt-confirm-overlay';
-  overlay.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
+  const stopProp = (e: Event): void => (e as MouseEvent).stopPropagation();
+  listeners?.add(overlay, 'click', stopProp);
 
   const box = document.createElement('div');
   box.className = 'hub-mgmt-confirm-box';
@@ -120,12 +129,13 @@ export function showAbandonConfirmation(): void {
   const cancelBtn = document.createElement('button');
   cancelBtn.className = 'btn-secondary';
   cancelBtn.textContent = 'Cancel';
-  cancelBtn.addEventListener('click', () => overlay.remove());
+  const cancelHandler = (): void => overlay.remove();
+  listeners?.add(cancelBtn, 'click', cancelHandler);
 
   const confirmBtn = document.createElement('button');
   confirmBtn.className = 'btn-danger';
   confirmBtn.textContent = 'Abandon';
-  confirmBtn.addEventListener('click', () => {
+  const confirmHandler = (): void => {
     const state = getPanelState();
     const hubId = getHubId();
     if (!state || !hubId) return;
@@ -135,7 +145,8 @@ export function showAbandonConfirmation(): void {
       if (currentState) renderHubSwitcher(currentState);
       hideHubManagementPanel();
     }
-  });
+  };
+  listeners?.add(confirmBtn, 'click', confirmHandler);
 
   buttons.appendChild(cancelBtn);
   buttons.appendChild(confirmBtn);

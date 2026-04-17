@@ -19,6 +19,20 @@ import {
   triggerRender,
 } from './_state.ts';
 import { computeSchematicLayout, getSchematicWidth } from './_schematicLayout.ts';
+import { getLogisticsListenerTracker } from './_listenerTracker.ts';
+
+/**
+ * Register a DOM listener through the logistics tracker.
+ */
+function _addTracked(
+  target: EventTarget,
+  event: string,
+  handler: EventListenerOrEventListenerObject,
+  options?: boolean | AddEventListenerOptions,
+): void {
+  const tracker = getLogisticsListenerTracker();
+  if (tracker) tracker.add(target, event, handler, options);
+}
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -137,7 +151,7 @@ export function renderRouteMap(): SVGSVGElement {
         circle.setAttribute('stroke-width', '3');
       }
       const clickBodyId = bodyId;
-      circle.addEventListener('click', (e: Event) => {
+      _addTracked(circle, 'click', ((e: Event) => {
         const currentLs = getLogisticsState();
         // Only allow setting origin if no legs have been added yet
         if (currentLs.builderLegs.length === 0) {
@@ -171,7 +185,7 @@ export function renderRouteMap(): SVGSVGElement {
 
           triggerRender();
         }
-      });
+      }) as EventListener);
     }
 
     svg.appendChild(circle);
@@ -244,7 +258,7 @@ export function renderRouteMap(): SVGSVGElement {
         }
         const clickHubId = node.hubId;
         const clickBodyId = node.parentId ?? '';
-        rect.addEventListener('click', (e: Event) => {
+        _addTracked(rect, 'click', ((e: Event) => {
           e.stopPropagation();
           const currentLs = getLogisticsState();
           if (currentLs.builderLegs.length === 0) {
@@ -252,7 +266,7 @@ export function renderRouteMap(): SVGSVGElement {
             currentLs.builderOriginHubId = clickHubId;
             triggerRender();
           }
-        });
+        }) as EventListener);
       }
 
       svg.appendChild(rect);
@@ -280,7 +294,7 @@ export function renderRouteMap(): SVGSVGElement {
         }
         const clickHubId = node.hubId;
         const clickBodyId = node.parentId ?? '';
-        rect.addEventListener('click', (e: Event) => {
+        _addTracked(rect, 'click', ((e: Event) => {
           e.stopPropagation();
           const currentLs = getLogisticsState();
           if (currentLs.builderLegs.length === 0) {
@@ -288,7 +302,7 @@ export function renderRouteMap(): SVGSVGElement {
             currentLs.builderOriginHubId = clickHubId;
             triggerRender();
           }
-        });
+        }) as EventListener);
       }
 
       svg.appendChild(rect);
@@ -333,7 +347,7 @@ export function renderRouteMap(): SVGSVGElement {
 
           const legId = leg.id;
           const destBodyId = leg.destination.bodyId;
-          path.addEventListener('click', () => {
+          _addTracked(path, 'click', () => {
             const currentLs = getLogisticsState();
             currentLs.builderLegs.push(legId);
             currentLs.builderCurrentBodyId = destBodyId;
@@ -392,7 +406,7 @@ export function renderRouteMap(): SVGSVGElement {
 
         // Click to highlight route in table
         const routeId = route.id;
-        path.addEventListener('click', () => {
+        _addTracked(path, 'click', () => {
           const overlay = getLogisticsState().overlay;
           const tableRow = overlay?.querySelector(`tr[data-route-id="${routeId}"]`);
           if (tableRow) {
@@ -499,9 +513,9 @@ function _showHubPopover(
     btn.style.fontSize = '11px';
     btn.textContent = `${hub.name} (${hub.type})`;
     const hubId = hub.id;
-    btn.addEventListener('mouseenter', () => { btn.style.background = '#2a2a4a'; });
-    btn.addEventListener('mouseleave', () => { btn.style.background = 'transparent'; });
-    btn.addEventListener('click', () => {
+    _addTracked(btn, 'mouseenter', () => { btn.style.background = '#2a2a4a'; });
+    _addTracked(btn, 'mouseleave', () => { btn.style.background = 'transparent'; });
+    _addTracked(btn, 'click', () => {
       const currentLs = getLogisticsState();
       currentLs.builderCurrentBodyId = bodyId;
       currentLs.builderOriginHubId = hubId;
@@ -525,9 +539,9 @@ function _showHubPopover(
   noHubBtn.style.fontSize = '11px';
   noHubBtn.style.fontStyle = 'italic';
   noHubBtn.textContent = 'No hub (body-level)';
-  noHubBtn.addEventListener('mouseenter', () => { noHubBtn.style.background = '#2a2a4a'; });
-  noHubBtn.addEventListener('mouseleave', () => { noHubBtn.style.background = 'transparent'; });
-  noHubBtn.addEventListener('click', () => {
+  _addTracked(noHubBtn, 'mouseenter', () => { noHubBtn.style.background = '#2a2a4a'; });
+  _addTracked(noHubBtn, 'mouseleave', () => { noHubBtn.style.background = 'transparent'; });
+  _addTracked(noHubBtn, 'click', () => {
     const currentLs = getLogisticsState();
     currentLs.builderCurrentBodyId = bodyId;
     currentLs.builderOriginHubId = null;
@@ -546,9 +560,12 @@ function _showHubPopover(
       document.removeEventListener('click', dismissOnOutsideClick, true);
     }
   };
-  // Defer to avoid the current click event from immediately dismissing
+  // Defer to avoid the current click event from immediately dismissing.
+  // Tracked so a panel teardown mid-popover cleans it up; the explicit
+  // removeEventListener in dismissOnOutsideClick still handles normal
+  // dismissal.
   requestAnimationFrame(() => {
-    document.addEventListener('click', dismissOnOutsideClick, true);
+    _addTracked(document, 'click', dismissOnOutsideClick as EventListener, true);
   });
 }
 

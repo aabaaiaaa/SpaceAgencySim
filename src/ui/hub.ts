@@ -38,6 +38,7 @@ import type { GameState } from '../core/gameState.ts';
 import type { FlightReturnSummary } from '../core/flightReturn.ts';
 import { initHubSwitcher, destroyHubSwitcher } from './hubSwitcher.ts';
 import { getActiveHub } from '../core/hubs.ts';
+import { createListenerTracker, type ListenerTracker } from './listenerTracker.ts';
 import {
   EARTH_ONLY_FACILITIES,
   SURFACE_HUB_FACILITIES,
@@ -132,6 +133,22 @@ let _overlay: HTMLElement | null = null;
 /** Cached reference to the game state for the construction panel. */
 let _state: GameState | null = null;
 
+/**
+ * Module-scoped listener tracker. Initialised on first use (since some
+ * exported modal functions — showWelcomeModal, showReturnResultsOverlay —
+ * may be invoked before initHubUI). Cleared on destroyHubUI so all
+ * hub-lifecycle listeners are bulk-removed.
+ */
+let _listeners: ListenerTracker | null = null;
+
+/** Return the shared module listener tracker, creating it lazily if needed. */
+function _getListeners(): ListenerTracker {
+  if (!_listeners) {
+    _listeners = createListenerTracker();
+  }
+  return _listeners;
+}
+
 // ---------------------------------------------------------------------------
 // Welcome modal — shown once on first hub visit for a new game
 // ---------------------------------------------------------------------------
@@ -197,7 +214,7 @@ export function showWelcomeModal(container: HTMLElement, state: GameState): void
   dismissBtn.id = 'welcome-dismiss-btn';
   dismissBtn.textContent = "Let's Go!";
 
-  dismissBtn.addEventListener('click', () => {
+  _getListeners().add(dismissBtn, 'click', () => {
     state.welcomeShown = true;
     overlay.remove();
     if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) {
@@ -223,6 +240,9 @@ export function showWelcomeModal(container: HTMLElement, state: GameState): void
  */
 export function initHubUI(container: HTMLElement, state: GameState, onNavigate: (destination: string) => void): void {
   _state = state;
+
+  // Ensure the shared module listener tracker exists for this hub session.
+  _getListeners();
 
   _overlay = document.createElement('div');
   _overlay.id = 'hub-overlay';
@@ -285,9 +305,9 @@ export function destroyHubUI(): void {
   const debugPanel = document.getElementById('debug-save-panel');
   if (debugPanel) debugPanel.remove();
 
-  // Clean up hub-specific topbar items and keyboard shortcuts.
+  // Clean up hub-specific topbar items. Keyboard shortcuts registered via
+  // the module listener tracker are removed at the end of this function.
   clearTopBarHubItems();
-  _unbindDebugSavesShortcut();
 
   // Tear down the hub switcher dropdown.
   destroyHubSwitcher();
@@ -303,6 +323,13 @@ export function destroyHubUI(): void {
     _overlay = null;
   }
   _state = null;
+
+  // Bulk-remove all listeners registered during this hub session.
+  if (_listeners) {
+    _listeners.removeAll();
+    _listeners = null;
+  }
+
   hideHubScene();
   // Destroy the PixiJS scene root so its Graphics objects and the
   // RendererPool don't leak across hub ↔ VAB ↔ flight swaps.
@@ -654,7 +681,7 @@ export function showReturnResultsOverlay(container: HTMLElement, summary: Flight
   dismissBtn.className = 'rr-dismiss-btn';
   dismissBtn.textContent = '← Return to Hub';
 
-  dismissBtn.addEventListener('click', () => {
+  _getListeners().add(dismissBtn, 'click', () => {
     overlay.remove();
     if (onDismiss) onDismiss();
   });
@@ -968,19 +995,19 @@ function _renderBuildings(onNavigate: (destination: string) => void): void {
     el.appendChild(label);
 
     // Click handler
-    el.addEventListener('click', () => {
+    _getListeners().add(el, 'click', () => {
       el.blur(); // Clear focus highlight before navigating away
       onNavigate(bld.id);
     });
 
     // Keyboard handler (Enter / Space)
-    el.addEventListener('keydown', (e: KeyboardEvent) => {
+    _getListeners().add(el, 'keydown', ((e: KeyboardEvent) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
         el.blur();
         onNavigate(bld.id);
       }
-    });
+    }) as EventListener);
 
     _overlay.appendChild(el);
   }
@@ -1005,14 +1032,14 @@ function _registerHubMenuItems(container: HTMLElement): void {
   ]);
 }
 
-/** Keyboard handler reference for cleanup. */
-let _debugSavesHandler: ((e: KeyboardEvent) => void) | null = null;
-
 /**
  * Bind Ctrl+Shift+D to open the debug saves panel.
+ *
+ * Registered through the module listener tracker; removed on hub destroy
+ * via the tracker's `removeAll()`.
  */
 function _bindDebugSavesShortcut(container: HTMLElement): void {
-  _debugSavesHandler = (e: KeyboardEvent) => {
+  const handler = (e: KeyboardEvent) => {
     if (e.ctrlKey && e.shiftKey && e.key === 'D') {
       e.preventDefault();
       if (_state && _state.debugMode) {
@@ -1020,17 +1047,7 @@ function _bindDebugSavesShortcut(container: HTMLElement): void {
       }
     }
   };
-  document.addEventListener('keydown', _debugSavesHandler);
-}
-
-/**
- * Remove the debug saves keyboard shortcut.
- */
-function _unbindDebugSavesShortcut(): void {
-  if (_debugSavesHandler) {
-    document.removeEventListener('keydown', _debugSavesHandler);
-    _debugSavesHandler = null;
-  }
+  _getListeners().add(document, 'keydown', handler as EventListener);
 }
 
 /**
@@ -1131,7 +1148,7 @@ function _openConstructionPanel(container: HTMLElement): void {
         if (!upgrade.allowed) {
           btn.title = upgrade.reason;
         }
-        btn.addEventListener('click', () => {
+        _getListeners().add(btn, 'click', () => {
           const result = upgradeFacility(_state!, def.id);
           if (result.success) {
             panel.remove();
@@ -1213,7 +1230,7 @@ function _openConstructionPanel(container: HTMLElement): void {
       if (!check.allowed) {
         btn.title = check.reason;
       }
-      btn.addEventListener('click', () => {
+      _getListeners().add(btn, 'click', () => {
         const result = buildFacility(_state!, def.id);
         if (result.success) {
           // Re-render the panel to reflect the change.
@@ -1233,7 +1250,7 @@ function _openConstructionPanel(container: HTMLElement): void {
   const closeBtn: HTMLButtonElement = document.createElement('button');
   closeBtn.className = 'cp-close-btn';
   closeBtn.textContent = '← Hub';
-  closeBtn.addEventListener('click', () => {
+  _getListeners().add(closeBtn, 'click', () => {
     panel.remove();
   });
   content.appendChild(closeBtn);

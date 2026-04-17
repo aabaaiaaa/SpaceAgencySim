@@ -11,6 +11,7 @@
 
 import { findNearbyOrbitalHub } from '../../core/hubs.ts';
 import { FlightPhase } from '../../core/constants.ts';
+import { getFlightControllerListenerTracker } from './_listenerTracker.ts';
 import type { GameState, FlightState } from '../../core/gameState.ts';
 import type { PhysicsState } from '../../core/physics.ts';
 import type { Hub } from '../../core/hubTypes.ts';
@@ -75,9 +76,7 @@ function _showDockPrompt(hub: Hub): void {
   dockBtn.textContent = 'Dock';
   dockBtn.id = 'hub-dock-accept';
   dockBtn.style.cssText = 'padding:6px 16px;background:#2060a0;color:#fff;border:1px solid #4080c0;border-radius:4px;cursor:pointer;';
-  dockBtn.addEventListener('click', () => {
-    // Docking acceptance — end flight and recover at hub
-    // Dispatch a custom event that the flight controller can handle
+  getFlightControllerListenerTracker()?.add(dockBtn, 'click', () => {
     window.dispatchEvent(new CustomEvent('hub-dock-accept', { detail: { hubId: hub.id } }));
     _hideDockPrompt();
   });
@@ -87,7 +86,7 @@ function _showDockPrompt(hub: Hub): void {
   dismissBtn.textContent = 'Dismiss';
   dismissBtn.id = 'hub-dock-dismiss';
   dismissBtn.style.cssText = 'padding:6px 16px;background:#404050;color:#ccc;border:1px solid #606070;border-radius:4px;cursor:pointer;';
-  dismissBtn.addEventListener('click', () => {
+  getFlightControllerListenerTracker()?.add(dismissBtn, 'click', () => {
     _dismissed = true;
     _hideDockPrompt();
   });
