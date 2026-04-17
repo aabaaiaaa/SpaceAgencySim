@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 95
-- **Remaining**: 9
-- **Last Updated**: 2026-04-17T03:24:51.428Z
+- **Completed**: 96
+- **Remaining**: 8
+- **Last Updated**: 2026-04-17T03:27:21.277Z
 
 ## Iteration Log
 
@@ -862,4 +862,13 @@
 - **Exit Status**: success
 - **Tokens**: 514,042 total (13 in, 5,483 out, 57,390 cache-create, 451,156 cache-read)
 - **Cost**: $0.7214
+
+### Iteration 96 - 2026-04-17T03:27:21.269Z
+- **Task Attempted**: TASK-096
+- **Task Completed**: TASK-096
+- **Summary**: Completed Extract crewAdmin reducer to src/ui/crewAdmin/_state.ts
+- **Duration**: 2m 28s
+- **Exit Status**: success
+- **Tokens**: 1,219,636 total (21 in, 7,158 out, 70,296 cache-create, 1,142,161 cache-read)
+- **Cost**: $1.1895
 

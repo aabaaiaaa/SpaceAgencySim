@@ -615,7 +615,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/ui-mainMenuState.test.ts` passes.
 
 ### TASK-096: Extract crewAdmin reducer to src/ui/crewAdmin/_state.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §10.5. Create `src/ui/crewAdmin/_state.ts`. Extract: `formatCrewRow`, `skillBarHTML` (if the pure HTML-string builder can be separated from the DOM mount), hire capacity check + cost calculation, training period calculation.
 - **Verification**: `npm run typecheck` passes.
