@@ -263,7 +263,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes. Grep confirms zero remaining non-tracker, non-self-removing sites.
 
 ### TASK-040: Add unit test for listener cleanup across migrated modules
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-039
 - **Description**: Per requirements §6.5. Extend `src/tests/ui-listenerTracker.test.ts` or add a new test that exercises the full lifecycle (init → register → destroy → assert zero residual listeners) for `_menuActions`, `launchPad`, and `library`. Mock `window.addEventListener`/`removeEventListener` to track counts.
 - **Verification**: `npx vitest run src/tests/ui-listenerTracker.test.ts` passes.

@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 38,
+  "lastIteration": 39,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-039",
-    "taskTitle": "Migrate remaining UI listener sites — batch 2",
-    "iterationNumber": 39,
-    "startedAt": "2026-04-17T00:05:44.900Z"
+    "taskId": "TASK-040",
+    "taskTitle": "Add unit test for listener cleanup across migrated modules",
+    "iterationNumber": 40,
+    "startedAt": "2026-04-17T00:24:24.931Z"
   }
 }

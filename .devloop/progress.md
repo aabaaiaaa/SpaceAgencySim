@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 39
-- **Remaining**: 65
-- **Last Updated**: 2026-04-17T00:24:22.521Z
+- **Completed**: 40
+- **Remaining**: 64
+- **Last Updated**: 2026-04-17T00:31:39.307Z
 
 ## Iteration Log
 
@@ -358,4 +358,13 @@
 - **Exit Status**: success
 - **Tokens**: 3,373,655 total (29 in, 7,684 out, 17,992 cache-create, 3,347,950 cache-read)
 - **Cost**: $23.8878
+
+### Iteration 40 - 2026-04-17T00:31:39.300Z
+- **Task Attempted**: TASK-040
+- **Task Completed**: TASK-040
+- **Summary**: Completed Add unit test for listener cleanup across migrated modules
+- **Duration**: 7m 14s
+- **Exit Status**: success
+- **Tokens**: 4,334,533 total (53 in, 23,365 out, 116,719 cache-create, 4,194,396 cache-read)
+- **Cost**: $3.4111
 
