@@ -609,7 +609,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes. `npx playwright test e2e/mainmenu*.spec.ts` passes (if present).
 
 ### TASK-095: Create src/tests/ui-mainMenuState.test.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-093
 - **Description**: Per requirements §10.4. Create `src/tests/ui-mainMenuState.test.ts`.
 - **Verification**: `npx vitest run src/tests/ui-mainMenuState.test.ts` passes.
