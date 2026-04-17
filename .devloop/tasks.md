@@ -279,7 +279,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes. `src/core/debris.ts` exists with the moved exports.
 
 ### TASK-042: Move _createDebrisFromParts to debris.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-041
 - **Description**: Per requirements §7.1. Move the `_createDebrisFromParts` function from `staging.ts` (approx. lines 756–813) to `src/core/debris.ts` as an exported function (e.g., `createDebrisFromParts`). Update `staging.ts` to import it. Preserve all behaviour.
 - **Verification**: `npx vitest run src/tests/staging.test.ts` passes. `npm run typecheck` passes.
