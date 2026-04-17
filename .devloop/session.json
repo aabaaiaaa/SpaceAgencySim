@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 42,
+  "lastIteration": 43,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-043",
-    "taskTitle": "Move _renormalizeAfterSeparation to debris.ts (if applicable)",
-    "iterationNumber": 43,
-    "startedAt": "2026-04-17T00:37:30.389Z"
+    "taskId": "TASK-044",
+    "taskTitle": "Update staging.ts to import all moved debris helpers",
+    "iterationNumber": 44,
+    "startedAt": "2026-04-17T00:38:22.433Z"
   }
 }

@@ -291,7 +291,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/staging.test.ts` passes.
 
 ### TASK-044: Update staging.ts to import all moved debris helpers
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-042, TASK-043
 - **Description**: Per requirements §7.1. Ensure `src/core/staging.ts` cleanly imports the moved functions and has no dead references. Optionally re-export them from `staging.ts` for backward compat if any internal consumer imports them from there.
 - **Verification**: `npx vitest run src/tests/staging.test.ts` passes. `npm run typecheck` passes.

@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 43
-- **Remaining**: 61
-- **Last Updated**: 2026-04-17T00:38:20.350Z
+- **Completed**: 44
+- **Remaining**: 60
+- **Last Updated**: 2026-04-17T00:40:02.950Z
 
 ## Iteration Log
 
@@ -394,4 +394,13 @@
 - **Exit Status**: success
 - **Tokens**: 231,507 total (10 in, 2,125 out, 33,853 cache-create, 195,519 cache-read)
 - **Cost**: $0.3625
+
+### Iteration 44 - 2026-04-17T00:40:02.945Z
+- **Task Attempted**: TASK-044
+- **Task Completed**: TASK-044
+- **Summary**: Completed Update staging.ts to import all moved debris helpers
+- **Duration**: 1m 41s
+- **Exit Status**: success
+- **Tokens**: 604,948 total (14 in, 2,388 out, 63,954 cache-create, 538,592 cache-read)
+- **Cost**: $0.7288
 
