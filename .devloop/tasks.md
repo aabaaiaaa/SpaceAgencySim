@@ -655,7 +655,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: Exit 0. No skipped or failing tests.
 
 ### TASK-102: Run smoke test suite (unit + E2E)
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-101
 - **Description**: Per requirements §12. Run `npm run test:smoke:unit` and `npm run test:smoke:e2e` sequentially. Smoke E2E must pass — note: smoke subset only per standing preference, NEVER the full E2E suite.
 - **Verification**: Both commands exit 0.
