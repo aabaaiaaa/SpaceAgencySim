@@ -415,7 +415,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/physics.test.ts` passes.
 
 ### TASK-064: Extract src/core/physics/phases/orbitPhase.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-063
 - **Description**: Per requirements §8. In `_integrate`, the ORBIT-phase branch becomes its own function `tickOrbitPhase(ps, dt, ctx)` in `src/core/physics/phases/orbitPhase.ts`. Update `integrate.ts` to dispatch.
 - **Verification**: `npx vitest run src/tests/physics.test.ts` passes. Orbit-specific tests confirmed in `src/tests/orbit*.test.ts`.

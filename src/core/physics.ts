@@ -44,7 +44,7 @@
  */
 
 import { getPartById } from '../data/parts.ts';
-import { PartType, ControlMode, FlightPhase, BODY_RADIUS, MIN_ORBIT_ALTITUDE } from './constants.ts';
+import { PartType, ControlMode, FlightPhase, BODY_RADIUS } from './constants.ts';
 import {
   airDensity,
   airDensityForBody,
@@ -83,7 +83,7 @@ import {
 import { MalfunctionType, PARTIAL_CHUTE_FACTOR } from './constants.ts';
 import { getWindForce } from './weather.ts';
 import { tickPower, recalcPowerState } from './power.ts';
-import { getOrbitalStateAtTime, orbitalStateToCartesian, computeOrbitalElements } from './orbit.ts';
+import { getOrbitalStateAtTime } from './orbit.ts';
 import { logger } from './logger.ts';
 import { computePartCdA } from './dragCoefficient.ts';
 import { G0, gravityForBody as _gravityForBody } from './physics/gravity.ts';
@@ -92,6 +92,7 @@ import {
   updateThrottleFromTWR as _updateThrottleFromTWR,
   type ThrustResult,
 } from './physics/thrust.ts';
+import { tickOrbitPhase } from './physics/phases/orbitPhase.ts';
 import type { AltitudeBand, ControlMode as ControlModeType } from './constants.ts';
 import type { FlightState, FlightEvent, OrbitalElements, PowerState, GameState, InventoryPart } from './gameState.ts';
 
@@ -727,34 +728,7 @@ function _integrate(ps: PhysicsState, assembly: RocketAssembly, flightState: Fli
   // When in stable orbit with no engines firing, skip Newtonian integration
   // and advance the craft along its frozen orbital path analytically.
   // This gives perfectly stable orbits at any time warp speed.
-  const isDockingOrRcsEarly = ps.controlMode === ControlMode.DOCKING || ps.controlMode === ControlMode.RCS;
-  if (flightState?.phase === FlightPhase.ORBIT &&
-      ps.firingEngines.size === 0 &&
-      !isDockingOrRcsEarly &&
-      bodyId) {
-    // Compute orbital elements if not yet frozen (e.g. after teleport or burn end).
-    // Only freeze if the orbit is valid (periapsis above minimum altitude).
-    if (!flightState.orbitalElements) {
-      const elements = computeOrbitalElements(ps.posX, ps.posY, ps.velX, ps.velY, bodyId);
-      if (elements) {
-        const periR = elements.semiMajorAxis * (1 - elements.eccentricity);
-        const periAlt = periR - (BODY_RADIUS[bodyId] ?? 6_371_000);
-        const minAlt = (MIN_ORBIT_ALTITUDE as Record<string, number>)[bodyId] ?? 70_000;
-        if (periAlt >= minAlt) {
-          elements.epoch = flightState.timeElapsed;
-          flightState.orbitalElements = elements;
-        }
-      }
-    }
-    if (flightState.orbitalElements) {
-      const state = orbitalStateToCartesian(flightState.orbitalElements, flightState.timeElapsed, bodyId);
-      ps.posX = state.posX;
-      ps.posY = state.posY;
-      ps.velX = state.velX;
-      ps.velY = state.velY;
-      return;
-    }
-  }
+  if (tickOrbitPhase(ps, FIXED_DT, { flightState })) return;
 
   // --- Phase-specific physics: TRANSFER has no gravity or drag ---------------
   // The craft drifts at constant velocity in deep space. Player can fire
