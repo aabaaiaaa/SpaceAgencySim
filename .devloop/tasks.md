@@ -373,7 +373,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/physics.test.ts` passes.
 
 ### TASK-057: Extract src/core/physics/init.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-056
 - **Description**: Per requirements §8. Move `createPhysicsState()` and its immediate initial-state helpers (physics.ts around line 618) to `src/core/physics/init.ts`. Re-export from `physics.ts`.
 - **Verification**: `npx vitest run src/tests/physics.test.ts` passes.
