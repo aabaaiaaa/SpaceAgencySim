@@ -303,7 +303,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/debris.test.ts` passes.
 
 ### TASK-046: Update test-map.json for debris module
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-045
 - **Description**: Per requirements §11. `src/core/debris.ts` should classify to area `core/debris` via the generator's default pattern — no script edits expected. Run `npm run test-map:generate` and confirm the mapping. If the generator misses the file, add a SOURCE_GROUPS entry (e.g., add to `'core/staging'` or create `'core/debris'`) and regenerate.
 - **Verification**: `grep -A 3 '"src/core/debris.ts"' test-map.json` shows the test.

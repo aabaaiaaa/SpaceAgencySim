@@ -147,6 +147,15 @@
         "e2e/crew.spec.ts"
       ]
     },
+    "core/debris": {
+      "sources": [
+        "src/core/debris.ts"
+      ],
+      "unit": [
+        "src/tests/debris.test.ts"
+      ],
+      "e2e": []
+    },
     "core/designLibrary": {
       "sources": [
         "src/core/designLibrary.ts"
@@ -265,6 +274,7 @@
         "src/tests/controlMode.test.ts",
         "src/tests/crew.test.ts",
         "src/tests/customChallenges.test.ts",
+        "src/tests/debris.test.ts",
         "src/tests/debugMode.test.ts",
         "src/tests/designLibrary.test.ts",
         "src/tests/docking.test.ts",
@@ -325,6 +335,7 @@
         "src/tests/surfaceOps.test.ts",
         "src/tests/techtree.test.ts",
         "src/tests/trackingStationTiers.test.ts",
+        "src/tests/ui-listenerLifecycle.test.ts",
         "src/tests/ui-modalFocus.test.ts",
         "src/tests/vabTiers.test.ts",
         "src/tests/weather.test.ts"
@@ -535,6 +546,7 @@
         "src/tests/branchCoverage.test.ts",
         "src/tests/collision.test.ts",
         "src/tests/controlMode.test.ts",
+        "src/tests/debris.test.ts",
         "src/tests/ejector.test.ts",
         "src/tests/fuelsystem.test.ts",
         "src/tests/hubs.test.ts",
@@ -626,6 +638,7 @@
         "src/tests/atmosphere.test.ts",
         "src/tests/branchCoverage.test.ts",
         "src/tests/collision.test.ts",
+        "src/tests/debris.test.ts",
         "src/tests/ejector.test.ts",
         "src/tests/fuelsystem.test.ts",
         "src/tests/instruments.test.ts",
@@ -970,6 +983,7 @@
         "src/ui/flightController/_hubDocking.ts",
         "src/ui/flightController/_init.ts",
         "src/ui/flightController/_keyboard.ts",
+        "src/ui/flightController/_listenerTracker.ts",
         "src/ui/flightController/_loop.ts",
         "src/ui/flightController/_mapView.ts",
         "src/ui/flightController/_menuActions.ts",
@@ -983,6 +997,7 @@
       "unit": [
         "src/tests/loopErrorHandling.test.ts",
         "src/tests/ui-fcState.test.ts",
+        "src/tests/ui-listenerLifecycle.test.ts",
         "src/tests/ui-mapView.test.ts",
         "src/tests/ui-timeWarp.test.ts",
         "src/tests/workerBridgeTimeout.test.ts"
@@ -1066,7 +1081,9 @@
       "sources": [
         "src/ui/launchPad.ts"
       ],
-      "unit": [],
+      "unit": [
+        "src/tests/ui-listenerLifecycle.test.ts"
+      ],
       "e2e": [
         "e2e/launchpad-relaunch.spec.ts",
         "e2e/launchpad.spec.ts",
@@ -1115,6 +1132,7 @@
         "src/ui/missionControl/_challengesTab.ts",
         "src/ui/missionControl/_contractsTab.ts",
         "src/ui/missionControl/_init.ts",
+        "src/ui/missionControl/_listenerTracker.ts",
         "src/ui/missionControl/_missionsTab.ts",
         "src/ui/missionControl/_shell.ts",
         "src/ui/missionControl/_state.ts"
