@@ -42,6 +42,17 @@ import { TECH_NODES } from '../data/techtree.ts';
 import { logger } from '../core/logger.ts';
 import { escapeHtml } from './escapeHtml.ts';
 import { createListenerTracker, type ListenerTracker } from './listenerTracker.ts';
+import {
+  formatSaveMoney,
+  formatSavePlayTime,
+  formatSaveDate,
+  getGameModeBadge,
+  hasSaveVersionMismatch,
+  shouldShowAgencyLine,
+  getKiaClass,
+  shouldShowLoadScreen,
+  organizeSaveSlots,
+} from './mainmenu/_state.ts';
 import './mainmenu.css';
 import type { GameState, SandboxSettings } from '../core/gameState.ts';
 import type { SaveSlotSummary } from '../core/saveload.ts';
@@ -166,50 +177,6 @@ const FREE_STARTER_PARTS: string[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// Formatting helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Formats a dollar amount with commas and a dollar sign.
- * e.g. 2000000 → "$2,000,000"
- */
-function formatMoney(amount: number): string {
-  return '$' + Math.round(amount).toLocaleString('en-US');
-}
-
-/**
- * Formats seconds as h:mm:ss.
- * e.g. 3725 → "1:02:05"
- */
-function formatPlayTime(totalSeconds: number): string {
-  const s: number = Math.max(0, Math.floor(totalSeconds));
-  const hours: number   = Math.floor(s / 3600);
-  const minutes: number = Math.floor((s % 3600) / 60);
-  const secs: number    = s % 60;
-  const mm: string = String(minutes).padStart(2, '0');
-  const ss: string = String(secs).padStart(2, '0');
-  return `${hours}:${mm}:${ss}`;
-}
-
-/**
- * Formats an ISO 8601 timestamp as a localised short date + time string.
- */
-function formatDate(isoTimestamp: string): string {
-  try {
-    const d = new Date(isoTimestamp);
-    return d.toLocaleString('en-US', {
-      year:   'numeric',
-      month:  'short',
-      day:    'numeric',
-      hour:   '2-digit',
-      minute: '2-digit',
-    });
-  } catch {
-    return isoTimestamp;
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Module state
 // ---------------------------------------------------------------------------
 
@@ -240,7 +207,7 @@ export async function initMainMenu(container: HTMLElement, onGameReady: (state: 
 
   // Decide which screen to show first.
   const saves = await listSaves();
-  const hasAnySave: boolean = saves.some((s) => s !== null);
+  const hasAnySave: boolean = shouldShowLoadScreen(saves);
 
   _renderTitle(_overlay);
 
@@ -290,19 +257,11 @@ function _renderLoadScreen(overlay: HTMLElement, saves: (SaveSlotSummary | null)
   grid.style.maxHeight = '70vh';
   grid.style.overflowY = 'auto';
 
-  // Manual slots 0-4: always show (empty placeholder if unused).
-  for (let i = 0; i < SAVE_SLOT_COUNT; i++) {
-    const summary = saves[i];
-    grid.appendChild(
-      summary ? _buildSaveCard(summary) : _buildEmptySlotCard(i)
-    );
-  }
-
-  // Overflow and auto-save slots (index 5+): show only if populated.
-  for (let i = SAVE_SLOT_COUNT; i < saves.length; i++) {
-    const summary = saves[i];
-    if (summary) {
-      grid.appendChild(_buildSaveCard(summary));
+  for (const card of organizeSaveSlots(saves, SAVE_SLOT_COUNT)) {
+    if (card.kind === 'filled') {
+      grid.appendChild(_buildSaveCard(card.summary));
+    } else {
+      grid.appendChild(_buildEmptySlotCard(card.slotIndex));
     }
   }
 
@@ -336,40 +295,36 @@ function _buildSaveCard(summary: SaveSlotSummary): HTMLDivElement {
   card.className = 'mm-save-card';
   card.setAttribute('data-slot', String(summary.slotIndex));
 
-  const kiaClass: string = summary.crewKIA > 0 ? 'mm-stat-kia' : '';
+  const kiaClass: string = getKiaClass(summary);
 
-  const modeBadge: string = summary.gameMode === 'sandbox'
-    ? '<span class="mm-mode-badge mm-mode-sandbox">SANDBOX</span>'
-    : summary.gameMode === 'tutorial'
-      ? '<span class="mm-mode-badge mm-mode-tutorial">TUTORIAL</span>'
-      : '<span class="mm-mode-badge mm-mode-freeplay">FREE PLAY</span>';
+  const modeBadgeInfo = getGameModeBadge(summary.gameMode);
+  const modeBadge: string = `<span class="mm-mode-badge ${modeBadgeInfo.cssClass}">${modeBadgeInfo.label}</span>`;
 
-  const versionMismatch = summary.version !== SAVE_VERSION;
-  const versionBadge = versionMismatch
+  const versionBadge = hasSaveVersionMismatch(summary, SAVE_VERSION)
     ? `<span class="mm-version-warning" data-testid="version-warning">v${summary.version} (current: v${SAVE_VERSION})</span>`
     : '';
 
   const autoSaveBadge = summary.isAutoSave
     ? '<span class="mm-mode-badge mm-mode-autosave">AUTO-SAVE</span>'
     : '';
-  const showAgencyLine = summary.agencyName && summary.agencyName !== summary.saveName;
+  const showAgencyLine = shouldShowAgencyLine(summary);
 
   card.innerHTML = `
     <p class="mm-save-card-name">${escapeHtml(summary.saveName)} ${modeBadge} ${autoSaveBadge}</p>
     ${showAgencyLine ? `<p class="mm-save-card-agency" data-agency-name="${escapeHtml(summary.agencyName)}">${escapeHtml(summary.agencyName)}</p>` : ''}
-    <p class="mm-save-card-date">Saved ${formatDate(summary.timestamp)}${versionBadge}</p>
+    <p class="mm-save-card-date">Saved ${formatSaveDate(summary.timestamp)}${versionBadge}</p>
     <div class="mm-save-card-stats">
       <div class="mm-stat">
         <span class="mm-stat-label">Cash</span>
-        <span class="mm-stat-value">${formatMoney(summary.money)}</span>
+        <span class="mm-stat-value">${formatSaveMoney(summary.money)}</span>
       </div>
       <div class="mm-stat">
         <span class="mm-stat-label">Time Played</span>
-        <span class="mm-stat-value">${formatPlayTime(summary.playTimeSeconds)}</span>
+        <span class="mm-stat-value">${formatSavePlayTime(summary.playTimeSeconds)}</span>
       </div>
       <div class="mm-stat">
         <span class="mm-stat-label">Flight Time</span>
-        <span class="mm-stat-value">${formatPlayTime(summary.flightTimeSeconds)}</span>
+        <span class="mm-stat-value">${formatSavePlayTime(summary.flightTimeSeconds)}</span>
       </div>
       <div class="mm-stat">
         <span class="mm-stat-label">Missions Done</span>
@@ -665,8 +620,7 @@ function _handleDeleteConfirm(slotIndex: number, saveName: string, storageKey?: 
         // Refresh the load screen.
         await _switchScreen('load', false);
         const saves = await listSaves();
-        const hasAnySave: boolean = saves.some((s) => s !== null);
-        if (!hasAnySave) {
+        if (!shouldShowLoadScreen(saves)) {
           // All saves deleted — go straight to new game.
           await _switchScreen('newgame', false);
         }
