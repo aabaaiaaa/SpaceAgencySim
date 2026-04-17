@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 47,
+  "lastIteration": 48,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-048",
-    "taskTitle": "Move envelope build/parse to saveEncoding.ts",
-    "iterationNumber": 48,
-    "startedAt": "2026-04-17T00:45:17.366Z"
+    "taskId": "TASK-049",
+    "taskTitle": "Move LZ-string compress/decompress wrappers to saveEncoding.ts",
+    "iterationNumber": 49,
+    "startedAt": "2026-04-17T00:47:39.388Z"
   }
 }

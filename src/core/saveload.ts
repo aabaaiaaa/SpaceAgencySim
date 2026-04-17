@@ -13,15 +13,18 @@
  * @module saveload
  */
 
-import { compressToUTF16, decompressFromUTF16 } from 'lz-string';
 import { AstronautStatus, GameMode } from './constants.ts';
 import { logger } from './logger.ts';
 import { idbSet, idbGet, idbDelete, idbGetAllKeys } from './idbStorage.ts';
 import {
   buildBinaryEnvelope,
+  compressSaveData,
+  decompressSaveData,
   hasMagicBytes,
   parseBinaryEnvelope,
 } from './saveEncoding.ts';
+
+export { compressSaveData, decompressSaveData } from './saveEncoding.ts';
 import { loadSettings, migrateSettings, saveSettings } from './settingsStore.ts';
 
 import type { GameState } from './gameState.ts';
@@ -146,13 +149,6 @@ interface SaveEnvelope {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- deserialized JSON with unknown shape before migration
   state: any;
 }
-
-/**
- * Prefix marker for compressed save strings in storage.
- * Compressed saves are stored as: COMPRESSED_PREFIX + compressToUTF16(json).
- * This allows `parseEnvelope` to detect compressed vs uncompressed data.
- */
-const COMPRESSED_PREFIX = 'LZC:';
 
 // ---------------------------------------------------------------------------
 // Binary Envelope Format (for export/import only — not internal storage)
@@ -327,29 +323,6 @@ export async function saveGame(state: GameState, slotIndex: number, saveName: st
 // ---------------------------------------------------------------------------
 // Load
 // ---------------------------------------------------------------------------
-
-/**
- * Compresses a JSON string for storage using lz-string UTF-16 encoding.
- * Returns the compressed string with a prefix marker for detection.
- */
-export function compressSaveData(json: string): string {
-  return COMPRESSED_PREFIX + compressToUTF16(json);
-}
-
-/**
- * Decompresses a storage string back to JSON.
- * Throws if the compressed prefix is missing (corrupt data).
- */
-export function decompressSaveData(raw: string): string {
-  if (!raw.startsWith(COMPRESSED_PREFIX)) {
-    throw new Error('Save data is missing the compressed prefix — possibly corrupt.');
-  }
-  const decompressed = decompressFromUTF16(raw.slice(COMPRESSED_PREFIX.length));
-  if (decompressed === null) {
-    throw new Error('Failed to decompress save data');
-  }
-  return decompressed;
-}
 
 /**
  * Parses a raw compressed storage string and returns the parsed envelope

@@ -321,7 +321,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` passes.
 
 ### TASK-049: Move LZ-string compress/decompress wrappers to saveEncoding.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-048
 - **Description**: Per requirements §7.2. If `saveload.ts` wraps `lz-string` with project-specific helpers, move the wrappers to `saveEncoding.ts`. If `lz-string` is called inline, leave it alone.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` passes.

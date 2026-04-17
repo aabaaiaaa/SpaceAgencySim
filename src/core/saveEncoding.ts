@@ -8,9 +8,44 @@
  * @module core/saveEncoding
  */
 
+import { compressToUTF16, decompressFromUTF16 } from 'lz-string';
 import { crc32 } from './crc32.ts';
 
 export { crc32 } from './crc32.ts';
+
+// ---------------------------------------------------------------------------
+// LZ-String Compression Wrappers
+// ---------------------------------------------------------------------------
+
+/**
+ * Prefix marker for compressed save strings in storage.
+ * Compressed saves are stored as: COMPRESSED_PREFIX + compressToUTF16(json).
+ * This allows callers to detect compressed vs uncompressed data.
+ */
+export const COMPRESSED_PREFIX = 'LZC:';
+
+/**
+ * Compresses a JSON string for storage using lz-string UTF-16 encoding.
+ * Returns the compressed string with a prefix marker for detection.
+ */
+export function compressSaveData(json: string): string {
+  return COMPRESSED_PREFIX + compressToUTF16(json);
+}
+
+/**
+ * Decompresses a storage string back to JSON.
+ * Throws if the compressed prefix is missing (corrupt data).
+ */
+export function decompressSaveData(raw: string): string {
+  if (!raw.startsWith(COMPRESSED_PREFIX)) {
+    throw new Error('Save data is missing the compressed prefix — possibly corrupt.');
+  }
+  const decompressed = decompressFromUTF16(raw.slice(COMPRESSED_PREFIX.length));
+  if (decompressed === null) {
+    throw new Error('Failed to decompress save data');
+  }
+  return decompressed;
+}
 
 // ---------------------------------------------------------------------------
 // Binary Envelope Format (for export/import only — not internal storage)
