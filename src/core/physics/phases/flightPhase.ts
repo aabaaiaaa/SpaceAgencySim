@@ -29,6 +29,11 @@ import {
   updateThrottleFromTWR,
   type ThrustResult,
 } from '../thrust.ts';
+import { applySteering } from '../steering.ts';
+import {
+  tickParachutes,
+  tickCanopyAngles,
+} from '../../parachute.ts';
 
 import type { FlightState } from '../../gameState.ts';
 import type { PhysicsState, RocketAssembly } from '../../physics.ts';
@@ -97,4 +102,58 @@ export function tickFlightPhasePrelude(
   }
 
   return { altitude, density, totalMass, isDockingOrRcs, thrustX, thrustY };
+}
+
+export interface FlightPhaseSteeringContext {
+  flightState: FlightState;
+  assembly: RocketAssembly;
+  bodyId: string | undefined;
+  altitude: number;
+  thrustX: number;
+  thrustY: number;
+  dt: number;
+}
+
+/**
+ * Continuous steering for the FLIGHT-phase tick.
+ *
+ * Delegates to {@link applySteering} in `../steering.ts`, which handles
+ * airborne A/D torque, grounded tipping, parachute restoring torque and
+ * damping, captured-asteroid torque, and aero / RCS angular damping. The
+ * wrapper exists so the FLIGHT-phase module owns the call-site composition
+ * (thrust magnitude, context bundling) independently of the integration
+ * loop.
+ */
+export function tickFlightPhaseSteering(
+  ps: PhysicsState,
+  ctx: FlightPhaseSteeringContext,
+): void {
+  const { flightState, assembly, bodyId, altitude, thrustX, thrustY, dt } = ctx;
+  const thrustMagnitude: number = Math.hypot(thrustX, thrustY);
+  applySteering(ps, assembly, altitude, dt, bodyId, flightState, thrustMagnitude);
+}
+
+export interface FlightPhaseParachuteContext {
+  flightState: FlightState;
+  assembly: RocketAssembly;
+  totalMass: number;
+  dt: number;
+}
+
+/**
+ * Parachute state-machine tick for the FLIGHT-phase integrator.
+ *
+ * Advances `deploying → deployed` timers, runs the mass-safety check, and
+ * updates canopy tilt angles. Skipped entirely when the craft is grounded —
+ * landed-parachute handling is routed through `tickLandedParachutes` at the
+ * `_handleGroundContact` path, not here.
+ */
+export function tickFlightPhaseParachutes(
+  ps: PhysicsState,
+  ctx: FlightPhaseParachuteContext,
+): void {
+  if (ps.grounded) return;
+  const { flightState, assembly, totalMass, dt } = ctx;
+  tickParachutes(ps, assembly, flightState, dt, totalMass);
+  tickCanopyAngles(ps, dt);
 }

@@ -439,7 +439,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/physics.test.ts src/tests/atmosphere.test.ts src/tests/fuelsystem.test.ts` passes.
 
 ### TASK-068: Extract src/core/physics/phases/flightPhase.ts — part 2 (steering + parachutes)
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-067
 - **Description**: Per requirements §8. Complete `flightPhase.ts` by adding the steering/parachute branch. Reuse `steering.ts` helpers.
 - **Verification**: `npx vitest run src/tests/physics.test.ts src/tests/parachute*.test.ts` passes.

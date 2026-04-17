@@ -59,8 +59,6 @@ import { tickFuelSystem } from './fuelsystem.ts';
 import { activateCurrentStage, tickDebris } from './staging.ts';
 import { tickCollisions } from './collision.ts';
 import {
-  tickParachutes,
-  tickCanopyAngles,
   tickLandedParachutes,
   ParachuteState,
   DEPLOY_DURATION,
@@ -90,7 +88,11 @@ import { G0, gravityForBody as _gravityForBody } from './physics/gravity.ts';
 import { tickOrbitPhase } from './physics/phases/orbitPhase.ts';
 import { tickTransferPhase } from './physics/phases/transferPhase.ts';
 import { tickCapturePhase } from './physics/phases/capturePhase.ts';
-import { tickFlightPhasePrelude } from './physics/phases/flightPhase.ts';
+import {
+  tickFlightPhasePrelude,
+  tickFlightPhaseSteering,
+  tickFlightPhaseParachutes,
+} from './physics/phases/flightPhase.ts';
 import type { AltitudeBand, ControlMode as ControlModeType } from './constants.ts';
 import type { FlightState, FlightEvent, OrbitalElements, PowerState, GameState, InventoryPart } from './gameState.ts';
 
@@ -834,7 +836,9 @@ function _integrate(ps: PhysicsState, assembly: RocketAssembly, flightState: Fli
   }
 
   // --- 7. Continuous steering ----------------------------------------------
-  _applySteering(ps, assembly, altitude, FIXED_DT, bodyId, flightState, Math.hypot(thrustX, thrustY));
+  tickFlightPhaseSteering(ps, {
+    flightState, assembly, bodyId, altitude, thrustX, thrustY, dt: FIXED_DT,
+  });
 
   // --- 7b. Topple-crash check (grounded tipping) -------------------------
   if (ps.grounded) {
@@ -860,10 +864,7 @@ function _integrate(ps: PhysicsState, assembly: RocketAssembly, flightState: Fli
   // --- 9. Parachute state machine ------------------------------------------
   // Advance deploying → deployed timers and run the mass-safety check.
   // totalMass was computed at step 1 above.
-  if (!ps.grounded) {
-    tickParachutes(ps, assembly, flightState, FIXED_DT, totalMass);
-    tickCanopyAngles(ps, FIXED_DT);
-  }
+  tickFlightPhaseParachutes(ps, { flightState, assembly, totalMass, dt: FIXED_DT });
 
   // --- 9b. Landing leg state machine ---------------------------------------
   // Advance deploying → deployed timers for all landing legs.
@@ -1316,9 +1317,9 @@ export function _computeAsteroidTorque(
 // ---------------------------------------------------------------------------
 // Steering — extracted to ./physics/steering.ts (includes parachute torque and
 // parachute-damping branches; _applyGroundedSteering is still defined below).
+// The FLIGHT-phase integrator calls `tickFlightPhaseSteering` from
+// `./physics/phases/flightPhase.ts`, which wraps the steering call.
 // ---------------------------------------------------------------------------
-
-import { applySteering as _applySteering } from './physics/steering.ts';
 
 /** Returns true if any parachute is currently deploying or deployed. */
 function _hasActiveParachutes(ps: PhysicsState): boolean {
