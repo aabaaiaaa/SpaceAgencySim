@@ -579,7 +579,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/ui-topbarState.test.ts` passes.
 
 ### TASK-090: Extract hub reducer to src/ui/hub/_state.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §10.3. Create `src/ui/hub/_state.ts`. Extract: `formatReturnResults` pure function, facility upgrade eligibility check, financial summary calculations.
 - **Verification**: `npm run typecheck` passes.

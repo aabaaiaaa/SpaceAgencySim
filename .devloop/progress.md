@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 89
-- **Remaining**: 15
-- **Last Updated**: 2026-04-17T03:10:32.270Z
+- **Completed**: 90
+- **Remaining**: 14
+- **Last Updated**: 2026-04-17T03:13:33.828Z
 
 ## Iteration Log
 
@@ -808,4 +808,13 @@
 - **Exit Status**: success
 - **Tokens**: 488,769 total (13 in, 4,938 out, 51,351 cache-create, 432,467 cache-read)
 - **Cost**: $0.6607
+
+### Iteration 90 - 2026-04-17T03:13:33.823Z
+- **Task Attempted**: TASK-090
+- **Task Completed**: TASK-090
+- **Summary**: Completed Extract hub reducer to src/ui/hub/_state.ts
+- **Duration**: 2m 59s
+- **Exit Status**: success
+- **Tokens**: 1,143,097 total (19 in, 9,920 out, 81,153 cache-create, 1,052,005 cache-read)
+- **Cost**: $1.2813
 

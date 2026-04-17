@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 88,
+  "lastIteration": 89,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-089",
-    "taskTitle": "Create src/tests/ui-topbarState.test.ts",
-    "iterationNumber": 89,
-    "startedAt": "2026-04-17T03:08:52.830Z"
+    "taskId": "TASK-090",
+    "taskTitle": "Extract hub reducer to src/ui/hub/_state.ts",
+    "iterationNumber": 90,
+    "startedAt": "2026-04-17T03:10:34.395Z"
   }
 }
