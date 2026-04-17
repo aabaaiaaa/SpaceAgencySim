@@ -391,7 +391,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/physics.test.ts src/tests/controlMode.test.ts` passes.
 
 ### TASK-060: Extract src/core/physics/docking.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-059
 - **Description**: Per requirements §8. Move `_applyDockingMovement` (physics.ts ~1795–1885) and `computeDockingRadialOut` to `src/core/physics/docking.ts`. Re-export from `physics.ts`. Preserve the iter-18 body-aware radial check.
 - **Verification**: `npx vitest run src/tests/physics.test.ts src/tests/docking*.test.ts` passes.
