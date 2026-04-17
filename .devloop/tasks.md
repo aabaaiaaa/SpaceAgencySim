@@ -333,7 +333,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` passes. `npm run lint` passes.
 
 ### TASK-051: Create src/tests/saveEncoding.test.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-050
 - **Description**: Per requirements §7.2. Create `src/tests/saveEncoding.test.ts` with round-trip tests for: envelope build/parse with known magic/version, CRC32 known values, compress/decompress round-trip, payload validation (valid input and each invalid branch). Tag one test `@smoke`.
 - **Verification**: `npx vitest run src/tests/saveEncoding.test.ts` passes.
