@@ -457,7 +457,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/physics.test.ts` passes. `integrate.ts` is < 100 LOC.
 
 ### TASK-071: Convert physics.ts to barrel re-export
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-070
 - **Description**: Per requirements §8. Rewrite `src/core/physics.ts` as a pure barrel: `export * from './physics/init'; export * from './physics/integrate'; export * from './physics/keyboard';` etc. No logic remaining in `physics.ts`. All public API surface is preserved.
 - **Verification**: `wc -l src/core/physics.ts` shows ≤ 30 LOC. All of `physics.test.ts`, `throttleControl.test.ts`, `controlMode.test.ts`, `parachute*.test.ts`, `atmosphere.test.ts`, `fuelsystem.test.ts`, `collision.test.ts`, `orbit*.test.ts`, `manoeuvre.test.ts`, `docking*.test.ts` pass.
