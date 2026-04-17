@@ -509,7 +509,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes. `npm run build` succeeds.
 
 ### TASK-079: Extract src/core/constants/satellites.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-078
 - **Description**: Per requirements §9. Move SatelliteType + constellation + lease + reposition + degradation constants (approx. lines 1487–1647) to `src/core/constants/satellites.ts`. Re-export from `constants.ts`. Note: this file imports altitude-band keys from `bodies.ts`.
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/satellite*.test.ts` passes.
