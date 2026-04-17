@@ -197,7 +197,7 @@ const SOURCE_GROUPS = {
   'core/power':         ['src/core/power.ts', 'src/core/lifeSupport.ts'],
   'core/malfunction':   ['src/core/malfunction.ts', 'src/core/ejector.ts'],
   'core/finance':       ['src/core/finance.ts', 'src/core/period.ts'],
-  'core/saveload':      ['src/core/saveload.ts', 'src/core/autoSave.ts', 'src/core/idbStorage.ts'],
+  'core/saveload':      ['src/core/saveload.ts', 'src/core/autoSave.ts', 'src/core/idbStorage.ts', 'src/core/saveEncoding.ts'],
   'core/challenges':    ['src/core/challenges.ts', 'src/core/customChallenges.ts'],
   'core/physicsWorker': ['src/core/physicsWorker.ts', 'src/core/physicsWorkerProtocol.ts'],
   'ui/settings':        ['src/ui/settings.ts', 'src/ui/perfDashboard.ts', 'src/ui/fpsMonitor.ts'],

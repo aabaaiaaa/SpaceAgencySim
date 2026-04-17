@@ -339,7 +339,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/saveEncoding.test.ts` passes.
 
 ### TASK-052: Update generator + test-map.json for saveEncoding module
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-051
 - **Description**: Per requirements §11. Recommended: add `'src/core/saveEncoding.ts'` to `SOURCE_GROUPS['core/saveload']` in `scripts/generate-test-map.mjs` so it groups with the rest of save I/O (saveload, autoSave, idbStorage). If you prefer saveEncoding to be its own area, skip the group edit and let the default classifier assign `core/saveEncoding`. Run `npm run test-map:generate` and confirm the mapping.
 - **Verification**: `grep -A 3 'saveEncoding' test-map.json` shows the test file mapped to the expected area.

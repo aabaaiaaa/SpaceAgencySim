@@ -400,6 +400,7 @@
       "unit": [
         "src/tests/branchCoverage.test.ts",
         "src/tests/logger.test.ts",
+        "src/tests/saveEncoding.test.ts",
         "src/tests/saveload.test.ts",
         "src/tests/undoRedo.test.ts"
       ],
@@ -691,6 +692,7 @@
       "sources": [
         "src/core/autoSave.ts",
         "src/core/idbStorage.ts",
+        "src/core/saveEncoding.ts",
         "src/core/saveload.ts"
       ],
       "unit": [
@@ -699,6 +701,7 @@
         "src/tests/designLibrary.test.ts",
         "src/tests/e2e-infrastructure.test.ts",
         "src/tests/idbStorage.test.ts",
+        "src/tests/saveEncoding.test.ts",
         "src/tests/saveload.test.ts",
         "src/tests/settingsStore.test.ts",
         "src/tests/storageErrors.test.ts"
