@@ -285,7 +285,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/staging.test.ts` passes. `npm run typecheck` passes.
 
 ### TASK-043: Move _renormalizeAfterSeparation to debris.ts (if applicable)
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-042
 - **Description**: Per requirements §7.1. If `_renormalizeAfterSeparation` (or a similarly-named helper) fits the debris module's scope, move it too. If it is more about the remaining craft post-separation than about debris, leave it in `staging.ts` and note why in the task message.
 - **Verification**: `npx vitest run src/tests/staging.test.ts` passes.
