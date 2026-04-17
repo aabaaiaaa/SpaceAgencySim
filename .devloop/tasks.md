@@ -409,7 +409,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/physics.test.ts src/tests/collision.test.ts` passes.
 
 ### TASK-063: Create src/core/physics/integrate.ts shell
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-062
 - **Description**: Per requirements §8. Create `src/core/physics/integrate.ts` with a skeleton `_integrate(ps, dt)` function. Import from all the newly-extracted modules. DO NOT move logic yet — this task stands up the shell with the existing body inlined as a starting point.
 - **Verification**: `npx vitest run src/tests/physics.test.ts` passes.
