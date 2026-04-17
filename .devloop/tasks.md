@@ -481,7 +481,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/physics-docking.test.ts` passes.
 
 ### TASK-075: Add focused unit test for physics/thrust.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-072
 - **Description**: Per requirements §8. Add `src/tests/physics-thrust.test.ts`. Cover thrust-from-throttle, TWR lookup edge cases (zero-mass, max throttle), fuel starvation (zero thrust when no fuel).
 - **Verification**: `npx vitest run src/tests/physics-thrust.test.ts` passes.
