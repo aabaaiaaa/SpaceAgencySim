@@ -44,18 +44,15 @@
  */
 
 import { getPartById } from '../data/parts.ts';
-import { PartType, FlightPhase, BODY_RADIUS } from './constants.ts';
+import { PartType } from './constants.ts';
 import {
   airDensity,
   airDensityForBody,
   ATMOSPHERE_TOP,
-  updateHeat,
-  updateSolarHeat,
 } from './atmosphere.ts';
 import {
   getAtmosphereTop,
 } from '../data/bodies.ts';
-import { tickFuelSystem } from './fuelsystem.ts';
 import { activateCurrentStage, tickDebris } from './staging.ts';
 import { tickCollisions } from './collision.ts';
 import {
@@ -65,34 +62,18 @@ import {
   LOW_DENSITY_THRESHOLD,
 } from './parachute.ts';
 import {
-  tickLegs,
   getDeployedLegFootOffset,
   LegState,
 } from './legs.ts';
 import {
-  tickScienceModules,
   onSafeLanding,
 } from './sciencemodule.ts';
 import { getBiomeId } from './biomes.ts';
-import {
-  checkMalfunctions,
-  tickMalfunctions,
-} from './malfunction.ts';
 import { MalfunctionType, PARTIAL_CHUTE_FACTOR } from './constants.ts';
-import { getWindForce } from './weather.ts';
-import { tickPower, recalcPowerState } from './power.ts';
-import { getOrbitalStateAtTime } from './orbit.ts';
-import { logger } from './logger.ts';
+import { recalcPowerState } from './power.ts';
 import { computePartCdA } from './dragCoefficient.ts';
 import { G0, gravityForBody as _gravityForBody } from './physics/gravity.ts';
-import { tickOrbitPhase } from './physics/phases/orbitPhase.ts';
-import { tickTransferPhase } from './physics/phases/transferPhase.ts';
-import { tickCapturePhase } from './physics/phases/capturePhase.ts';
-import {
-  tickFlightPhasePrelude,
-  tickFlightPhaseSteering,
-  tickFlightPhaseParachutes,
-} from './physics/phases/flightPhase.ts';
+import { _integrate } from './physics/integrate.ts';
 import type { AltitudeBand, ControlMode as ControlModeType } from './constants.ts';
 import type { FlightState, FlightEvent, OrbitalElements, PowerState, GameState, InventoryPart } from './gameState.ts';
 
@@ -715,292 +696,6 @@ export function fireNextStage(
 }
 
 // ---------------------------------------------------------------------------
-// Integration step (private)
-// ---------------------------------------------------------------------------
-
-/**
- * Advance the simulation by exactly FIXED_DT seconds.
- */
-function _integrate(ps: PhysicsState, assembly: RocketAssembly, flightState: FlightState): void {
-  const bodyId: string | undefined = flightState?.bodyId;
-
-  // --- Phase-specific physics: ORBIT uses Keplerian propagation ------------
-  // When in stable orbit with no engines firing, skip Newtonian integration
-  // and advance the craft along its frozen orbital path analytically.
-  // This gives perfectly stable orbits at any time warp speed.
-  if (tickOrbitPhase(ps, FIXED_DT, { flightState })) return;
-
-  // --- Phase-specific physics: TRANSFER has no gravity or drag ---------------
-  // The craft drifts at constant velocity in deep space. Player can fire
-  // engines for course corrections (thrust only, no gravity/drag).
-  if (tickTransferPhase(ps, FIXED_DT, { flightState, assembly })) return;
-
-  // --- Phase-specific physics: CAPTURE uses radial gravity from destination ---
-  // The craft is approaching a body and must burn to slow down.
-  if (tickCapturePhase(ps, FIXED_DT, { flightState, assembly, bodyId })) return;
-
-  // --- FLIGHT-phase fallthrough --------------------------------------------
-  // All remaining phases (PRELAUNCH, LAUNCH, FLIGHT, REENTRY, MANOEUVRE) share
-  // the same Newtonian integrator below. REENTRY ("descent") is not a distinct
-  // physics branch — it differs from FLIGHT only in which atmospheric-heat
-  // bookkeeping applies (see `atmosphere.ts#isReentryCondition`), and that is
-  // already handled by `updateHeat()` within the shared path. Per requirements
-  // §8 this means no `phases/descentPhase.ts` is warranted; the FLIGHT phase
-  // branch covers descent/re-entry integration.
-
-  // --- 0–2. FLIGHT-phase prelude ------------------------------------------
-  // TWR throttle conversion, atmosphere lookup, total-mass snapshot,
-  // docking/RCS determination, and main-engine thrust. See
-  // `./physics/phases/flightPhase.ts`.
-  const { altitude, density, totalMass, isDockingOrRcs, thrustX, thrustY } =
-    tickFlightPhasePrelude(ps, { flightState, assembly, bodyId });
-
-  // --- 3. Gravity force (body-specific, inverse-square) --------------------
-  const gravAccel: number = _gravityForBody(bodyId, altitude);
-  let gravFX: number;
-  let gravFY: number;
-
-  // In ORBIT or MANOEUVRE phase, gravity is radial (toward body centre) so
-  // that orbital burns produce correct orbit changes.  In FLIGHT and other
-  // atmospheric phases, gravity is flat vertical (the 2D ground model).
-  const useRadialGravity =
-    flightState?.phase === FlightPhase.MANOEUVRE ||
-    (flightState?.phase === FlightPhase.ORBIT && ps.firingEngines.size > 0);
-
-  if (useRadialGravity && bodyId) {
-    const R: number = (BODY_RADIUS[bodyId] ?? 6_371_000);
-    const rx: number = ps.posX;
-    const ry: number = ps.posY + R;
-    const r: number = Math.hypot(rx, ry);
-    const gravMag: number = gravAccel * totalMass;
-    gravFX = -gravMag * rx / r;
-    gravFY = -gravMag * ry / r;
-  } else {
-    // FLIGHT phase: flat vertical gravity.
-    gravFX = 0;
-    gravFY = -gravAccel * totalMass;
-  }
-
-  // --- 4. Drag force -------------------------------------------------------
-  const speed: number    = Math.hypot(ps.velX, ps.velY);
-  const dragMag: number  = _computeDragForce(ps, assembly, density, speed);
-  let dragFX = 0;
-  let dragFY = 0;
-  if (speed > 1e-6) {
-    dragFX = -dragMag * (ps.velX / speed);
-    dragFY = -dragMag * (ps.velY / speed);
-  }
-
-  // --- 4b. Wind force (weather system) -------------------------------------
-  let windFX = 0;
-  let windFY = 0;
-  if (density > 0 && ps.weatherWindSpeed > 0) {
-    const windWeather = {
-      windSpeed: ps.weatherWindSpeed,
-      windAngle: ps.weatherWindAngle,
-      temperature: 1, visibility: 0, extreme: false, description: '', bodyId: bodyId as string,
-    };
-    const windAccel = getWindForce(windWeather, altitude, bodyId);
-    // Wind acts as a force on the rocket (acceleration × mass → force component).
-    windFX = windAccel.windFX * totalMass;
-    windFY = windAccel.windFY * totalMass;
-  }
-
-  // --- 5. Net acceleration -------------------------------------------------
-  const netFX: number = thrustX + gravFX + dragFX + windFX;
-  const netFY: number = thrustY + gravFY + dragFY + windFY;
-
-  let accX: number;
-  let accY: number;
-  if (totalMass <= 0) {
-    accX = 0;
-    accY = 0;
-  } else {
-    accX = netFX / totalMass;
-    accY = netFY / totalMass;
-  }
-
-  // Ground reaction: prevent downward acceleration while on launch pad.
-  if (ps.grounded && accY < 0) {
-    accY = 0;
-    accX = 0; // no horizontal drift on pad
-  }
-
-  // Launch clamp hold: while clamps are active, prevent all movement.
-  // Engines can fire (for engine spool-up visuals) but the rocket stays put.
-  if (ps.grounded && ps.hasLaunchClamps) {
-    accX = 0;
-    accY = 0;
-  }
-
-  // --- 6. Euler integration ------------------------------------------------
-  ps.velX += accX * FIXED_DT;
-  ps.velY += accY * FIXED_DT;
-  ps.posX += ps.velX * FIXED_DT;
-  ps.posY += ps.velY * FIXED_DT;
-
-  // --- 6b. Docking / RCS mode local movement --------------------------------
-  if (isDockingOrRcs) {
-    _applyDockingMovement(ps, assembly, totalMass, FIXED_DT, bodyId);
-  }
-
-  // --- 7. Continuous steering ----------------------------------------------
-  tickFlightPhaseSteering(ps, {
-    flightState, assembly, bodyId, altitude, thrustX, thrustY, dt: FIXED_DT,
-  });
-
-  // --- 7b. Topple-crash check (grounded tipping) -------------------------
-  if (ps.grounded) {
-    _checkToppleCrash(ps, assembly, flightState);
-    if (ps.crashed) return;
-  }
-
-  // --- 8. Fuel consumption (segment-aware, via fuelsystem.js) -------------
-  tickFuelSystem(ps, assembly, FIXED_DT, density);
-
-  // --- 8b. Malfunction tick (continuous effects like fuel leaks) ----------
-  tickMalfunctions(ps, assembly, FIXED_DT);
-
-  // --- 8c. Pending malfunction check (delayed after biome transition) -----
-  if (ps._malfunctionCheckPending) {
-    ps._malfunctionCheckTimer = (ps._malfunctionCheckTimer ?? 0) - FIXED_DT;
-    if (ps._malfunctionCheckTimer <= 0) {
-      ps._malfunctionCheckPending = false;
-      checkMalfunctions(ps, assembly, flightState, ps._gameState ?? undefined);
-    }
-  }
-
-  // --- 9. Parachute state machine ------------------------------------------
-  // Advance deploying → deployed timers and run the mass-safety check.
-  // totalMass was computed at step 1 above.
-  tickFlightPhaseParachutes(ps, { flightState, assembly, totalMass, dt: FIXED_DT });
-
-  // --- 9b. Landing leg state machine ---------------------------------------
-  // Advance deploying → deployed timers for all landing legs.
-  tickLegs(ps, assembly, flightState, FIXED_DT);
-
-  // --- 9c. Science module experiment timers --------------------------------
-  // Decrement running experiment countdowns; emit SCIENCE_COLLECTED on
-  // completion; update flightState.scienceModuleRunning.
-  tickScienceModules(ps, assembly, flightState, FIXED_DT);
-
-  // --- 9d. Power system (solar generation, battery, consumers) ------------
-  if (ps.powerState) {
-    // Count active science instruments for power draw calculation.
-    let activeScienceCount = 0;
-    for (const [, entry] of ps.instrumentStates) {
-      if (entry.state === 'COLLECTING' || entry.state === 'RUNNING') {
-        activeScienceCount++;
-      }
-    }
-
-    // Compute angular position for orbital sunlight check.
-    let angularPositionDeg: number | undefined = undefined;
-    if (flightState.inOrbit && flightState.orbitalElements) {
-      const oState = getOrbitalStateAtTime(
-        flightState.orbitalElements,
-        flightState.timeElapsed,
-        flightState.bodyId || 'EARTH',
-      );
-      angularPositionDeg = oState.angularPositionDeg;
-    }
-
-    tickPower(ps.powerState, {
-      dt: FIXED_DT,
-      altitude: Math.max(0, ps.posY),
-      bodyId: flightState.bodyId || 'EARTH',
-      gameTimeSeconds: flightState.timeElapsed,
-      angularPositionDeg,
-      inOrbit: flightState.inOrbit,
-      scienceRunning: flightState.scienceModuleRunning,
-      activeScienceCount,
-      commsActive: false, // comms are passive for player craft
-    });
-  }
-
-  // --- 9e. Ejected crew physics --------------------------------------------
-  if (ps.ejectedCrew) {
-    const crewG: number = _gravityForBody(bodyId, Math.max(0, ps.posY));
-    for (const crew of ps.ejectedCrew) {
-      // Countdown to chute deployment
-      if (!crew.chuteOpen && crew.chuteTimer > 0) {
-        crew.chuteTimer -= FIXED_DT;
-        if (crew.chuteTimer <= 0) crew.chuteOpen = true;
-      }
-
-      // Gravity (body-specific)
-      crew.velY -= crewG * FIXED_DT;
-
-      // Parachute drag when open (terminal velocity ~5 m/s)
-      if (crew.chuteOpen && crew.velY < 0) {
-        const drag: number = 0.5 * crew.velY * crew.velY * 0.08;
-        crew.velY += drag * FIXED_DT;
-        if (crew.velY > -5) crew.velY = Math.max(crew.velY, -5);
-      }
-
-      // Air drag on horizontal velocity
-      crew.velX *= (1 - 0.5 * FIXED_DT);
-
-      crew.x += crew.velX * FIXED_DT;
-      crew.y += crew.velY * FIXED_DT;
-
-      // Stop at ground
-      if (crew.y <= 0) {
-        crew.y = 0;
-        crew.velX = 0;
-        crew.velY = 0;
-      }
-    }
-  }
-
-  // --- 10. Atmospheric heat model -------------------------------------------
-  if (!ps.grounded) {
-    // density is already body-aware (computed above via _densityForBody).
-    updateHeat(ps, assembly, flightState, speed, altitude, density);
-
-    // Solar proximity heat: escalating radiant heat when near the Sun.
-    if (bodyId === 'SUN') {
-      updateSolarHeat(ps, assembly, flightState, altitude);
-    }
-  }
-
-  // --- 10. Launch clamp check -----------------------------------------------
-  // If launch clamps were flagged, re-check whether any clamp parts remain
-  // in the active assembly.  Once all clamps are staged away, clear the flag.
-  if (ps.hasLaunchClamps) {
-    let clampsRemain = false;
-    for (const instanceId of ps.activeParts) {
-      const placed = assembly.parts.get(instanceId);
-      const cDef: PartDef | null | undefined = placed ? getPartById(placed.partId) : null;
-      if (cDef && cDef.type === PartType.LAUNCH_CLAMP) {
-        clampsRemain = true;
-        break;
-      }
-    }
-    if (!clampsRemain) {
-      ps.hasLaunchClamps = false;
-    }
-  }
-
-  // --- 10b. Liftoff detection -----------------------------------------------
-  // Rocket cannot lift off while launch clamps are still active.
-  if (ps.grounded && ps.posY > 0 && !ps.hasLaunchClamps) {
-    ps.grounded = false;
-    ps.isTipping = false;
-  }
-
-  // --- 11. Ground clamping and landing detection ---------------------------
-  if (!ps.grounded && ps.posY <= 0) {
-    ps.posY = 0;
-    _handleGroundContact(ps, assembly, flightState);
-  } else if (ps.grounded) {
-    // Still on pad: keep clamped.
-    if (ps.posY < 0) ps.posY = 0;
-    if (ps.velY < 0) ps.velY = 0;
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Mass calculation (private)
 // ---------------------------------------------------------------------------
 
@@ -1182,7 +877,7 @@ function _getChuteDeployProgress(ps: PhysicsState, instanceId: string): number {
  *
  * dragForce = 0.5 × rho × v² × Cd × A  (summed over all active parts)
  */
-function _computeDragForce(ps: PhysicsState, assembly: RocketAssembly, density: number, speed: number): number {
+export function _computeDragForce(ps: PhysicsState, assembly: RocketAssembly, density: number, speed: number): number {
   if (density <= 0 || speed <= 0) return 0;
 
   let totalCdA = 0;
@@ -1522,7 +1217,7 @@ export function _applyGroundedSteering(
 /**
  * Check if the rocket has toppled past the crash angle and trigger a crash.
  */
-function _checkToppleCrash(ps: PhysicsState, assembly: RocketAssembly, flightState: FlightState): void {
+export function _checkToppleCrash(ps: PhysicsState, assembly: RocketAssembly, flightState: FlightState): void {
   if (Math.abs(ps.angle) <= TOPPLE_CRASH_ANGLE) return;
 
   // Compute tip speed: linear velocity of the farthest part from the
@@ -1622,7 +1317,7 @@ import { tickDebrisGround } from './physics/debrisGround.ts';
  *
  * Emits LANDING or CRASH event and sets ps.landed / ps.crashed accordingly.
  */
-function _handleGroundContact(ps: PhysicsState, assembly: RocketAssembly, flightState: FlightState): void {
+export function _handleGroundContact(ps: PhysicsState, assembly: RocketAssembly, flightState: FlightState): void {
   const impactSpeed: number = Math.hypot(ps.velX, ps.velY);
   const time: number        = flightState.timeElapsed;
 

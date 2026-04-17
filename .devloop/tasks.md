@@ -451,7 +451,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/physics.test.ts` passes.
 
 ### TASK-070: Refactor _integrate to pure dispatcher
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-069
 - **Description**: Per requirements §8 integration-loop refactor. After all phase extractions, `_integrate` in `integrate.ts` should be a short dispatcher (~30 LOC): read phase, call corresponding `tickXxxPhase(ps, dt, ctx)`, handle cross-phase transitions. Delete duplicated logic now living in phase files.
 - **Verification**: `npx vitest run src/tests/physics.test.ts` passes. `integrate.ts` is < 100 LOC.
