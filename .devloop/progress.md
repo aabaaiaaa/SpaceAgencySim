@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 77
-- **Remaining**: 27
-- **Last Updated**: 2026-04-17T02:33:36.001Z
+- **Completed**: 78
+- **Remaining**: 26
+- **Last Updated**: 2026-04-17T02:38:11.027Z
 
 ## Iteration Log
 
@@ -700,4 +700,13 @@
 - **Exit Status**: success
 - **Tokens**: 2,797,746 total (37 in, 32,575 out, 117,705 cache-create, 2,647,429 cache-read)
 - **Cost**: $2.8739
+
+### Iteration 78 - 2026-04-17T02:38:11.024Z
+- **Task Attempted**: TASK-078
+- **Task Completed**: TASK-078
+- **Summary**: Completed Extract src/core/constants/gameplay.ts
+- **Duration**: 4m 33s
+- **Exit Status**: success
+- **Tokens**: 1,656,660 total (33 in, 16,747 out, 77,019 cache-create, 1,562,861 cache-read)
+- **Cost**: $1.6816
 

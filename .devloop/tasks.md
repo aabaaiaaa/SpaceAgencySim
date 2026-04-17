@@ -503,7 +503,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes. `npm run lint` passes. `npm run build` succeeds.
 
 ### TASK-078: Extract src/core/constants/gameplay.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-077
 - **Description**: Per requirements §9. Move weather + hard landing + injury + medical + part wear + difficulty + comms + resources + mining constants to `src/core/constants/gameplay.ts`. Re-export from `constants.ts`.
 - **Verification**: `npm run typecheck` passes. `npm run build` succeeds.
