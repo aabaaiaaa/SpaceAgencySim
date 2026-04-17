@@ -17,7 +17,7 @@
  *   node scripts/generate-test-map.mjs --dry-run    # print to stdout only
  */
 
-import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, existsSync, statSync } from 'node:fs';
 import { resolve, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -103,6 +103,7 @@ const BARREL_MAP = {
   'src/ui/flightController.ts': 'src/ui/flightController',
   'src/ui/missionControl.ts':   'src/ui/missionControl',
   'src/render/flight.ts':       'src/render/flight',
+  'src/core/physics.ts':        'src/core/physics',
 };
 
 /**
@@ -116,13 +117,25 @@ function expandBarrel(barrelPosix) {
   const absDir = resolve(ROOT, subDir);
   const result = [barrelPosix];
   if (existsSync(absDir)) {
-    for (const entry of readdirSync(absDir)) {
-      if (entry.endsWith('.ts')) {
-        result.push(norm(relative(ROOT, resolve(absDir, entry))));
-      }
+    for (const file of walkTsFiles(absDir)) {
+      result.push(norm(relative(ROOT, file)));
     }
   }
   return result;
+}
+
+/** Recursively yield all .ts file absolute paths under a directory. */
+function walkTsFiles(absDir) {
+  const out = [];
+  for (const entry of readdirSync(absDir)) {
+    const abs = resolve(absDir, entry);
+    if (statSync(abs).isDirectory()) {
+      out.push(...walkTsFiles(abs));
+    } else if (entry.endsWith('.ts')) {
+      out.push(abs);
+    }
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------
@@ -252,6 +265,7 @@ function classifySource(srcPath) {
     { re: /^src\/ui\/flightController\//, area: 'ui/flightController' },
     { re: /^src\/ui\/missionControl\//, area: 'ui/missionControl' },
     { re: /^src\/render\/flight\//, area: 'render/flight' },
+    { re: /^src\/core\/physics\//, area: 'core/physics' },
   ];
   for (const { re, area } of subDirPatterns) {
     if (re.test(srcPath)) return area;
@@ -511,10 +525,8 @@ function buildTestMap() {
     area.sources.add(barrelPath);
     const absDir = resolve(ROOT, subDir);
     if (existsSync(absDir)) {
-      for (const entry of readdirSync(absDir)) {
-        if (entry.endsWith('.ts')) {
-          area.sources.add(norm(relative(ROOT, resolve(absDir, entry))));
-        }
+      for (const file of walkTsFiles(absDir)) {
+        area.sources.add(norm(relative(ROOT, file)));
       }
     }
   }

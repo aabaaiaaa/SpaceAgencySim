@@ -463,7 +463,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `wc -l src/core/physics.ts` shows ≤ 30 LOC. All of `physics.test.ts`, `throttleControl.test.ts`, `controlMode.test.ts`, `parachute*.test.ts`, `atmosphere.test.ts`, `fuelsystem.test.ts`, `collision.test.ts`, `orbit*.test.ts`, `manoeuvre.test.ts`, `docking*.test.ts` pass.
 
 ### TASK-072: Update generator + test-map.json for physics sub-modules
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-071
 - **Description**: Per requirements §11. Edit `scripts/generate-test-map.mjs` to teach it about the new physics barrel: (a) add `'src/core/physics.ts': 'src/core/physics'` to `BARREL_MAP`; (b) add `{ re: /^src\/core\/physics\//, area: 'core/physics' }` to `subDirPatterns` inside `classifySource`. Then run `npm run test-map:generate` and verify each physics sub-module classifies to the existing `core/physics` area (keeping all sub-modules grouped with the barrel + existing physics tests).
 - **Verification**: `grep -B 1 -A 10 '"src/core/physics/' test-map.json` shows entries. The `core/physics` area includes sources `src/core/physics.ts` plus all new `src/core/physics/*.ts` and `src/core/physics/phases/*.ts` files.
