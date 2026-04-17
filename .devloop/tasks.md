@@ -349,7 +349,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 ## Section 8 — physics.ts Full Barrel Split + Integration Loop Refactor
 
 ### TASK-053: Create src/core/physics/ directory with stub barrel
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §8. Create the directory `src/core/physics/`. Do NOT move any code yet. Create an empty (or comment-only) placeholder in `src/core/physics/index.ts` if useful. Leave `physics.ts` untouched. This task simply stages the directory.
 - **Verification**: `src/core/physics/` directory exists. `npm run typecheck` passes (no behaviour change).
