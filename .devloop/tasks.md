@@ -597,7 +597,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/ui-hubState.test.ts` passes.
 
 ### TASK-093: Extract mainmenu reducer to src/ui/mainmenu/_state.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §10.4. Create `src/ui/mainmenu/_state.ts`. Extract: save slot card formatting (date, duration, crew count, money), save list sort/filter order. Skip shooting-stars animation state.
 - **Verification**: `npm run typecheck` passes.
