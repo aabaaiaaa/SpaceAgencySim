@@ -361,7 +361,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/physics.test.ts` passes. `npm run typecheck` passes.
 
 ### TASK-055: Extract src/core/physics/keyboard.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-054
 - **Description**: Per requirements §8. Move `handleKeyDown` and `handleKeyUp` (physics.ts lines 877–947) to `src/core/physics/keyboard.ts`. Re-export from `physics.ts` so external imports keep working.
 - **Verification**: `npx vitest run src/tests/physics.test.ts src/tests/throttleControl.test.ts` passes.
