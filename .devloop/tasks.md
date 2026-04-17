@@ -561,7 +561,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/ui-flightHudState.test.ts` passes.
 
 ### TASK-087: Extract topbar reducer to src/ui/topbar/_state.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §10.2. Create `src/ui/topbar/_state.ts` with `TopbarState` + getters/setters following the VAB pattern. Extract: cash color / health-based formatting, mission count badge visibility, dropdown open state, modal visibility helpers.
 - **Verification**: `npm run typecheck` passes.

@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 86
-- **Remaining**: 18
-- **Last Updated**: 2026-04-17T03:03:25.333Z
+- **Completed**: 87
+- **Remaining**: 17
+- **Last Updated**: 2026-04-17T03:05:54.692Z
 
 ## Iteration Log
 
@@ -781,4 +781,13 @@
 - **Exit Status**: success
 - **Tokens**: 952,564 total (27 in, 7,467 out, 44,976 cache-create, 900,094 cache-read)
 - **Cost**: $0.9180
+
+### Iteration 87 - 2026-04-17T03:05:54.686Z
+- **Task Attempted**: TASK-087
+- **Task Completed**: TASK-087
+- **Summary**: Completed Extract topbar reducer to src/ui/topbar/_state.ts
+- **Duration**: 2m 27s
+- **Exit Status**: success
+- **Tokens**: 816,110 total (20 in, 8,071 out, 77,464 cache-create, 730,555 cache-read)
+- **Cost**: $1.0513
 

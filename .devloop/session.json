@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 85,
+  "lastIteration": 86,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-086",
-    "taskTitle": "Create src/tests/ui-flightHudState.test.ts",
-    "iterationNumber": 86,
-    "startedAt": "2026-04-17T03:00:46.223Z"
+    "taskId": "TASK-087",
+    "taskTitle": "Extract topbar reducer to src/ui/topbar/_state.ts",
+    "iterationNumber": 87,
+    "startedAt": "2026-04-17T03:03:27.404Z"
   }
 }
