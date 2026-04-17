@@ -621,7 +621,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes.
 
 ### TASK-097: Update crewAdmin.ts to use the new reducer
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-096
 - **Description**: Per requirements §10.5. Update `src/ui/crewAdmin.ts`.
 - **Verification**: `npm run typecheck` passes. `npx playwright test e2e/crew*.spec.ts` passes (if present).

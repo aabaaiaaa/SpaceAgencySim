@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 96
-- **Remaining**: 8
-- **Last Updated**: 2026-04-17T03:27:21.277Z
+- **Completed**: 97
+- **Remaining**: 7
+- **Last Updated**: 2026-04-17T03:29:25.178Z
 
 ## Iteration Log
 
@@ -871,4 +871,13 @@
 - **Exit Status**: success
 - **Tokens**: 1,219,636 total (21 in, 7,158 out, 70,296 cache-create, 1,142,161 cache-read)
 - **Cost**: $1.1895
+
+### Iteration 97 - 2026-04-17T03:29:25.174Z
+- **Task Attempted**: TASK-097
+- **Task Completed**: TASK-097
+- **Summary**: Completed Update crewAdmin.ts to use the new reducer
+- **Duration**: 2m 2s
+- **Exit Status**: success
+- **Tokens**: 964,264 total (18 in, 5,820 out, 66,243 cache-create, 892,183 cache-read)
+- **Cost**: $1.0057
 

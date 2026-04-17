@@ -25,8 +25,15 @@ import {
 import { getFacilityTier } from '../core/construction.ts';
 import { refreshTopBar } from './topbar.ts';
 import { createListenerTracker, type ListenerTracker } from './listenerTracker.ts';
+import {
+  skillBarsHTML,
+  getMedicalButtonLabel,
+  computeTrainingRemaining,
+  computeInjuryRemaining,
+  computeHireTabState,
+} from './crewAdmin/_state.ts';
 import './crewAdmin.css';
-import type { GameState } from '../core/gameState.ts';
+import type { GameState, CrewSkills } from '../core/gameState.ts';
 
 
 // ---------------------------------------------------------------------------
@@ -311,15 +318,16 @@ function _renderActiveTab(): void {
     // Skills column with bars and effect descriptions
     const skillsTd = document.createElement('td');
     skillsTd.className = 'crew-skills-cell';
-    const skills = astronaut.skills ?? { piloting: 0, engineering: 0, science: 0 };
-    skillsTd.innerHTML = _renderSkillBars(skills);
+    const skills: CrewSkills = astronaut.skills ?? { piloting: 0, engineering: 0, science: 0 };
+    skillsTd.innerHTML = skillBarsHTML(skills);
     tr.appendChild(skillsTd);
 
     // Status column — injury, training, or ready
     const statusTd = document.createElement('td');
     const injured = isCrewInjured(_state!, astronaut.id);
+    const currentPeriod = _state!.currentPeriod ?? 0;
     if (injured) {
-      const remaining = (astronaut.injuryEnds ?? 0) - (_state!.currentPeriod ?? 0);
+      const remaining = computeInjuryRemaining(astronaut.injuryEnds, currentPeriod);
       const badge = document.createElement('span');
       badge.className = 'crew-injury-badge';
       badge.textContent = `Injured (${remaining} flights)`;
@@ -328,7 +336,7 @@ function _renderActiveTab(): void {
       // Medical care button
       const medBtn = document.createElement('button');
       medBtn.className = 'crew-medical-btn';
-      medBtn.textContent = crewAdminTier >= 3 ? 'Adv. Medical' : 'Medical';
+      medBtn.textContent = getMedicalButtonLabel(crewAdminTier);
       _tracker!.add(medBtn, 'click', () => {
         const result = crewAdminTier >= 3
           ? payAdvancedMedicalCare(_state!, astronaut.id)
@@ -342,7 +350,7 @@ function _renderActiveTab(): void {
     } else if (astronaut.trainingSkill) {
       const badge = document.createElement('span');
       badge.className = 'crew-training-badge';
-      const periodsLeft = Math.max(0, (astronaut.trainingEnds ?? 0) - (_state!.currentPeriod ?? 0));
+      const periodsLeft = computeTrainingRemaining(astronaut.trainingEnds, currentPeriod);
       badge.textContent = `Training: ${astronaut.trainingSkill} (${periodsLeft} left)`;
       statusTd.appendChild(badge);
     } else {
@@ -376,41 +384,6 @@ function _renderActiveTab(): void {
 }
 
 /**
- * Render skill bars with effect descriptions for a crew member.
- */
-function _renderSkillBars(skills: { piloting: number; engineering: number; science: number }): string {
-  const p = Math.round(skills.piloting);
-  const e = Math.round(skills.engineering);
-  const s = Math.round(skills.science);
-
-  const pilotEffect = `+${(p * 0.3).toFixed(0)}% turn rate`;
-  const engEffect = `${(60 + (e / 100) * 20).toFixed(0)}% part recovery`;
-  const sciDuration = (100 - (s / 100) * 33.3).toFixed(0);
-  const sciEffect = `${sciDuration}% exp. time, +${((s / 100) * 50).toFixed(0)}% yield`;
-
-  return `
-    <div class="crew-skill-row">
-      <span class="crew-skill-label">Pilot</span>
-      <div class="crew-skill-bar-bg"><div class="crew-skill-bar-fill piloting" style="width:${p}%"></div></div>
-      <span class="crew-skill-value">${p}</span>
-    </div>
-    <div class="crew-skill-effect">${pilotEffect}</div>
-    <div class="crew-skill-row">
-      <span class="crew-skill-label">Eng.</span>
-      <div class="crew-skill-bar-bg"><div class="crew-skill-bar-fill engineering" style="width:${e}%"></div></div>
-      <span class="crew-skill-value">${e}</span>
-    </div>
-    <div class="crew-skill-effect">${engEffect}</div>
-    <div class="crew-skill-row">
-      <span class="crew-skill-label">Science</span>
-      <div class="crew-skill-bar-bg"><div class="crew-skill-bar-fill science" style="width:${s}%"></div></div>
-      <span class="crew-skill-value">${s}</span>
-    </div>
-    <div class="crew-skill-effect">${sciEffect}</div>
-  `;
-}
-
-/**
  * Handle the "Fire" button for an astronaut.
  */
 function _handleFire(id: string): void {
@@ -430,11 +403,10 @@ function _renderHireTab(): void {
   const content = _getContent();
   if (!content || !_state) return;
 
-  const cash         = _state.money;
-  const hireCost     = getAdjustedHireCost(_state.reputation ?? 50);
-  const canAfford    = cash >= hireCost;
   const activeCrew   = getActiveCrew(_state);
-  const atCapacity   = activeCrew.length >= 20; // MAX_CREW_SIZE
+  const hireCost     = getAdjustedHireCost(_state.reputation ?? 50);
+  const hireState    = computeHireTabState(_state.money, hireCost, activeCrew.length);
+  const { cash, canAfford, atCapacity } = hireState;
 
   const panel = document.createElement('div');
   panel.id = 'crew-hire-panel';
@@ -660,10 +632,10 @@ function _renderTrainingTab(): void {
       item.appendChild(name);
 
       // Progress info: skill + periods remaining
-      const periodsLeft = (astronaut.trainingEnds ?? 0) - currentPeriod;
+      const periodsLeft = computeTrainingRemaining(astronaut.trainingEnds, currentPeriod);
       const status = document.createElement('span');
       status.className = 'training-status';
-      status.textContent = `${astronaut.trainingSkill} \u2014 ${Math.max(0, periodsLeft)} flight${periodsLeft !== 1 ? 's' : ''} remaining`;
+      status.textContent = `${astronaut.trainingSkill} \u2014 ${periodsLeft} flight${periodsLeft !== 1 ? 's' : ''} remaining`;
       item.appendChild(status);
 
       const cancelBtn = document.createElement('button');

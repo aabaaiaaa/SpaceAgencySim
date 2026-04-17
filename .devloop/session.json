@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 95,
+  "lastIteration": 96,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-096",
-    "taskTitle": "Extract crewAdmin reducer to src/ui/crewAdmin/_state.ts",
-    "iterationNumber": 96,
-    "startedAt": "2026-04-17T03:24:53.508Z"
+    "taskId": "TASK-097",
+    "taskTitle": "Update crewAdmin.ts to use the new reducer",
+    "iterationNumber": 97,
+    "startedAt": "2026-04-17T03:27:23.372Z"
   }
 }
