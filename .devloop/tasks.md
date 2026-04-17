@@ -633,7 +633,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/ui-crewAdminState.test.ts` passes.
 
 ### TASK-099: Update generator + test-map.json for UI state files and tests
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-086, TASK-089, TASK-092, TASK-095, TASK-098
 - **Description**: Per requirements §11. Files like `src/ui/flightHud/_state.ts` will classify to `ui/flightHud` via the generator's fallback regex for deep paths — no script edits strictly required. Recommended (cleaner + explicit): add to `subDirPatterns` in `scripts/generate-test-map.mjs`: entries for `src/ui/flightHud/`, `src/ui/topbar/`, `src/ui/hub/`, `src/ui/mainmenu/`, `src/ui/crewAdmin/` with their corresponding areas. Then run `npm run test-map:generate` and confirm each `_state.ts` maps into the expected area and each `ui-*State.test.ts` is in that area's `unit` list.
 - **Verification**: For each of the five UI state modules: `grep -B 1 -A 8 '"src/ui/<panel>/_state.ts"' test-map.json` shows the expected area and the corresponding test file appears in its `unit` list.

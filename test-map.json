@@ -161,6 +161,7 @@
         "src/tests/surfaceOps.test.ts",
         "src/tests/techtree.test.ts",
         "src/tests/trackingStationTiers.test.ts",
+        "src/tests/ui-crewAdminState.test.ts",
         "src/tests/vabTiers.test.ts",
         "src/tests/weather.test.ts"
       ],
@@ -755,6 +756,7 @@
         "src/tests/sciencemodule.test.ts",
         "src/tests/staging.test.ts",
         "src/tests/stagingCalc.test.ts",
+        "src/tests/ui-flightHudState.test.ts",
         "src/tests/ui-vabStaging.test.ts",
         "src/tests/undoRedo.test.ts",
         "src/tests/vabTiers.test.ts"
@@ -1061,9 +1063,12 @@
     },
     "ui/crewAdmin": {
       "sources": [
-        "src/ui/crewAdmin.ts"
+        "src/ui/crewAdmin.ts",
+        "src/ui/crewAdmin/_state.ts"
       ],
-      "unit": [],
+      "unit": [
+        "src/tests/ui-crewAdminState.test.ts"
+      ],
       "e2e": [
         "e2e/agency-depth.spec.ts",
         "e2e/crew.spec.ts"
@@ -1137,7 +1142,8 @@
     },
     "ui/flightController/surface": {
       "sources": [
-        "src/ui/flightController/_postFlight.ts"
+        "src/ui/flightController/_postFlight.ts",
+        "src/ui/flightController/_surfaceActions.ts"
       ],
       "unit": [
         "src/tests/loopErrorHandling.test.ts"
@@ -1148,9 +1154,12 @@
     },
     "ui/flightHud": {
       "sources": [
-        "src/ui/flightHud.ts"
+        "src/ui/flightContextMenu.ts",
+        "src/ui/flightHud.ts",
+        "src/ui/flightHud/_state.ts"
       ],
       "unit": [
+        "src/tests/ui-flightHudState.test.ts",
         "src/tests/ui-timeWarp.test.ts"
       ],
       "e2e": [
@@ -1170,9 +1179,11 @@
     },
     "ui/hub": {
       "sources": [
-        "src/ui/hub.ts"
+        "src/ui/hub.ts",
+        "src/ui/hub/_state.ts"
       ],
       "unit": [
+        "src/tests/ui-hubState.test.ts",
         "src/tests/ui-modalFocus.test.ts"
       ],
       "e2e": [
@@ -1218,9 +1229,11 @@
     },
     "ui/mainmenu": {
       "sources": [
-        "src/ui/mainmenu.ts"
+        "src/ui/mainmenu.ts",
+        "src/ui/mainmenu/_state.ts"
       ],
       "unit": [
+        "src/tests/ui-mainMenuState.test.ts",
         "src/tests/ui-modalFocus.test.ts"
       ],
       "e2e": [
@@ -1276,7 +1289,9 @@
     },
     "ui/settings": {
       "sources": [
-        "src/ui/fpsMonitor.ts"
+        "src/ui/fpsMonitor.ts",
+        "src/ui/perfDashboard.ts",
+        "src/ui/settings.ts"
       ],
       "unit": [
         "src/tests/fpsMonitor.test.ts",
@@ -1290,9 +1305,12 @@
     },
     "ui/topbar": {
       "sources": [
-        "src/ui/topbar.ts"
+        "src/ui/topbar.ts",
+        "src/ui/topbar/_state.ts"
       ],
-      "unit": [],
+      "unit": [
+        "src/tests/ui-topbarState.test.ts"
+      ],
       "e2e": [
         "e2e/flight.spec.ts",
         "e2e/saveload.spec.ts"
@@ -1309,6 +1327,7 @@
     },
     "ui/utilities": {
       "sources": [
+        "src/ui/autoSaveToast.ts",
         "src/ui/escapeHtml.ts",
         "src/ui/listenerTracker.ts",
         "src/ui/rocketCardUtil.ts"

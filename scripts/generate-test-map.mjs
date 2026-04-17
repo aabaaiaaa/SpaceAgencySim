@@ -266,6 +266,11 @@ function classifySource(srcPath) {
     { re: /^src\/ui\/vab\//, area: 'ui/vab' },
     { re: /^src\/ui\/flightController\//, area: 'ui/flightController' },
     { re: /^src\/ui\/missionControl\//, area: 'ui/missionControl' },
+    { re: /^src\/ui\/flightHud\//, area: 'ui/flightHud' },
+    { re: /^src\/ui\/topbar\//, area: 'ui/topbar' },
+    { re: /^src\/ui\/hub\//, area: 'ui/hub' },
+    { re: /^src\/ui\/mainmenu\//, area: 'ui/mainmenu' },
+    { re: /^src\/ui\/crewAdmin\//, area: 'ui/crewAdmin' },
     { re: /^src\/render\/flight\//, area: 'render/flight' },
     { re: /^src\/core\/physics\//, area: 'core/physics' },
     { re: /^src\/core\/constants\//, area: 'core/constants' },
@@ -480,26 +485,24 @@ function buildTestMap() {
   // -------------------------------------------------------------------
 
   for (const [areaName, area] of areas) {
-    if (area.sources.size === 0 && areaName !== 'e2e-infra') {
-      // Check SOURCE_GROUPS
-      if (SOURCE_GROUPS[areaName]) {
-        for (const src of SOURCE_GROUPS[areaName]) {
-          if (existsSync(resolve(ROOT, src))) {
-            area.sources.add(src);
-          }
+    if (areaName === 'e2e-infra') continue;
+
+    // Always ensure SOURCE_GROUPS sources are present
+    if (SOURCE_GROUPS[areaName]) {
+      for (const src of SOURCE_GROUPS[areaName]) {
+        if (existsSync(resolve(ROOT, src))) {
+          area.sources.add(src);
         }
       }
-      // Convention: area name → src/{area}.ts
-      if (area.sources.size === 0) {
-        const conventionPath = `src/${areaName}.ts`;
-        if (existsSync(resolve(ROOT, conventionPath))) {
-          area.sources.add(conventionPath);
-          // If it's a barrel, expand
-          if (BARREL_MAP[conventionPath]) {
-            for (const sub of expandBarrel(conventionPath)) {
-              area.sources.add(sub);
-            }
-          }
+    }
+    // Convention: area name → src/{area}.ts — ensure it's present
+    const conventionPath = `src/${areaName}.ts`;
+    if (existsSync(resolve(ROOT, conventionPath))) {
+      area.sources.add(conventionPath);
+      // If it's a barrel, expand
+      if (BARREL_MAP[conventionPath]) {
+        for (const sub of expandBarrel(conventionPath)) {
+          area.sources.add(sub);
         }
       }
     }
