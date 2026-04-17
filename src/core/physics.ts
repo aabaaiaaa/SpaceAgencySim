@@ -739,6 +739,15 @@ function _integrate(ps: PhysicsState, assembly: RocketAssembly, flightState: Fli
   // The craft is approaching a body and must burn to slow down.
   if (tickCapturePhase(ps, FIXED_DT, { flightState, assembly, bodyId })) return;
 
+  // --- FLIGHT-phase fallthrough --------------------------------------------
+  // All remaining phases (PRELAUNCH, LAUNCH, FLIGHT, REENTRY, MANOEUVRE) share
+  // the same Newtonian integrator below. REENTRY ("descent") is not a distinct
+  // physics branch — it differs from FLIGHT only in which atmospheric-heat
+  // bookkeeping applies (see `atmosphere.ts#isReentryCondition`), and that is
+  // already handled by `updateHeat()` within the shared path. Per requirements
+  // §8 this means no `phases/descentPhase.ts` is warranted; the FLIGHT phase
+  // branch covers descent/re-entry integration.
+
   // --- 0–2. FLIGHT-phase prelude ------------------------------------------
   // TWR throttle conversion, atmosphere lookup, total-mass snapshot,
   // docking/RCS determination, and main-engine thrust. See

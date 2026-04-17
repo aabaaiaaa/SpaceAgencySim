@@ -445,7 +445,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/physics.test.ts src/tests/parachute*.test.ts` passes.
 
 ### TASK-069: Extract src/core/physics/phases/descentPhase.ts if distinct
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-068
 - **Description**: Per requirements §8. If `_integrate` has a distinct DESCENT/re-entry branch, extract it to `src/core/physics/phases/descentPhase.ts`. If DESCENT is folded into FLIGHT, document this and skip the extraction.
 - **Verification**: `npx vitest run src/tests/physics.test.ts` passes.
