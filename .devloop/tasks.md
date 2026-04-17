@@ -527,7 +527,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes. `npm run build` succeeds. `npm run test:smoke:unit` passes.
 
 ### TASK-082: Rewrite constants.ts as pure barrel
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-081
 - **Description**: Per requirements §9. Ensure `src/core/constants.ts` contains only `export * from './constants/flight';` etc. — no constant definitions. Should be ≤ 20 LOC.
 - **Verification**: `wc -l src/core/constants.ts` shows ≤ 20. `npm run typecheck` passes.
