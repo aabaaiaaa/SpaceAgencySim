@@ -591,7 +591,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes. Hub-related E2E specs pass — target: `npx playwright test e2e/hub*.spec.ts` (or whichever spec exercises hub).
 
 ### TASK-092: Create src/tests/ui-hubState.test.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-090
 - **Description**: Per requirements §10.3. Create `src/tests/ui-hubState.test.ts`.
 - **Verification**: `npx vitest run src/tests/ui-hubState.test.ts` passes.
