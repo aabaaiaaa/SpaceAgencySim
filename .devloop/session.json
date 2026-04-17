@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 46,
+  "lastIteration": 47,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-047",
-    "taskTitle": "Create src/core/saveEncoding.ts scaffolding",
-    "iterationNumber": 47,
-    "startedAt": "2026-04-17T00:43:55.272Z"
+    "taskId": "TASK-048",
+    "taskTitle": "Move envelope build/parse to saveEncoding.ts",
+    "iterationNumber": 48,
+    "startedAt": "2026-04-17T00:45:17.366Z"
   }
 }

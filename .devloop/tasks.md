@@ -315,7 +315,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/saveload.test.ts` passes.
 
 ### TASK-048: Move envelope build/parse to saveEncoding.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-047
 - **Description**: Per requirements §7.2. Move the binary envelope builder (header: magic(4) + version(2) + crc(4) + length(4) + payload) and its parser from `saveload.ts` to `saveEncoding.ts`. Update `saveload.ts` to import them.
 - **Verification**: `npx vitest run src/tests/saveload.test.ts` passes.
