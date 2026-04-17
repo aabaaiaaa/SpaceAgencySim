@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 43,
+  "lastIteration": 44,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-044",
-    "taskTitle": "Update staging.ts to import all moved debris helpers",
-    "iterationNumber": 44,
-    "startedAt": "2026-04-17T00:38:22.433Z"
+    "taskId": "TASK-045",
+    "taskTitle": "Create src/tests/debris.test.ts",
+    "iterationNumber": 45,
+    "startedAt": "2026-04-17T00:40:05.031Z"
   }
 }

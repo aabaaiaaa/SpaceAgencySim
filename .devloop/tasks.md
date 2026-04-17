@@ -297,7 +297,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/staging.test.ts` passes. `npm run typecheck` passes.
 
 ### TASK-045: Create src/tests/debris.test.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-042
 - **Description**: Per requirements §7.1. Create `src/tests/debris.test.ts` with focused tests for: `createDebrisFromParts` output (count, IDs, initial physics state), `resetDebrisIdCounter` effects, ID monotonicity within a flight. Tag one test `@smoke`.
 - **Verification**: `npx vitest run src/tests/debris.test.ts` passes.
