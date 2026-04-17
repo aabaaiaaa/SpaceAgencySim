@@ -515,7 +515,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/satellite*.test.ts` passes.
 
 ### TASK-080: Extract src/core/constants/economy.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-079
 - **Description**: Per requirements §9. Move finance + facilities + contracts + reputation + training + crew-cost constants to `src/core/constants/economy.ts`. Re-export from `constants.ts`. Imports `PartType` from `flight.ts` (which is extracted next).
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/finance.test.ts src/tests/contracts.test.ts` passes.
