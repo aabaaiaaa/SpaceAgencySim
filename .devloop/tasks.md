@@ -661,7 +661,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: Both commands exit 0.
 
 ### TASK-103: Run targeted E2E for migrated and new specs
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-102
 - **Description**: Per requirements §12. Run `npx playwright test e2e/keyboard-nav.spec.ts e2e/tipping.spec.ts e2e/flight-hud-surface.spec.ts` plus whichever spec covers hub-return auto-save (`e2e/auto-save-hub-return.spec.ts` or the extended `e2e/auto-save.spec.ts`) and the new `e2e/mission-finance-loop.spec.ts`.
 - **Verification**: All five/six specs pass.

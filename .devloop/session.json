@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 101,
+  "lastIteration": 102,
   "startedAt": "2026-04-17T13:14:25.320Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-102",
-    "taskTitle": "Run smoke test suite (unit + E2E)",
-    "iterationNumber": 102,
-    "startedAt": "2026-04-17T13:14:43.253Z"
+    "taskId": "TASK-103",
+    "taskTitle": "Run targeted E2E for migrated and new specs",
+    "iterationNumber": 103,
+    "startedAt": "2026-04-17T13:15:01.942Z"
   }
 }
