@@ -475,7 +475,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/physics-gravity.test.ts` passes.
 
 ### TASK-074: Add focused unit test for physics/docking.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-072
 - **Description**: Per requirements §8. Add `src/tests/physics-docking.test.ts`. Cover `_applyDockingMovement` translation in RCS mode and `computeDockingRadialOut` across bodies. Reuse existing docking test fixtures where possible.
 - **Verification**: `npx vitest run src/tests/physics-docking.test.ts` passes.
