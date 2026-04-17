@@ -403,7 +403,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/physics.test.ts src/tests/parachute*.test.ts` passes.
 
 ### TASK-062: Extract src/core/physics/debrisGround.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-061
 - **Description**: Per requirements §8. Move `tickDebrisGround()` (physics.ts starting ~line 2303, ~500 LOC) to `src/core/physics/debrisGround.ts`. Re-export from `physics.ts`. Biggest single extraction in the iteration — verify carefully.
 - **Verification**: `npx vitest run src/tests/physics.test.ts src/tests/collision.test.ts` passes.
