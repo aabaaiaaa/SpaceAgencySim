@@ -11,11 +11,13 @@
 import type { GameState } from '../core/gameState.ts';
 import { setActiveHub } from '../core/hubs.ts';
 import { showHubManagementPanel } from './hubManagement.ts';
+import { createListenerTracker, type ListenerTracker } from './listenerTracker.ts';
 
 let _selectEl: HTMLSelectElement | null = null;
 let _container: HTMLElement | null = null;
 let _gearBtn: HTMLButtonElement | null = null;
 let _stateRef: GameState | null = null;
+let _listeners: ListenerTracker | null = null;
 
 /**
  * Create and mount the hub switcher dropdown inside the given container.
@@ -35,6 +37,7 @@ export function initHubSwitcher(
   wrapper.style.cssText = 'position:absolute;top:52px;left:50%;transform:translateX(-50%);z-index:20;pointer-events:auto;';
 
   _stateRef = state;
+  _listeners = createListenerTracker();
 
   _selectEl = document.createElement('select');
   _selectEl.id = 'hub-switcher';
@@ -47,7 +50,7 @@ export function initHubSwitcher(
   _gearBtn.style.cssText =
     'margin-left:4px;background:none;border:1px solid #888;border-radius:4px;' +
     'color:#fff;font-size:16px;cursor:pointer;padding:2px 6px;vertical-align:middle;';
-  _gearBtn.addEventListener('click', () => {
+  _listeners.add(_gearBtn, 'click', () => {
     if (_stateRef) {
       showHubManagementPanel(_stateRef, _stateRef.activeHubId);
     }
@@ -60,7 +63,7 @@ export function initHubSwitcher(
 
   renderHubSwitcher(state);
 
-  _selectEl.addEventListener('change', () => {
+  _listeners.add(_selectEl, 'change', () => {
     if (!_selectEl) return;
     setActiveHub(state, _selectEl.value);
     renderHubSwitcher(state);
@@ -104,6 +107,10 @@ export function renderHubSwitcher(state: GameState): void {
  * Tear down the hub switcher, removing it from the DOM and clearing refs.
  */
 export function destroyHubSwitcher(): void {
+  if (_listeners) {
+    _listeners.removeAll();
+    _listeners = null;
+  }
   if (_container) {
     _container.remove();
     _container = null;

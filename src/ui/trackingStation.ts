@@ -24,6 +24,7 @@ import {
 import { getFacilityTier } from '../core/construction.ts';
 import { getWeatherForecast } from '../core/weather.ts';
 import { getTransferTargets } from '../core/manoeuvre.ts';
+import { createListenerTracker, type ListenerTracker } from './listenerTracker.ts';
 import './trackingStation.css';
 
 // ---------------------------------------------------------------------------
@@ -33,6 +34,7 @@ import './trackingStation.css';
 let _overlay: HTMLDivElement | null = null;
 let _state: GameState | null = null;
 let _onBack: (() => void) | null = null;
+let _listeners: ListenerTracker | null = null;
 
 // ---------------------------------------------------------------------------
 // Object type display helpers
@@ -59,6 +61,7 @@ export function initTrackingStationUI(
 ): void {
   _state = state;
   _onBack = onBack;
+  _listeners = createListenerTracker();
 
   _overlay = document.createElement('div');
   _overlay.id = 'ts-overlay';
@@ -71,6 +74,10 @@ export function initTrackingStationUI(
  * Remove the Tracking Station overlay.
  */
 export function destroyTrackingStationUI(): void {
+  if (_listeners) {
+    _listeners.removeAll();
+    _listeners = null;
+  }
   if (_overlay) {
     _overlay.remove();
     _overlay = null;
@@ -98,7 +105,7 @@ function _render(): void {
   const backBtn = document.createElement('button');
   backBtn.id = 'ts-back-btn';
   backBtn.textContent = '← Hub';
-  backBtn.addEventListener('click', () => {
+  _listeners?.add(backBtn, 'click', () => {
     const onBack = _onBack; // capture before destroy nulls it
     destroyTrackingStationUI();
     if (onBack) onBack();

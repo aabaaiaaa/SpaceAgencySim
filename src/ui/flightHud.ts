@@ -47,6 +47,7 @@ import { getAvailableSurfaceActions } from '../core/surfaceOps.ts';
 import './flightHud.css';
 import { markThrottleDirty } from './flightController/_loop.ts';
 import { setThrottleInstant } from '../core/throttleControl.ts';
+import { createListenerTracker, type ListenerTracker } from './listenerTracker.ts';
 import type { PhysicsState } from '../core/physics.ts';
 import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.ts';
 import type { FlightState, GameState } from '../core/gameState.ts';
@@ -78,6 +79,9 @@ let _state: GameState | null = null;
 
 /** Keyboard handler for X/Z throttle cut/full. */
 let _keyHandler: ((e: KeyboardEvent) => void) | null = null;
+
+/** Tracker for HUD button listeners. */
+let _listeners: ListenerTracker | null = null;
 
 /** Callback invoked with the chosen warp level when a warp button is clicked. */
 let _onTimeWarpChange: ((level: number) => void) | null = null;
@@ -174,6 +178,7 @@ export function initFlightHud(
   _launchTipHidden  = false;
   _consecutiveErrors = 0;
   _errorBanner       = null;
+  _listeners         = createListenerTracker();
 
   // Root container.
   _hud = document.createElement('div');
@@ -222,6 +227,11 @@ export function destroyFlightHud(): void {
   if (_keyHandler) {
     window.removeEventListener('keydown', _keyHandler);
     _keyHandler = null;
+  }
+
+  if (_listeners) {
+    _listeners.removeAll();
+    _listeners = null;
   }
 
   if (_hud) {
@@ -422,7 +432,7 @@ function _buildLeftPanel(): void {
   _elModeToggle.className = 'flight-lp-mode-toggle active';
   _elModeToggle.textContent = 'TWR';
   _elModeToggle.title = 'Toggle throttle mode: TWR (auto-adjust) / ABS (manual)';
-  _elModeToggle.addEventListener('click', () => {
+  _listeners?.add(_elModeToggle, 'click', () => {
     if (!_ps) return;
     if (_ps.throttleMode === 'twr') {
       _ps.throttleMode = 'absolute';
@@ -520,7 +530,7 @@ function _buildLeftPanel(): void {
   setTWR1Btn.className = 'flight-lp-btn';
   setTWR1Btn.textContent = 'TWR=1';
   setTWR1Btn.title = 'Set throttle so thrust-to-weight ratio equals 1';
-  setTWR1Btn.addEventListener('click', () => {
+  _listeners?.add(setTWR1Btn, 'click', () => {
     if (!_ps) return;
     if (_ps.throttleMode === 'twr') {
       _ps.targetTWR = 1.0;
@@ -535,7 +545,7 @@ function _buildLeftPanel(): void {
   minusBtn.className = 'flight-lp-btn';
   minusBtn.textContent = '\u22120.1';
   minusBtn.title = 'Decrease throttle/TWR by 0.1';
-  minusBtn.addEventListener('click', () => {
+  _listeners?.add(minusBtn, 'click', () => {
     if (!_ps) return;
     if (_ps.throttleMode === 'twr') {
       _ps.targetTWR = _ps.targetTWR === Infinity
@@ -552,7 +562,7 @@ function _buildLeftPanel(): void {
   plusBtn.className = 'flight-lp-btn';
   plusBtn.textContent = '+0.1';
   plusBtn.title = 'Increase throttle/TWR by 0.1';
-  plusBtn.addEventListener('click', () => {
+  _listeners?.add(plusBtn, 'click', () => {
     if (!_ps) return;
     if (_ps.throttleMode === 'twr') {
       if (_ps.targetTWR !== Infinity) {
@@ -661,7 +671,7 @@ function _buildTimeWarpPanel(): void {
     btn.textContent     = btnLabel;
     btn.dataset.warp    = String(level);
     btn.setAttribute('aria-label', level === 0 ? 'Pause' : `Time warp ${btnLabel}`);
-    btn.addEventListener('click', () => {
+    _listeners?.add(btn, 'click', () => {
       if (_warpLocked) return;
       if (_onTimeWarpChange) _onTimeWarpChange(level);
     });
@@ -906,7 +916,7 @@ function _updateSurfacePanel(): void {
     }
 
     if (action.enabled) {
-      btn.addEventListener('click', () => {
+      _listeners?.add(btn, 'click', () => {
         if (_onSurfaceAction) _onSurfaceAction(action.id);
       });
     }
@@ -965,7 +975,7 @@ function _showErrorBanner(): void {
   const continueBtn = document.createElement('button');
   continueBtn.textContent = 'Try to Continue';
   continueBtn.className = 'error-banner-btn-continue';
-  continueBtn.addEventListener('click', () => {
+  _listeners?.add(continueBtn, 'click', () => {
     _consecutiveErrors = 0;
     if (_errorBanner) { _errorBanner.remove(); _errorBanner = null; }
   });
@@ -974,7 +984,7 @@ function _showErrorBanner(): void {
   abortBtn.textContent = 'Abort to Hub';
   abortBtn.dataset.testid = 'hud-error-abort-btn';
   abortBtn.className = 'error-banner-btn-abort';
-  abortBtn.addEventListener('click', () => {
+  _listeners?.add(abortBtn, 'click', () => {
     if (_errorBanner) { _errorBanner.remove(); _errorBanner = null; }
     if (_onAbort) _onAbort();
   });

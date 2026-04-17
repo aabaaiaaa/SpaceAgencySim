@@ -19,6 +19,7 @@ import {
   buildEconomySection,
 } from './_sections.ts';
 import { showReactivateConfirmation, showAbandonConfirmation } from './_dialogs.ts';
+import { createListenerTracker, type ListenerTracker } from '../listenerTracker.ts';
 import '../hubManagement.css';
 
 // ---------------------------------------------------------------------------
@@ -28,6 +29,7 @@ import '../hubManagement.css';
 let _backdrop: HTMLDivElement | null = null;
 let _state: GameState | null = null;
 let _hubId: string | null = null;
+let _listeners: ListenerTracker | null = null;
 
 // ---------------------------------------------------------------------------
 // State accessors (for sub-modules)
@@ -36,6 +38,7 @@ let _hubId: string | null = null;
 export function getPanelState(): GameState | null { return _state; }
 export function getHubId(): string | null { return _hubId; }
 export function getBackdrop(): HTMLDivElement | null { return _backdrop; }
+export function getPanelListeners(): ListenerTracker | null { return _listeners; }
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -50,6 +53,7 @@ export function showHubManagementPanel(state: GameState, hubId: string): void {
 
   _state = state;
   _hubId = hubId;
+  _listeners = createListenerTracker();
 
   const info = getHubManagementInfo(state, hubId);
 
@@ -57,7 +61,7 @@ export function showHubManagementPanel(state: GameState, hubId: string): void {
   const backdrop = document.createElement('div');
   backdrop.id = 'hub-mgmt-backdrop';
   backdrop.className = 'hub-mgmt-backdrop';
-  backdrop.addEventListener('click', () => hideHubManagementPanel());
+  _listeners.add(backdrop, 'click', () => hideHubManagementPanel());
 
   // Panel
   const panel = document.createElement('div');
@@ -65,7 +69,7 @@ export function showHubManagementPanel(state: GameState, hubId: string): void {
   panel.setAttribute('role', 'dialog');
   panel.setAttribute('aria-modal', 'true');
   panel.setAttribute('aria-label', 'Hub Management');
-  panel.addEventListener('click', (e: MouseEvent) => e.stopPropagation());
+  _listeners.add(panel, 'click', (e: Event) => (e as MouseEvent).stopPropagation());
 
   panel.appendChild(buildHeader(info));
   panel.appendChild(buildNameError());
@@ -80,7 +84,7 @@ export function showHubManagementPanel(state: GameState, hubId: string): void {
   _backdrop = backdrop;
 
   // Keyboard: Escape closes
-  backdrop.addEventListener('keydown', _onKeydown);
+  _listeners.add(backdrop, 'keydown', _onKeydown as EventListener);
   // Focus the name input
   const nameInput = panel.querySelector<HTMLInputElement>('.hub-mgmt-name-input');
   if (nameInput) nameInput.focus();
@@ -90,8 +94,11 @@ export function showHubManagementPanel(state: GameState, hubId: string): void {
  * Hides the hub management panel and cleans up references.
  */
 export function hideHubManagementPanel(): void {
+  if (_listeners) {
+    _listeners.removeAll();
+    _listeners = null;
+  }
   if (_backdrop) {
-    _backdrop.removeEventListener('keydown', _onKeydown);
     _backdrop.remove();
     _backdrop = null;
   }
@@ -122,7 +129,7 @@ function _buildActions(info: HubManagementInfo): HTMLDivElement {
     btn.className = 'btn-primary';
     btn.textContent = 'Reactivate';
     btn.title = 'Pay one period of maintenance to bring this hub back online';
-    btn.addEventListener('click', () => {
+    _listeners?.add(btn, 'click', () => {
       showReactivateConfirmation(info);
     });
     row.appendChild(btn);
@@ -133,7 +140,7 @@ function _buildActions(info: HubManagementInfo): HTMLDivElement {
     btn.className = 'btn-danger';
     btn.textContent = 'Abandon';
     btn.title = 'Permanently abandon this hub';
-    btn.addEventListener('click', () => {
+    _listeners?.add(btn, 'click', () => {
       showAbandonConfirmation();
     });
     row.appendChild(btn);

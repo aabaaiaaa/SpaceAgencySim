@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 37
-- **Remaining**: 67
-- **Last Updated**: 2026-04-16T23:58:25.673Z
+- **Completed**: 38
+- **Remaining**: 66
+- **Last Updated**: 2026-04-17T00:05:42.605Z
 
 ## Iteration Log
 
@@ -340,4 +340,13 @@
 - **Exit Status**: success
 - **Tokens**: 297,246 total (10 in, 7,509 out, 56,772 cache-create, 232,955 cache-read)
 - **Cost**: $0.6591
+
+### Iteration 38 - 2026-04-17T00:05:42.599Z
+- **Task Attempted**: TASK-038
+- **Task Completed**: TASK-038
+- **Summary**: Completed Migrate remaining UI listener sites — batch 1
+- **Duration**: 7m 15s
+- **Exit Status**: success
+- **Tokens**: 6,672,989 total (69 in, 27,445 out, 130,639 cache-create, 6,514,836 cache-read)
+- **Cost**: $4.7604
 

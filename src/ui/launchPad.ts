@@ -257,7 +257,7 @@ function _renderShell(): void {
   const backBtn = document.createElement('button');
   backBtn.id = 'launch-pad-back-btn';
   backBtn.textContent = '\u2190 Hub';
-  backBtn.addEventListener('click', () => {
+  _listeners?.add(backBtn, 'click', () => {
     const onBack = _onBack; // capture before destroy nulls it
     destroyLaunchPadUI();
     if (onBack) onBack();
@@ -383,7 +383,7 @@ function _renderWeatherBar(): void {
     skipBtn.title = 'Insufficient funds';
   }
 
-  skipBtn.addEventListener('click', () => {
+  _listeners?.add(skipBtn, 'click', () => {
     if (!_state) return;
     const result = skipWeather(_state, 'EARTH');
     if (result.success) {
@@ -448,7 +448,7 @@ function _buildRocketCard(design: RocketDesign): HTMLElement {
       ? `Rocket too heavy for Tier ${padTier} pad (max ${isFinite(maxMass) ? _fmt(maxMass) + ' kg' : 'unlimited'})`
       : 'Insufficient funds';
   }
-  launchBtn.addEventListener('click', () => _handleLaunch(design));
+  _listeners?.add(launchBtn, 'click', () => _handleLaunch(design));
   card.appendChild(launchBtn);
 
   return card;

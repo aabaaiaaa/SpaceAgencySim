@@ -7,7 +7,13 @@
 import type { HubManagementInfo } from '../../core/hubTypes.ts';
 import { renameHub } from '../../core/hubs.ts';
 import { renderHubSwitcher } from '../hubSwitcher.ts';
-import { getPanelState, getHubId, getBackdrop, hideHubManagementPanel } from './_panel.ts';
+import {
+  getPanelState,
+  getHubId,
+  getBackdrop,
+  hideHubManagementPanel,
+  getPanelListeners,
+} from './_panel.ts';
 
 // ---------------------------------------------------------------------------
 // Header — editable name + close button
@@ -50,18 +56,20 @@ export function buildHeader(info: HubManagementInfo): HTMLDivElement {
       }
     };
 
-    nameInput.addEventListener('blur', commitRename);
-    nameInput.addEventListener('keydown', (e: KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
+    const listeners = getPanelListeners();
+    listeners?.add(nameInput, 'blur', commitRename);
+    listeners?.add(nameInput, 'keydown', (e: Event) => {
+      const ke = e as KeyboardEvent;
+      if (ke.key === 'Enter') {
+        ke.preventDefault();
         nameInput.blur();
-      } else if (e.key === 'Escape') {
+      } else if (ke.key === 'Escape') {
         nameInput.value = originalName;
         const backdrop = getBackdrop();
         const errorEl = backdrop?.querySelector<HTMLDivElement>('.hub-mgmt-name-error');
         if (errorEl) errorEl.textContent = '';
         nameInput.blur();
-        e.stopPropagation(); // Prevent panel close on Escape while editing
+        ke.stopPropagation(); // Prevent panel close on Escape while editing
       }
     });
   }
@@ -71,7 +79,7 @@ export function buildHeader(info: HubManagementInfo): HTMLDivElement {
   closeBtn.textContent = '\u2715';
   closeBtn.title = 'Close';
   closeBtn.setAttribute('aria-label', 'Close hub management panel');
-  closeBtn.addEventListener('click', () => hideHubManagementPanel());
+  getPanelListeners()?.add(closeBtn, 'click', () => hideHubManagementPanel());
 
   header.appendChild(nameInput);
   header.appendChild(closeBtn);

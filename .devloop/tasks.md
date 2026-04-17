@@ -251,7 +251,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: The task's final message contains a bulleted list of remaining sites with file:line and a brief note about each.
 
 ### TASK-038: Migrate remaining UI listener sites — batch 1
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-037
 - **Description**: Per requirements §6.4. From the list produced by TASK-037, migrate the first half of the remaining sites to `ListenerTracker`. Skip any that are legitimately self-removing (one-shot handlers that call `removeEventListener` from inside themselves) — document these in the task message.
 - **Verification**: `npm run typecheck` passes. Each migrated site's module's tests still pass.
