@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 65,
+  "lastIteration": 66,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-066",
-    "taskTitle": "Extract src/core/physics/phases/capturePhase.ts",
-    "iterationNumber": 66,
-    "startedAt": "2026-04-17T01:40:40.174Z"
+    "taskId": "TASK-067",
+    "taskTitle": "Extract src/core/physics/phases/flightPhase.ts — part 1 (atmosphere + thrust)",
+    "iterationNumber": 67,
+    "startedAt": "2026-04-17T01:42:53.041Z"
   }
 }

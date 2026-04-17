@@ -433,7 +433,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/physics.test.ts` passes.
 
 ### TASK-067: Extract src/core/physics/phases/flightPhase.ts — part 1 (atmosphere + thrust)
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-066
 - **Description**: Per requirements §8. Move the FLIGHT-phase branch's atmosphere/thrust/fuel section to `src/core/physics/phases/flightPhase.ts` (first half). Preserve thrust → fuel → mass ordering.
 - **Verification**: `npx vitest run src/tests/physics.test.ts src/tests/atmosphere.test.ts src/tests/fuelsystem.test.ts` passes.

@@ -44,7 +44,7 @@
  */
 
 import { getPartById } from '../data/parts.ts';
-import { PartType, ControlMode, FlightPhase, BODY_RADIUS } from './constants.ts';
+import { PartType, FlightPhase, BODY_RADIUS } from './constants.ts';
 import {
   airDensity,
   airDensityForBody,
@@ -87,14 +87,10 @@ import { getOrbitalStateAtTime } from './orbit.ts';
 import { logger } from './logger.ts';
 import { computePartCdA } from './dragCoefficient.ts';
 import { G0, gravityForBody as _gravityForBody } from './physics/gravity.ts';
-import {
-  computeThrust as _computeThrust,
-  updateThrottleFromTWR as _updateThrottleFromTWR,
-  type ThrustResult,
-} from './physics/thrust.ts';
 import { tickOrbitPhase } from './physics/phases/orbitPhase.ts';
 import { tickTransferPhase } from './physics/phases/transferPhase.ts';
 import { tickCapturePhase } from './physics/phases/capturePhase.ts';
+import { tickFlightPhasePrelude } from './physics/phases/flightPhase.ts';
 import type { AltitudeBand, ControlMode as ControlModeType } from './constants.ts';
 import type { FlightState, FlightEvent, OrbitalElements, PowerState, GameState, InventoryPart } from './gameState.ts';
 
@@ -741,28 +737,12 @@ function _integrate(ps: PhysicsState, assembly: RocketAssembly, flightState: Fli
   // The craft is approaching a body and must burn to slow down.
   if (tickCapturePhase(ps, FIXED_DT, { flightState, assembly, bodyId })) return;
 
-  // --- 0. TWR-relative throttle conversion --------------------------------
-  _updateThrottleFromTWR(ps, assembly, bodyId);
-
-  const altitude: number = Math.max(0, ps.posY);
-  const density: number  = _densityForBody(altitude, bodyId);
-
-  // --- 1. Total rocket mass (dry + remaining fuel) -------------------------
-  const totalMass: number = _computeTotalMass(ps, assembly);
-
-  // --- Docking / RCS mode: thrust affects local position, not orbit --------
-  const isDockingOrRcs = ps.controlMode === ControlMode.DOCKING || ps.controlMode === ControlMode.RCS;
-
-  // --- 2. Thrust vector ----------------------------------------------------
-  // In docking/RCS modes, main engine thrust is suppressed — movement comes
-  // from docking thrusters only (handled in _applyDockingMovement).
-  let thrustX = 0;
-  let thrustY = 0;
-  if (!isDockingOrRcs) {
-    const thrustResult: ThrustResult = _computeThrust(ps, assembly, density);
-    thrustX = thrustResult.thrustX;
-    thrustY = thrustResult.thrustY;
-  }
+  // --- 0–2. FLIGHT-phase prelude ------------------------------------------
+  // TWR throttle conversion, atmosphere lookup, total-mass snapshot,
+  // docking/RCS determination, and main-engine thrust. See
+  // `./physics/phases/flightPhase.ts`.
+  const { altitude, density, totalMass, isDockingOrRcs, thrustX, thrustY } =
+    tickFlightPhasePrelude(ps, { flightState, assembly, bodyId });
 
   // --- 3. Gravity force (body-specific, inverse-square) --------------------
   const gravAccel: number = _gravityForBody(bodyId, altitude);
