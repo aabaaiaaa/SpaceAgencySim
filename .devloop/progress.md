@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 83
-- **Remaining**: 21
-- **Last Updated**: 2026-04-17T02:53:38.151Z
+- **Completed**: 84
+- **Remaining**: 20
+- **Last Updated**: 2026-04-17T02:56:00.459Z
 
 ## Iteration Log
 
@@ -754,4 +754,13 @@
 - **Exit Status**: success
 - **Tokens**: 608,562 total (16 in, 2,423 out, 42,220 cache-create, 563,903 cache-read)
 - **Cost**: $0.6065
+
+### Iteration 84 - 2026-04-17T02:56:00.455Z
+- **Task Attempted**: TASK-084
+- **Task Completed**: TASK-084
+- **Summary**: Completed Extract flightHud reducer to src/ui/flightHud/_state.ts
+- **Duration**: 2m 20s
+- **Exit Status**: success
+- **Tokens**: 1,082,145 total (21 in, 5,952 out, 62,826 cache-create, 1,013,346 cache-read)
+- **Cost**: $1.0482
 

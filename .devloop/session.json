@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 82,
+  "lastIteration": 83,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-083",
-    "taskTitle": "Update generator + test-map.json for constants sub-modules",
-    "iterationNumber": 83,
-    "startedAt": "2026-04-17T02:52:05.309Z"
+    "taskId": "TASK-084",
+    "taskTitle": "Extract flightHud reducer to src/ui/flightHud/_state.ts",
+    "iterationNumber": 84,
+    "startedAt": "2026-04-17T02:53:40.395Z"
   }
 }

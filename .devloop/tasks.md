@@ -543,7 +543,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 ## Section 10 — UI Reducer Extraction
 
 ### TASK-084: Extract flightHud reducer to src/ui/flightHud/_state.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §10.1. Create the directory `src/ui/flightHud/` and inside it `_state.ts`. Define `FlightHudState` interface, `getFlightHudState()`, `setFlightHudState(patch)`, `resetFlightHudState()` — follow `src/ui/vab/_state.ts` pattern exactly. Extract: throttle display formatter, altitude/velocity formatter, apoapsis estimator, fuel tank list builder.
 - **Verification**: `npm run typecheck` passes. The new file exists and exports the state API.
