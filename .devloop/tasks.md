@@ -367,7 +367,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/physics.test.ts src/tests/throttleControl.test.ts` passes.
 
 ### TASK-056: Extract src/core/physics/capturedBody.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-055
 - **Description**: Per requirements §8. Move `setCapturedBody`, `clearCapturedBody`, `setThrustAligned` (physics.ts lines ~2803–2824) to `src/core/physics/capturedBody.ts`. Re-export from `physics.ts`.
 - **Verification**: `npx vitest run src/tests/physics.test.ts` passes.

@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 54,
+  "lastIteration": 55,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-055",
-    "taskTitle": "Extract src/core/physics/keyboard.ts",
-    "iterationNumber": 55,
-    "startedAt": "2026-04-17T00:59:44.787Z"
+    "taskId": "TASK-056",
+    "taskTitle": "Extract src/core/physics/capturedBody.ts",
+    "iterationNumber": 56,
+    "startedAt": "2026-04-17T01:02:51.505Z"
   }
 }
