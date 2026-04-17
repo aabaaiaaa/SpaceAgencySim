@@ -42,8 +42,11 @@ test.describe('Flight HUD — Surface Ops layout', () => {
     );
 
     // Force a landed state — the physics & layout we exercise is independent
-    // of how the craft arrived on the surface.
-    await teleportCraft(page, { posX: 0, posY: 0, velX: 0, velY: 0, grounded: true, landed: true });
+    // of how the craft arrived on the surface.  NB: `grounded` must stay false
+    // to avoid the auto-trigger for the post-flight summary
+    // (_loop.ts: ps.landed && ps.grounded && !ps.crashed), which would hide
+    // the flight HUD before we can measure the surface panel.
+    await teleportCraft(page, { posX: 0, posY: 0, velX: 0, velY: 0, grounded: false, landed: true });
 
     // Wait for the Surface Ops panel to become visible (it only renders when landed).
     await expect(page.locator('#flight-hud-surface')).toBeVisible({ timeout: 5_000 });

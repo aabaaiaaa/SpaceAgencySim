@@ -87,9 +87,10 @@ describe('computeDockingRadialOut()', () => {
   });
 
   it('produces a different result on MARS vs EARTH (body radius threads through)', () => {
-    // For a craft close to the surface (posX small, posY ~ 0), the body radius
-    // dominates radCheck — picking different bodies must change the outcome.
-    const posX = -5_000_000; // negative posX forces Earth path to flip differently from Mars
+    // radCheck = 0.707*(posX - posY - bodyRadius).  Choose a posX that lies
+    // between MARS_RADIUS (~3.39 M m) and EARTH_RADIUS (~6.37 M m) so the
+    // sign of radCheck flips between bodies, forcing different outcomes.
+    const posX = 5_000_000;
     const earth = computeDockingRadialOut(posX, 0, 1000, 1000, 0, BODY_RADIUS.EARTH);
     const mars  = computeDockingRadialOut(posX, 0, 1000, 1000, 0, BODY_RADIUS.MARS);
     // Same inputs, different body radii — at least one component sign should flip.

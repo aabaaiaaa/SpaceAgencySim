@@ -23,7 +23,7 @@ const UNLOCKED_PARTS: string[] = ['probe-core-mk1', 'tank-small', 'engine-spark'
 
 test.describe('Auto-Save System', () => {
 
-  test('auto-save toast appears after post-flight summary', async ({ page }) => {
+  test('auto-save toast appears after returning from flight', async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const envelope = buildSaveEnvelope({
@@ -36,7 +36,10 @@ test.describe('Auto-Save System', () => {
     await startTestFlight(page, UNLOCKED_PARTS);
     await teleportCraft(page, { posX: 0, posY: 5, velX: 0, velY: 0, grounded: true, landed: true, crashed: true });
 
+    // Post-flight summary appears on crash; auto-save fires on hub return (Iter-19 §1.2).
     await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
+    await page.click('#post-flight-return-btn', { timeout: 2_000 });
+    await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('#auto-save-toast')).toBeVisible({ timeout: 5_000 });
 
     await page.waitForFunction(
@@ -69,6 +72,8 @@ test.describe('Auto-Save System', () => {
     await teleportCraft(page, { posX: 0, posY: 5, velX: 0, velY: 0, grounded: true, landed: true, crashed: true });
 
     await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
+    await page.click('#post-flight-return-btn', { timeout: 2_000 });
+    await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('#auto-save-toast')).toBeVisible({ timeout: 5_000 });
     await page.click('#auto-save-cancel-btn');
 
@@ -104,12 +109,14 @@ test.describe('Auto-Save System', () => {
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
     await dismissWelcomeModal(page);
 
-    // Trigger a flight and crash to invoke auto-save.
+    // Trigger a flight and crash to invoke auto-save on hub return (Iter-19 §1.2).
     await startTestFlight(page, UNLOCKED_PARTS);
     await teleportCraft(page, { posX: 0, posY: 5, velX: 0, velY: 0, grounded: true, landed: true, crashed: true });
 
-    // Wait for auto-save to complete.
+    // Wait for the post-flight summary, return to hub, then auto-save fires there.
     await expect(page.locator('#post-flight-summary')).toBeVisible({ timeout: 10_000 });
+    await page.click('#post-flight-return-btn', { timeout: 2_000 });
+    await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('#auto-save-toast')).toBeVisible({ timeout: 5_000 });
     await page.waitForFunction(
       (): boolean => {

@@ -189,6 +189,18 @@ let _onGameReady: ((state: GameState) => void) | null = null;
 /** Tracks all event listeners registered by the main menu so they can be bulk-removed on destroy. */
 let _listeners: ListenerTracker | null = null;
 
+/**
+ * Return the shared module listener tracker, creating it lazily if needed.
+ * Ensures modal helpers (_showConfirmModal) can register listeners even
+ * when invoked before initMainMenu (e.g., in unit tests).
+ */
+function _getListeners(): ListenerTracker {
+  if (!_listeners) {
+    _listeners = createListenerTracker();
+  }
+  return _listeners;
+}
+
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -785,14 +797,14 @@ export function _showConfirmModal(title: string, body: string, confirmText: stri
   const onEscape = (e: KeyboardEvent): void => {
     if (e.key === 'Escape') remove();
   };
-  _listeners?.add(document, 'keydown', onEscape as EventListener);
+  _getListeners().add(document, 'keydown', onEscape as EventListener);
 
-  _listeners?.add(backdrop.querySelector('#mm-modal-confirm')!, 'click', () => {
+  _getListeners().add(backdrop.querySelector('#mm-modal-confirm')!, 'click', () => {
     remove();
     void onConfirm();
   });
-  _listeners?.add(backdrop.querySelector('#mm-modal-cancel')!, 'click', remove);
-  _listeners?.add(backdrop, 'click', ((e: MouseEvent) => {
+  _getListeners().add(backdrop.querySelector('#mm-modal-cancel')!, 'click', remove);
+  _getListeners().add(backdrop, 'click', ((e: MouseEvent) => {
     if (e.target === backdrop) remove();
   }) as EventListener);
 

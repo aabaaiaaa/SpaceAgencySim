@@ -25,7 +25,11 @@ import type { SaveSlotSummary } from '../../core/saveload.ts';
  * leading hyphen; fractional values are rounded to the nearest integer.
  */
 export function formatSaveMoney(amount: number): string {
-  return '$' + Math.round(amount).toLocaleString('en-US');
+  const rounded: number = Math.round(amount);
+  if (rounded < 0) {
+    return '-$' + Math.abs(rounded).toLocaleString('en-US');
+  }
+  return '$' + rounded.toLocaleString('en-US');
 }
 
 /**
