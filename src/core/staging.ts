@@ -68,20 +68,13 @@ const DEFAULT_SAFE_LANDING_SPEED = 10;
 const SEPARATION_COOLDOWN_TICKS = 10;
 
 // ---------------------------------------------------------------------------
-// Internal ID counter for debris fragments
+// Debris ID counter
 // ---------------------------------------------------------------------------
+// The counter and its reset function now live in `./debris.ts`. Re-exported
+// here so existing consumers of `staging.ts` continue to work unchanged.
 
-let _debrisNextId = 1;
-
-/**
- * Reset the module-level debris ID counter back to 1.
- *
- * Call on flight start/abort so debris IDs don't grow unbounded across
- * a long session. Usually invoked via the consolidated {@link resetFlightState}.
- */
-export function resetDebrisIdCounter(): void {
-  _debrisNextId = 1;
-}
+import { nextDebrisId, resetDebrisIdCounter } from './debris.ts';
+export { resetDebrisIdCounter };
 
 /**
  * Reset all module-level flight-lifecycle state.
@@ -877,7 +870,7 @@ function _createDebrisFromParts(
   }
 
   return {
-    id:             `debris-${_debrisNextId++}`,
+    id:             nextDebrisId(),
     activeParts,
     firingEngines,
     fuelStore,

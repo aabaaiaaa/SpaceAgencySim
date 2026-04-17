@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 39,
+  "lastIteration": 40,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-040",
-    "taskTitle": "Add unit test for listener cleanup across migrated modules",
-    "iterationNumber": 40,
-    "startedAt": "2026-04-17T00:24:24.931Z"
+    "taskId": "TASK-041",
+    "taskTitle": "Create src/core/debris.ts scaffolding",
+    "iterationNumber": 41,
+    "startedAt": "2026-04-17T00:31:41.479Z"
   }
 }

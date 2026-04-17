@@ -273,7 +273,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 ## Section 7 — Core Refactors
 
 ### TASK-041: Create src/core/debris.ts scaffolding
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §7.1. Create `src/core/debris.ts` with the module structure: export `_debrisNextId` counter state (move from `staging.ts`), export `resetDebrisIdCounter()` function (move from wherever it currently lives). Leave the existing `staging.ts` functions in place; this task only stands up the new module.
 - **Verification**: `npm run typecheck` passes. `src/core/debris.ts` exists with the moved exports.
