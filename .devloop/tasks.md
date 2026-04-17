@@ -491,7 +491,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 ## Section 9 — constants.ts Topical Split
 
 ### TASK-076: Create src/core/constants/ directory
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §9. Create the directory `src/core/constants/`. Do not move anything yet. Touch an empty file if needed so git picks up the directory.
 - **Verification**: `src/core/constants/` exists.
