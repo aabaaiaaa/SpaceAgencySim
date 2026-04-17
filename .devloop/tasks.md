@@ -667,7 +667,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: All five/six specs pass.
 
 ### TASK-104: Run affected-test suite against master
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-103
 - **Description**: Per requirements §12. Run `node scripts/run-affected.mjs --base master`. This confirms the affected-test tooling recognizes our changes and surfaces the right tests. Should exit 0.
 - **Verification**: Exit 0. Task message summarizes the areas that were detected as affected.
