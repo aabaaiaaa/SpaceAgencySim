@@ -309,7 +309,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `grep -A 3 '"src/core/debris.ts"' test-map.json` shows the test.
 
 ### TASK-047: Create src/core/saveEncoding.ts scaffolding
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: none
 - **Description**: Per requirements §7.2. Create `src/core/saveEncoding.ts`. Move the CRC32 lookup table and `crc32()` function from `saveload.ts`. Leave `saveload.ts` importing them via `export { crc32 } from './saveEncoding.ts'` if any external consumer depends on the export.
 - **Verification**: `npm run typecheck` passes. `npx vitest run src/tests/saveload.test.ts` passes.
