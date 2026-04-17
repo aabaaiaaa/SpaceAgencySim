@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 75,
+  "lastIteration": 76,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-076",
-    "taskTitle": "Create src/core/constants/ directory",
-    "iterationNumber": 76,
-    "startedAt": "2026-04-17T02:25:29.023Z"
+    "taskId": "TASK-077",
+    "taskTitle": "Extract src/core/constants/bodies.ts",
+    "iterationNumber": 77,
+    "startedAt": "2026-04-17T02:26:01.906Z"
   }
 }

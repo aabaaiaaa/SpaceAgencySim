@@ -497,7 +497,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `src/core/constants/` exists.
 
 ### TASK-077: Extract src/core/constants/bodies.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-076
 - **Description**: Per requirements §9, recommended order step 1 (self-contained). Move the celestial-body + altitude-band + biome + surface-op + life-support constants (approx. lines 773–1074 and 1738–1959 of `constants.ts`) to `src/core/constants/bodies.ts`. Update `constants.ts` to re-export from the new file so all 123 consumers stay working.
 - **Verification**: `npm run typecheck` passes. `npm run lint` passes. `npm run build` succeeds.
