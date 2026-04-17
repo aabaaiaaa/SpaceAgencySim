@@ -385,7 +385,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/physics.test.ts` passes.
 
 ### TASK-059: Extract src/core/physics/rcs.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-058
 - **Description**: Per requirements §8. Move RCS-specific helpers (RCS damping used in steering, RCS thrust application as called from docking mode) to `src/core/physics/rcs.ts`. Note the coupling with control-mode state flagged in requirements.
 - **Verification**: `npx vitest run src/tests/physics.test.ts src/tests/controlMode.test.ts` passes.

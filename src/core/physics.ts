@@ -92,6 +92,12 @@ import {
   updateThrottleFromTWR as _updateThrottleFromTWR,
   type ThrustResult,
 } from './physics/thrust.ts';
+import {
+  RCS_TORQUE_MULTIPLIER,
+  hasRcs as _hasRcs,
+  applyRcsAngularDamping,
+  applyRcsTranslation,
+} from './physics/rcs.ts';
 
 import type { AltitudeBand, ControlMode as ControlModeType } from './constants.ts';
 import type { FlightState, FlightEvent, OrbitalElements, PowerState, GameState, InventoryPart } from './gameState.ts';
@@ -510,12 +516,8 @@ const ANGULAR_VEL_SNAP_THRESHOLD: number = 0.05;
 // -- Airborne torque-based rotation constants --------------------------------
 /** N·m of torque applied by player A/D input while airborne. */
 const PLAYER_FLIGHT_TORQUE: number = 2000;
-/** Torque multiplier when in vacuum with RCS-capable command module. */
-const RCS_TORQUE_MULTIPLIER: number = 2.5;
 /** Angular damping coefficient in atmosphere (proportional to density). */
 const AERO_ANGULAR_DAMPING: number = 0.02;
-/** Active RCS braking torque (N·m per rad/s) when keys released. */
-const RCS_ANGULAR_DAMPING: number = 3.0;
 /** Tuning knob for parachute stabilization torque strength. */
 const CHUTE_TORQUE_SCALE: number = 3.0;
 /** Angular velocity decay rate (1/s) for deployed parachutes. */
@@ -1444,19 +1446,7 @@ function _applyDockingMovement(
   const accel: number = thrustN / Math.max(1, effectiveMass);
 
   if (isRcs) {
-    // RCS mode: WASD = craft-relative translation.
-    let dvAlongAxis = 0;
-    let dvPerpAxis = 0;
-    if (w) { dvAlongAxis += accel * dt; ps.rcsActiveDirections.add('up'); }
-    if (s) { dvAlongAxis -= accel * dt; ps.rcsActiveDirections.add('down'); }
-    if (a) { dvPerpAxis -= accel * dt;  ps.rcsActiveDirections.add('left'); }
-    if (d) { dvPerpAxis += accel * dt;  ps.rcsActiveDirections.add('right'); }
-
-    // Convert craft-relative to world coordinates.
-    const sinA: number = Math.sin(ps.angle);
-    const cosA: number = Math.cos(ps.angle);
-    ps.velX += dvAlongAxis * sinA + dvPerpAxis * cosA;
-    ps.velY += dvAlongAxis * cosA - dvPerpAxis * sinA;
+    applyRcsTranslation(ps, accel, dt, { w, s, a, d });
   } else {
     // DOCKING mode: A/D = along-track, W/S = radial.
     const speed: number = Math.hypot(ps.velX, ps.velY);
@@ -1641,13 +1631,7 @@ function _applySteering(
 
     // RCS active braking in vacuum.
     if (altitude > atmoTop && _hasRcs(ps, assembly)) {
-      const rcsBrake: number = RCS_ANGULAR_DAMPING * ps.angularVelocity / I;
-      // Don't overshoot zero.
-      if (Math.abs(rcsBrake * dt) > Math.abs(ps.angularVelocity)) {
-        ps.angularVelocity = 0;
-      } else {
-        ps.angularVelocity -= rcsBrake * dt;
-      }
+      applyRcsAngularDamping(ps, I, dt);
     }
   }
 
@@ -2061,18 +2045,6 @@ export function tickDebrisGround(debris: DebrisState, assembly: RocketAssembly, 
       debris.angularVelocity = 0;
     }
   }
-}
-
-/**
- * Return true if the rocket has at least one active RCS-capable command module.
- */
-function _hasRcs(ps: PhysicsState, assembly: RocketAssembly): boolean {
-  for (const instanceId of ps.activeParts) {
-    const placed = assembly.parts.get(instanceId);
-    const def: PartDef | null | undefined = placed ? getPartById(placed.partId) : null;
-    if (def && def.properties?.hasRcs === true) return true;
-  }
-  return false;
 }
 
 // ---------------------------------------------------------------------------
