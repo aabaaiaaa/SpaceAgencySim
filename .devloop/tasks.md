@@ -573,7 +573,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes. `npx playwright test e2e/topbar*.spec.ts` passes (if such specs exist) or run the affected suite for topbar.
 
 ### TASK-089: Create src/tests/ui-topbarState.test.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-087
 - **Description**: Per requirements §10.2. Create `src/tests/ui-topbarState.test.ts` mirroring `ui-vabState.test.ts` style.
 - **Verification**: `npx vitest run src/tests/ui-topbarState.test.ts` passes.
