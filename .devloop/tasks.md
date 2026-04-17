@@ -567,7 +567,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes.
 
 ### TASK-088: Update topbar.ts to use the new reducer
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-087
 - **Description**: Per requirements §10.2. Update `src/ui/topbar.ts` to delegate to the reducer. Keep DOM/listener code in place.
 - **Verification**: `npm run typecheck` passes. `npx playwright test e2e/topbar*.spec.ts` passes (if such specs exist) or run the affected suite for topbar.

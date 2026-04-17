@@ -33,6 +33,20 @@ import { getPartById } from '../data/parts.ts';
 import { openHelpPanel } from './help.ts';
 import { createListenerTracker } from './listenerTracker.ts';
 import { logger } from '../core/logger.ts';
+import {
+  formatCash,
+  moneyColor,
+  formatRate,
+  formatMissionsBadge,
+  helpSectionForScreen,
+  isSaveCompatible,
+  DROPDOWN_ID,
+  MISSIONS_DROPDOWN_ID,
+  MODAL_BACKDROP_IDS,
+  getTopbarState,
+  setTopbarState,
+  resetTopbarState,
+} from './topbar/_state.ts';
 import './topbar.css';
 import type { GameState } from '../core/gameState.ts';
 import type { ListenerTracker } from './listenerTracker.ts';
@@ -96,42 +110,8 @@ let _hubMenuItems: HubMenuItem[] = [];
  */
 let _onDropdownToggle: ((isOpen: boolean) => void) | null = null;
 
-/**
- * Current screen identifier, set by the navigation handler in index.js.
- * Used to determine the default help section.
- */
-let _currentScreen: string = 'hub';
-
 /** Tracks all event listeners registered by the topbar so they can be bulk-removed on destroy. */
 let _tracker: ListenerTracker = createListenerTracker();
-
-// ---------------------------------------------------------------------------
-// Formatting helpers
-// ---------------------------------------------------------------------------
-
-/**
- * Format a dollar amount as $X,XXX,XXX.
- */
-function _fmtCash(n: number): string {
-  return '$' + Math.round(n).toLocaleString('en-US');
-}
-
-/**
- * Return a CSS color string reflecting financial health.
- * Green = healthy (>= $100k), amber = tight (< $100k), red = near bankruptcy (< $20k).
- */
-function _moneyColor(funds: number): string {
-  if (funds < 20_000)  return 'var(--color-danger-text)';   // red
-  if (funds < 100_000) return 'var(--color-warning)';       // amber
-  return 'var(--color-money)';                              // green
-}
-
-/**
- * Format an interest rate decimal as a percentage string.
- */
-function _fmtRate(r: number): string {
-  return (r * 100).toFixed(0) + '%';
-}
 
 // ---------------------------------------------------------------------------
 // Public API
@@ -165,8 +145,8 @@ export function initTopBar(container: HTMLElement, state: GameState, { onExitToM
   cash.dataset.testid = 'topbar-cash';
   cash.setAttribute('aria-label', 'View loan details');
   cash.title = 'View loan details';
-  cash.textContent = _fmtCash(state.money ?? 0);
-  cash.style.color = _moneyColor(state.money ?? 0);
+  cash.textContent = formatCash(state.money ?? 0);
+  cash.style.color = moneyColor(state.money ?? 0);
   _tracker.add(cash, 'click', () => _openLoanModal());
 
   // Hamburger button — right
@@ -248,7 +228,7 @@ export function destroyTopBar(): void {
   _state = null;
   _onExitToMenu = null;
   _onLoadGame = null;
-
+  resetTopbarState();
 }
 
 /**
@@ -260,8 +240,8 @@ export function refreshTopBar(): void {
   if (!_state) return;
   const cashEl = document.getElementById('topbar-cash');
   if (cashEl) {
-    cashEl.textContent = _fmtCash(_state.money ?? 0);
-    cashEl.style.color = _moneyColor(_state.money ?? 0);
+    cashEl.textContent = formatCash(_state.money ?? 0);
+    cashEl.style.color = moneyColor(_state.money ?? 0);
   }
   const flightEl = document.getElementById('topbar-flight');
   if (flightEl) {
@@ -316,33 +296,15 @@ export function setTopBarDropdownToggleCallback(cb: ((isOpen: boolean) => void) 
  * relevant section by default.
  */
 export function setCurrentScreen(screenId: string): void {
-  _currentScreen = screenId;
+  setTopbarState({ currentScreen: screenId });
 }
-
-// ---------------------------------------------------------------------------
-// Dropdown
-// ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
 // Help
 // ---------------------------------------------------------------------------
 
-/** Screen ID → default help section mapping. */
-const _SCREEN_TO_HELP_SECTION: Record<string, string> = {
-  'hub':              'overview',
-  'vab':              'vab',
-  'flight':           'flight',
-  'orbit':            'orbit',
-  'mission-control':  'missions',
-  'crew-admin':       'crew',
-  'launch-pad':       'vab',
-  'tracking-station': 'orbit',
-  'satellite-ops':    'satellites',
-  'library':          'facilities',
-};
-
 function _openHelp(): void {
-  const section: string = _SCREEN_TO_HELP_SECTION[_currentScreen] || 'overview';
+  const section: string = helpSectionForScreen(getTopbarState().currentScreen);
   const container: HTMLElement = _root?.parentElement || document.body;
   openHelpPanel(container, _state, section);
 }
@@ -352,7 +314,7 @@ function _openHelp(): void {
 // ---------------------------------------------------------------------------
 
 function _toggleDropdown(): void {
-  const existing = document.getElementById('topbar-dropdown');
+  const existing = document.getElementById(DROPDOWN_ID);
   if (existing) {
     _closeDropdown();
   } else {
@@ -363,7 +325,7 @@ function _toggleDropdown(): void {
 function _openDropdown(): void {
   _onDropdownToggle?.(true);
   const menu: HTMLDivElement = document.createElement('div');
-  menu.id = 'topbar-dropdown';
+  menu.id = DROPDOWN_ID;
   menu.setAttribute('role', 'menu');
 
   // Inject flight-specific items (e.g. "Return to Space Agency") when in flight.
@@ -468,7 +430,7 @@ function _openDropdown(): void {
 }
 
 function _closeDropdown(): void {
-  const d = document.getElementById('topbar-dropdown');
+  const d = document.getElementById(DROPDOWN_ID);
   if (d) {
     _onDropdownToggle?.(false);
     d.remove();
@@ -482,14 +444,14 @@ function _onDocKeydown(e: KeyboardEvent): void {
   if (e.key !== 'Escape') return;
 
   // Close dropdowns first (they sit above modals in visual hierarchy).
-  const dropdown = document.getElementById('topbar-dropdown');
+  const dropdown = document.getElementById(DROPDOWN_ID);
   if (dropdown) {
     _closeDropdown();
     document.getElementById('topbar-menu-btn')?.focus();
     return;
   }
 
-  const mDropdown = document.getElementById('topbar-missions-dropdown');
+  const mDropdown = document.getElementById(MISSIONS_DROPDOWN_ID);
   if (mDropdown) {
     _closeMissionsDropdown();
     document.getElementById('topbar-missions-btn')?.focus();
@@ -497,7 +459,7 @@ function _onDocKeydown(e: KeyboardEvent): void {
   }
 
   // Close any open topbar modal.
-  for (const id of ['loan-modal-backdrop', 'save-modal-backdrop', 'load-modal-backdrop', 'load-confirm-backdrop', 'exit-confirm-backdrop', 'sandbox-settings-backdrop']) {
+  for (const id of MODAL_BACKDROP_IDS) {
     const el = document.getElementById(id);
     if (el) {
       el.remove();
@@ -511,7 +473,7 @@ function _onDocKeydown(e: KeyboardEvent): void {
  * clicks anywhere that isn't the menu button or the dropdown itself.
  */
 function _onDocClick(e: Event): void {
-  const dropdown = document.getElementById('topbar-dropdown');
+  const dropdown = document.getElementById(DROPDOWN_ID);
   if (dropdown) {
     const btn = document.getElementById('topbar-menu-btn');
     if (!(btn && btn.contains(e.target as Node)) && !dropdown.contains(e.target as Node)) {
@@ -519,7 +481,7 @@ function _onDocClick(e: Event): void {
     }
   }
 
-  const mDropdown = document.getElementById('topbar-missions-dropdown');
+  const mDropdown = document.getElementById(MISSIONS_DROPDOWN_ID);
   if (mDropdown) {
     const mBtn = document.getElementById('topbar-missions-btn');
     if (!(mBtn && mBtn.contains(e.target as Node)) && !mDropdown.contains(e.target as Node)) {
@@ -533,7 +495,7 @@ function _onDocClick(e: Event): void {
 // ---------------------------------------------------------------------------
 
 function _toggleMissionsDropdown(): void {
-  const existing = document.getElementById('topbar-missions-dropdown');
+  const existing = document.getElementById(MISSIONS_DROPDOWN_ID);
   if (existing) {
     _closeMissionsDropdown();
   } else {
@@ -544,7 +506,7 @@ function _toggleMissionsDropdown(): void {
 function _openMissionsDropdown(): void {
   _closeDropdown(); // close hamburger if open
   const panel: HTMLDivElement = document.createElement('div');
-  panel.id = 'topbar-missions-dropdown';
+  panel.id = MISSIONS_DROPDOWN_ID;
   _buildMissionsContent(panel);
 
   // Position below the missions button
@@ -560,7 +522,7 @@ function _openMissionsDropdown(): void {
 }
 
 function _closeMissionsDropdown(): void {
-  const d = document.getElementById('topbar-missions-dropdown');
+  const d = document.getElementById(MISSIONS_DROPDOWN_ID);
   if (d) d.remove();
 }
 
@@ -586,7 +548,7 @@ function _buildMissionsContent(container: HTMLElement): void {
 
     const reward: HTMLDivElement = document.createElement('div');
     reward.className = 'topbar-mission-reward';
-    reward.textContent = 'Reward: ' + _fmtCash(m.reward);
+    reward.textContent = 'Reward: ' + formatCash(m.reward);
     card.appendChild(reward);
 
     if (Array.isArray(m.unlockedParts) && m.unlockedParts.length > 0) {
@@ -644,11 +606,12 @@ function _refreshMissionsBtn(): void {
   const btn = document.getElementById('topbar-missions-btn');
   if (!btn || !_state) return;
   const count: number = _state.missions?.accepted?.length ?? 0;
-  btn.textContent = count > 0 ? `Missions (${count})` : 'Missions';
-  btn.classList.toggle('has-missions', count > 0);
+  const badge = formatMissionsBadge(count);
+  btn.textContent = badge.label;
+  btn.classList.toggle('has-missions', badge.hasMissions);
 
   // If the dropdown is open, refresh its content
-  const dropdown = document.getElementById('topbar-missions-dropdown');
+  const dropdown = document.getElementById(MISSIONS_DROPDOWN_ID);
   if (dropdown) _buildMissionsContent(dropdown);
 }
 
@@ -709,10 +672,10 @@ function _buildLoanStats(): HTMLDivElement {
   const totalAccrued: number = s.loan.totalInterestAccrued ?? 0;
 
   const rows: Array<{ label: string; value: string; negative: boolean }> = [
-    { label: 'Outstanding balance',      value: _fmtCash(s.loan.balance),      negative: s.loan.balance > 0  },
-    { label: 'Interest rate',            value: _fmtRate(s.loan.interestRate) + ' per mission', negative: false },
-    { label: 'Interest on next mission', value: _fmtCash(interestNext),         negative: interestNext > 0    },
-    { label: 'Total interest accrued',   value: _fmtCash(totalAccrued),         negative: false               },
+    { label: 'Outstanding balance',      value: formatCash(s.loan.balance),      negative: s.loan.balance > 0  },
+    { label: 'Interest rate',            value: formatRate(s.loan.interestRate) + ' per mission', negative: false },
+    { label: 'Interest on next mission', value: formatCash(interestNext),         negative: interestNext > 0    },
+    { label: 'Total interest accrued',   value: formatCash(totalAccrued),         negative: false               },
   ];
 
   for (const { label, value, negative } of rows) {
@@ -758,7 +721,7 @@ function _buildPaySection(): HTMLDivElement {
   const hint: HTMLDivElement = document.createElement('div');
   hint.className = 'loan-action-hint';
   hint.id = 'pay-hint';
-  hint.textContent = `Available cash: ${_fmtCash(_state?.money ?? 0)}`;
+  hint.textContent = `Available cash: ${formatCash(_state?.money ?? 0)}`;
 
   const row: HTMLDivElement = document.createElement('div');
   row.className = 'loan-action-row';
@@ -793,7 +756,7 @@ function _buildPaySection(): HTMLDivElement {
       return;
     }
     if (amount > _state.money) {
-      feedback.textContent = `Insufficient funds — you have ${_fmtCash(_state.money)}.`;
+      feedback.textContent = `Insufficient funds — you have ${formatCash(_state.money)}.`;
       return;
     }
 
@@ -802,14 +765,14 @@ function _buildPaySection(): HTMLDivElement {
     _refreshLoanStats();
 
     const hint = document.getElementById('pay-hint');
-    if (hint) hint.textContent = `Available cash: ${_fmtCash(_state.money)}`;
+    if (hint) hint.textContent = `Available cash: ${formatCash(_state.money)}`;
 
     if (paid < amount) {
-      feedback.textContent = `Paid ${_fmtCash(paid)}. Loan fully cleared!`;
+      feedback.textContent = `Paid ${formatCash(paid)}. Loan fully cleared!`;
     } else if (newBalance <= 0) {
-      feedback.textContent = `Paid ${_fmtCash(paid)}. Loan fully cleared!`;
+      feedback.textContent = `Paid ${formatCash(paid)}. Loan fully cleared!`;
     } else {
-      feedback.textContent = `Paid ${_fmtCash(paid)}. Remaining balance: ${_fmtCash(newBalance)}.`;
+      feedback.textContent = `Paid ${formatCash(paid)}. Remaining balance: ${formatCash(newBalance)}.`;
     }
     input.value = '';
   });
@@ -839,7 +802,7 @@ function _buildBorrowSection(): HTMLDivElement {
   const hint: HTMLDivElement = document.createElement('div');
   hint.className = 'loan-action-hint';
   hint.id = 'borrow-hint';
-  hint.textContent = `Max additional: ${_fmtCash(headroom)}  (limit ${_fmtCash(MAX_LOAN_BALANCE)})`;
+  hint.textContent = `Max additional: ${formatCash(headroom)}  (limit ${formatCash(MAX_LOAN_BALANCE)})`;
 
   const row: HTMLDivElement = document.createElement('div');
   row.className = 'loan-action-row';
@@ -884,13 +847,13 @@ function _buildBorrowSection(): HTMLDivElement {
 
     const newHeadroom: number = Math.max(0, MAX_LOAN_BALANCE - _state.loan.balance);
     const h = document.getElementById('borrow-hint');
-    if (h) h.textContent = `Max additional: ${_fmtCash(newHeadroom)}  (limit ${_fmtCash(MAX_LOAN_BALANCE)})`;
+    if (h) h.textContent = `Max additional: ${formatCash(newHeadroom)}  (limit ${formatCash(MAX_LOAN_BALANCE)})`;
     if (newHeadroom <= 0) btn.disabled = true;
 
     if (borrowed < amount) {
-      feedback.textContent = `Borrowed ${_fmtCash(borrowed)} (limit reached). Balance: ${_fmtCash(newBalance)}.`;
+      feedback.textContent = `Borrowed ${formatCash(borrowed)} (limit reached). Balance: ${formatCash(newBalance)}.`;
     } else {
-      feedback.textContent = `Borrowed ${_fmtCash(borrowed)}. Balance: ${_fmtCash(newBalance)}.`;
+      feedback.textContent = `Borrowed ${formatCash(borrowed)}. Balance: ${formatCash(newBalance)}.`;
     }
     input.value = '';
   });
@@ -945,7 +908,7 @@ async function _openSaveSlotPicker(): Promise<void> {
       info.appendChild(name);
       info.appendChild(detail);
 
-      if (slot.version !== SAVE_VERSION) {
+      if (!isSaveCompatible(slot.version, SAVE_VERSION)) {
         const versionWarn: HTMLSpanElement = document.createElement('span');
         versionWarn.className = 'save-version-warning';
         versionWarn.dataset.testid = 'version-warning';
@@ -1023,7 +986,7 @@ async function _doLoadGame(): Promise<void> {
 
     if (slot) {
       hasAnySave = true;
-      const isIncompatible: boolean = slot.version !== SAVE_VERSION;
+      const isIncompatible: boolean = !isSaveCompatible(slot.version, SAVE_VERSION);
       const name: HTMLElement = document.createElement('strong');
       name.textContent = (slot.saveName || `Slot ${i + 1}`) + (isIncompatible ? ' (Incompatible)' : '');
 
@@ -1056,7 +1019,7 @@ async function _doLoadGame(): Promise<void> {
 
     const tag: HTMLSpanElement = document.createElement('span');
     tag.className = 'save-slot-action-tag';
-    if (slot && slot.version === SAVE_VERSION) {
+    if (slot && isSaveCompatible(slot.version, SAVE_VERSION)) {
       tag.textContent = 'Load';
       tag.classList.add('load-action');
     } else if (slot) {
@@ -1070,7 +1033,7 @@ async function _doLoadGame(): Promise<void> {
     card.appendChild(info);
     card.appendChild(tag);
 
-    if (slot && slot.version === SAVE_VERSION) {
+    if (slot && isSaveCompatible(slot.version, SAVE_VERSION)) {
       const slotIndex: number = i;
       card.style.cursor = 'pointer';
       _tracker.add(card, 'click', () => {
@@ -1321,7 +1284,7 @@ function _makeTitleRow(title: string, onClose: () => void): HTMLDivElement {
  * Remove all open topbar modals from the DOM.
  */
 function _closeAllModals(): void {
-  for (const id of ['loan-modal-backdrop', 'save-modal-backdrop', 'load-modal-backdrop', 'load-confirm-backdrop', 'exit-confirm-backdrop', 'sandbox-settings-backdrop']) {
+  for (const id of MODAL_BACKDROP_IDS) {
     const el = document.getElementById(id);
     if (el) el.remove();
   }
