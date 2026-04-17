@@ -93,6 +93,7 @@ import {
   type ThrustResult,
 } from './physics/thrust.ts';
 import { tickOrbitPhase } from './physics/phases/orbitPhase.ts';
+import { tickTransferPhase } from './physics/phases/transferPhase.ts';
 import type { AltitudeBand, ControlMode as ControlModeType } from './constants.ts';
 import type { FlightState, FlightEvent, OrbitalElements, PowerState, GameState, InventoryPart } from './gameState.ts';
 
@@ -733,27 +734,7 @@ function _integrate(ps: PhysicsState, assembly: RocketAssembly, flightState: Fli
   // --- Phase-specific physics: TRANSFER has no gravity or drag ---------------
   // The craft drifts at constant velocity in deep space. Player can fire
   // engines for course corrections (thrust only, no gravity/drag).
-  if (flightState?.phase === FlightPhase.TRANSFER) {
-    if (ps.firingEngines.size > 0) {
-      const totalMassT = _computeTotalMass(ps, assembly);
-      const thrustResult: ThrustResult = _computeThrust(ps, assembly, 0);
-      if (totalMassT > 0) {
-        ps.velX += (thrustResult.thrustX / totalMassT) * FIXED_DT;
-        ps.velY += (thrustResult.thrustY / totalMassT) * FIXED_DT;
-      }
-      // Asteroid torque in deep space — spin from off-CoM thrust.
-      const transferThrustMag = Math.hypot(thrustResult.thrustX, thrustResult.thrustY);
-      const transferAstTorque = _computeAsteroidTorque(ps, assembly, transferThrustMag);
-      if (transferAstTorque !== 0) {
-        ps.angularVelocity += transferAstTorque * FIXED_DT;
-        ps.angle += ps.angularVelocity * FIXED_DT;
-      }
-      tickFuelSystem(ps, assembly, FIXED_DT, 0);
-    }
-    ps.posX += ps.velX * FIXED_DT;
-    ps.posY += ps.velY * FIXED_DT;
-    return;
-  }
+  if (tickTransferPhase(ps, FIXED_DT, { flightState, assembly })) return;
 
   // --- Phase-specific physics: CAPTURE uses radial gravity from destination ---
   // The craft is approaching a body and must burn to slow down.

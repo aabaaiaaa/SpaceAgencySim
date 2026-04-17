@@ -421,7 +421,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npx vitest run src/tests/physics.test.ts` passes. Orbit-specific tests confirmed in `src/tests/orbit*.test.ts`.
 
 ### TASK-065: Extract src/core/physics/phases/transferPhase.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-064
 - **Description**: Per requirements §8. Same treatment for TRANSFER phase.
 - **Verification**: `npx vitest run src/tests/physics.test.ts src/tests/manoeuvre.test.ts` passes.

@@ -26,6 +26,7 @@ import { applyDockingMovement } from './docking.ts';
 import { hasRcs, applyRcsAngularDamping, RCS_TORQUE_MULTIPLIER } from './rcs.ts';
 import { tickDebrisGround } from './debrisGround.ts';
 import { tickOrbitPhase } from './phases/orbitPhase.ts';
+import { tickTransferPhase } from './phases/transferPhase.ts';
 
 import type { FlightState } from '../gameState.ts';
 import type { PhysicsState, RocketAssembly } from '../physics.ts';
@@ -43,6 +44,7 @@ void applyRcsAngularDamping;
 void RCS_TORQUE_MULTIPLIER;
 void tickDebrisGround;
 void tickOrbitPhase;
+void tickTransferPhase;
 
 /** Fixed integration step in seconds (60 Hz). Mirrors physics.ts FIXED_DT. */
 export const FIXED_DT: number = 1 / 60;
