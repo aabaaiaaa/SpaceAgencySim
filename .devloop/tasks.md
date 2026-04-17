@@ -643,7 +643,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 ## Section 11 — Final Verification
 
 ### TASK-100: Run typecheck, lint, and build
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-006, TASK-011, TASK-019, TASK-021, TASK-022, TASK-023, TASK-024, TASK-025, TASK-033, TASK-040, TASK-046, TASK-052, TASK-072, TASK-083, TASK-099
 - **Description**: Per requirements §12. Run `npm run typecheck && npm run lint && npm run build`. All three must produce zero errors.
 - **Verification**: All three commands exit 0.
