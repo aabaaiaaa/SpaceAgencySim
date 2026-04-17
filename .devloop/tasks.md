@@ -627,7 +627,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes. `npx playwright test e2e/crew*.spec.ts` passes (if present).
 
 ### TASK-098: Create src/tests/ui-crewAdminState.test.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-096
 - **Description**: Per requirements §10.5. Create `src/tests/ui-crewAdminState.test.ts`.
 - **Verification**: `npx vitest run src/tests/ui-crewAdminState.test.ts` passes.
