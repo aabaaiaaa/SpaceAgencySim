@@ -104,6 +104,7 @@ const BARREL_MAP = {
   'src/ui/missionControl.ts':   'src/ui/missionControl',
   'src/render/flight.ts':       'src/render/flight',
   'src/core/physics.ts':        'src/core/physics',
+  'src/core/constants.ts':      'src/core/constants',
 };
 
 /**
@@ -198,7 +199,8 @@ function resolveImport(specifier, importerAbsPath) {
 const SOURCE_GROUPS = {
   'app/main':           ['src/main.ts'],
   'ui/fatalError':      ['src/ui/fatalError.ts'],
-  'core/gameState':     ['src/core/gameState.ts', 'src/core/constants.ts'],
+  'core/gameState':     ['src/core/gameState.ts'],
+  'core/constants':     ['src/core/constants.ts'],
   'core/rocketbuilder': ['src/core/rocketbuilder.ts', 'src/core/rocketvalidator.ts'],
   'core/orbit':         ['src/core/orbit.ts', 'src/core/manoeuvre.ts'],
   'core/parachute':     ['src/core/parachute.ts', 'src/core/legs.ts'],
@@ -266,6 +268,7 @@ function classifySource(srcPath) {
     { re: /^src\/ui\/missionControl\//, area: 'ui/missionControl' },
     { re: /^src\/render\/flight\//, area: 'render/flight' },
     { re: /^src\/core\/physics\//, area: 'core/physics' },
+    { re: /^src\/core\/constants\//, area: 'core/constants' },
   ];
   for (const { re, area } of subDirPatterns) {
     if (re.test(srcPath)) return area;

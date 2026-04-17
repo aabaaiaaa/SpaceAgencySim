@@ -533,7 +533,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `wc -l src/core/constants.ts` shows ≤ 20. `npm run typecheck` passes.
 
 ### TASK-083: Update generator + test-map.json for constants sub-modules
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-082
 - **Description**: Per requirements §11. Edit `scripts/generate-test-map.mjs` to teach it about the new constants barrel: (a) add `'src/core/constants.ts': 'src/core/constants'` to `BARREL_MAP`; (b) add `{ re: /^src\/core\/constants\//, area: 'core/constants' }` to `subDirPatterns`; (c) decide whether to leave `'src/core/constants.ts'` in `SOURCE_GROUPS['core/gameState']` (keeps existing grouping; sub-files become a separate `core/constants` area) or remove it and create a new `core/constants` SOURCE_GROUP explicitly (unifies barrel + sub-files in one area — recommended). Run `npm run test-map:generate` and verify mappings.
 - **Verification**: `grep -B 1 -A 5 '"src/core/constants' test-map.json` shows entries for all topical files. `npm run typecheck` and `npm run build` still pass (mapping changes don't affect runtime).

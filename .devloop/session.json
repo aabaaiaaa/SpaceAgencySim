@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 81,
+  "lastIteration": 82,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-082",
-    "taskTitle": "Rewrite constants.ts as pure barrel",
-    "iterationNumber": 82,
-    "startedAt": "2026-04-17T02:51:17.050Z"
+    "taskId": "TASK-083",
+    "taskTitle": "Update generator + test-map.json for constants sub-modules",
+    "iterationNumber": 83,
+    "startedAt": "2026-04-17T02:52:05.309Z"
   }
 }
