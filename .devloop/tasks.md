@@ -555,7 +555,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes. `npx playwright test e2e/flight.spec.ts` passes (the flight E2E exercises flightHud).
 
 ### TASK-086: Create src/tests/ui-flightHudState.test.ts
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-084
 - **Description**: Per requirements §10.1. Create `src/tests/ui-flightHudState.test.ts`. Cover defaults, patching, reset. Test pure formatters/reducers directly with known inputs.
 - **Verification**: `npx vitest run src/tests/ui-flightHudState.test.ts` passes.
