@@ -585,7 +585,7 @@ Tasks for the iteration-19 broad sweep. Each task is sized for ~10–20 min of a
 - **Verification**: `npm run typecheck` passes.
 
 ### TASK-091: Update hub.ts to use the new reducer
-- **Status**: pending
+- **Status**: done
 - **Dependencies**: TASK-090
 - **Description**: Per requirements §10.3. Update `src/ui/hub.ts` to delegate to the reducer.
 - **Verification**: `npm run typecheck` passes. Hub-related E2E specs pass — target: `npx playwright test e2e/hub*.spec.ts` (or whichever spec exercises hub).

@@ -1,14 +1,14 @@
 {
   "phase": "run",
   "sessionId": null,
-  "lastIteration": 89,
+  "lastIteration": 90,
   "startedAt": "2026-04-16T22:30:06.397Z",
   "iteration": 19,
   "devloopVersion": "4.1.0",
   "activeTask": {
-    "taskId": "TASK-090",
-    "taskTitle": "Extract hub reducer to src/ui/hub/_state.ts",
-    "iterationNumber": 90,
-    "startedAt": "2026-04-17T03:10:34.395Z"
+    "taskId": "TASK-091",
+    "taskTitle": "Update hub.ts to use the new reducer",
+    "iterationNumber": 91,
+    "startedAt": "2026-04-17T03:13:35.962Z"
   }
 }

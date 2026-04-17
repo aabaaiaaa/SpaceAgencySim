@@ -2,9 +2,9 @@
 
 ## Summary
 - **Total Tasks**: 104
-- **Completed**: 90
-- **Remaining**: 14
-- **Last Updated**: 2026-04-17T03:13:33.828Z
+- **Completed**: 91
+- **Remaining**: 13
+- **Last Updated**: 2026-04-17T03:16:16.670Z
 
 ## Iteration Log
 
@@ -817,4 +817,13 @@
 - **Exit Status**: success
 - **Tokens**: 1,143,097 total (19 in, 9,920 out, 81,153 cache-create, 1,052,005 cache-read)
 - **Cost**: $1.2813
+
+### Iteration 91 - 2026-04-17T03:16:16.664Z
+- **Task Attempted**: TASK-091
+- **Task Completed**: TASK-091
+- **Summary**: Completed Update hub.ts to use the new reducer
+- **Duration**: 2m 41s
+- **Exit Status**: success
+- **Tokens**: 862,372 total (16 in, 8,426 out, 74,889 cache-create, 779,041 cache-read)
+- **Cost**: $1.0683
 

@@ -44,6 +44,13 @@ import {
   SURFACE_HUB_FACILITIES,
   ORBITAL_HUB_FACILITIES,
 } from '../data/hubFacilities.ts';
+import {
+  formatReturnResults,
+  formatNetCashChange,
+  classifyFacilityAction,
+  formatBuildCost,
+  formatUpgradeAction,
+} from './hub/_state.ts';
 
 // ---------------------------------------------------------------------------
 // Layout constants — must match src/render/hub.js
@@ -432,81 +439,22 @@ export function showReturnResultsOverlay(container: HTMLElement, summary: Flight
   finTitle.textContent = 'Financial Summary';
   finSection.appendChild(finTitle);
 
-  const missionRewardTotal: number = summary.completedMissions.reduce((s, e) => s + e.reward, 0);
-
-  // Mission rewards row.
-  if (missionRewardTotal > 0) {
-    finSection.appendChild(_rrRow(
-      'Mission rewards',
-      `+$${missionRewardTotal.toLocaleString('en-US')}`,
-      'positive',
-    ));
-  }
-
-  // Part recovery row.
-  if (summary.recoveryValue > 0) {
-    finSection.appendChild(_rrRow(
-      'Part recovery (60 %)',
-      `+$${summary.recoveryValue.toLocaleString('en-US')}`,
-      'positive',
-    ));
-  }
-
-  // Interest row (shows loan balance alongside).
-  if (summary.interestCharged > 0) {
-    const loanBalance: number = summary.loanBalance ?? 0;
-    const interestLabel: string = loanBalance > 0
-      ? `Loan interest (balance: $${Math.round(loanBalance).toLocaleString('en-US')})`
-      : 'Loan interest';
-    finSection.appendChild(_rrRow(
-      interestLabel,
-      `−$${Math.round(summary.interestCharged).toLocaleString('en-US')}`,
-      'negative',
-    ));
-  }
-
-  // Death fines row.
-  if (summary.deathFineTotal > 0) {
-    finSection.appendChild(_rrRow(
-      'Crew death fines',
-      `−$${summary.deathFineTotal.toLocaleString('en-US')}`,
-      'negative',
-    ));
-  }
-
-  // Operating costs rows.
-  if (summary.operatingCosts > 0) {
-    if (summary.crewSalaryCost > 0) {
-      const crewLabel: string = summary.activeCrewCount === 1
-        ? 'Crew salaries (1 astronaut)'
-        : `Crew salaries (${summary.activeCrewCount} astronauts)`;
-      finSection.appendChild(_rrRow(
-        crewLabel,
-        `−$${summary.crewSalaryCost.toLocaleString('en-US')}`,
-        'negative',
-      ));
-    }
-    if (summary.facilityUpkeep > 0) {
-      finSection.appendChild(_rrRow(
-        'Facility upkeep',
-        `−$${summary.facilityUpkeep.toLocaleString('en-US')}`,
-        'negative',
-      ));
-    }
+  for (const row of formatReturnResults(summary)) {
+    finSection.appendChild(_rrRow(row.label, row.value, row.tone));
   }
 
   // Net cash change.
+  const netDisplay = formatNetCashChange(summary.netCashChange);
   const netEl: HTMLDivElement = document.createElement('div');
   netEl.className = 'rr-net-change';
 
   const netLabel: HTMLSpanElement = document.createElement('span');
   netLabel.className = 'rr-label';
-  netLabel.textContent = 'Net cash change';
+  netLabel.textContent = netDisplay.label;
 
   const netValue: HTMLSpanElement = document.createElement('span');
-  netValue.className = `rr-value ${summary.netCashChange >= 0 ? 'rr-value-positive' : 'rr-value-negative'}`;
-  const sign: string = summary.netCashChange >= 0 ? '+' : '−';
-  netValue.textContent = `${sign}$${Math.abs(Math.round(summary.netCashChange)).toLocaleString('en-US')}`;
+  netValue.className = `rr-value ${netDisplay.positive ? 'rr-value-positive' : 'rr-value-negative'}`;
+  netValue.textContent = netDisplay.value;
 
   netEl.appendChild(netLabel);
   netEl.appendChild(netValue);
@@ -1114,70 +1062,74 @@ function _openConstructionPanel(container: HTMLElement): void {
 
     // ── Cost + Action columns ──────────────────────────────────────────
     const isBuilt: boolean = hasFacility(_state, def.id);
+    const upgrade = isBuilt ? canUpgradeFacility(_state, def.id) : null;
+    const actionKind = classifyFacilityAction(
+      isBuilt,
+      upgradeDef != null,
+      upgrade?.nextTier ?? 0,
+      _state.tutorialMode,
+    );
 
-    if (isBuilt) {
-      // Check if upgradeable (R&D Lab).
-      const upgrade = canUpgradeFacility(_state, def.id);
-      if (upgrade.nextTier > 0) {
-        // Show upgrade cost.
-        const costGroup: HTMLDivElement = document.createElement('div');
-        costGroup.className = 'cp-cost-group';
+    if (actionKind === 'upgrade' && upgrade) {
+      // Show upgrade cost.
+      const costGroup: HTMLDivElement = document.createElement('div');
+      costGroup.className = 'cp-cost-group';
 
-        const moneyCostEl: HTMLSpanElement = document.createElement('span');
-        moneyCostEl.className = 'cp-facility-cost';
-        moneyCostEl.textContent = `$${upgrade.moneyCost.toLocaleString('en-US')}`;
-        costGroup.appendChild(moneyCostEl);
+      const moneyCostEl: HTMLSpanElement = document.createElement('span');
+      moneyCostEl.className = 'cp-facility-cost';
+      moneyCostEl.textContent = `$${upgrade.moneyCost.toLocaleString('en-US')}`;
+      costGroup.appendChild(moneyCostEl);
 
-        if (upgrade.scienceCost > 0) {
-          const sciCostEl: HTMLSpanElement = document.createElement('span');
-          sciCostEl.className = 'cp-facility-cost-science';
-          sciCostEl.textContent = `${upgrade.scienceCost} science`;
-          costGroup.appendChild(sciCostEl);
-        }
-
-        item.appendChild(costGroup);
-
-        // Upgrade action.
-        const actionGroup: HTMLDivElement = document.createElement('div');
-        actionGroup.className = 'cp-action-group';
-
-        const btn: HTMLButtonElement = document.createElement('button');
-        btn.className = 'cp-upgrade-btn';
-        btn.textContent = `Upgrade to Tier ${upgrade.nextTier}`;
-        btn.disabled = !upgrade.allowed;
-        if (!upgrade.allowed) {
-          btn.title = upgrade.reason;
-        }
-        _getListeners().add(btn, 'click', () => {
-          const result = upgradeFacility(_state!, def.id);
-          if (result.success) {
-            panel.remove();
-            _openConstructionPanel(container);
-          }
-        });
-        actionGroup.appendChild(btn);
-
-        if (upgrade.description) {
-          const descNote: HTMLParagraphElement = document.createElement('p');
-          descNote.className = 'cp-upgrade-desc';
-          descNote.textContent = upgrade.description;
-          actionGroup.appendChild(descNote);
-        }
-
-        item.appendChild(actionGroup);
-      } else {
-        // Built, no upgrades available (or max tier).
-        const costEl: HTMLSpanElement = document.createElement('span');
-        costEl.className = 'cp-facility-cost cp-facility-cost-free';
-        costEl.textContent = '';
-        item.appendChild(costEl);
-
-        const badge: HTMLSpanElement = document.createElement('span');
-        badge.className = 'cp-built-badge';
-        badge.textContent = upgradeDef ? 'Max Tier' : 'Built';
-        item.appendChild(badge);
+      if (upgrade.scienceCost > 0) {
+        const sciCostEl: HTMLSpanElement = document.createElement('span');
+        sciCostEl.className = 'cp-facility-cost-science';
+        sciCostEl.textContent = `${upgrade.scienceCost} science`;
+        costGroup.appendChild(sciCostEl);
       }
-    } else if (_state.tutorialMode) {
+
+      item.appendChild(costGroup);
+
+      // Upgrade action.
+      const actionGroup: HTMLDivElement = document.createElement('div');
+      actionGroup.className = 'cp-action-group';
+
+      const upgradeDisplay = formatUpgradeAction(upgrade.nextTier, upgrade.allowed, upgrade.reason);
+      const btn: HTMLButtonElement = document.createElement('button');
+      btn.className = 'cp-upgrade-btn';
+      btn.textContent = upgradeDisplay.buttonLabel;
+      btn.disabled = !upgradeDisplay.enabled;
+      if (upgradeDisplay.disabledTooltip != null) {
+        btn.title = upgradeDisplay.disabledTooltip;
+      }
+      _getListeners().add(btn, 'click', () => {
+        const result = upgradeFacility(_state!, def.id);
+        if (result.success) {
+          panel.remove();
+          _openConstructionPanel(container);
+        }
+      });
+      actionGroup.appendChild(btn);
+
+      if (upgrade.description) {
+        const descNote: HTMLParagraphElement = document.createElement('p');
+        descNote.className = 'cp-upgrade-desc';
+        descNote.textContent = upgrade.description;
+        actionGroup.appendChild(descNote);
+      }
+
+      item.appendChild(actionGroup);
+    } else if (actionKind === 'max-tier' || actionKind === 'built') {
+      // Built, no upgrades available (or max tier).
+      const costEl: HTMLSpanElement = document.createElement('span');
+      costEl.className = 'cp-facility-cost cp-facility-cost-free';
+      costEl.textContent = '';
+      item.appendChild(costEl);
+
+      const badge: HTMLSpanElement = document.createElement('span');
+      badge.className = 'cp-built-badge';
+      badge.textContent = actionKind === 'max-tier' ? 'Max Tier' : 'Built';
+      item.appendChild(badge);
+    } else if (actionKind === 'locked') {
       // Cost column (informational).
       const costEl: HTMLSpanElement = document.createElement('span');
       costEl.className = 'cp-facility-cost';
@@ -1189,26 +1141,24 @@ function _openConstructionPanel(container: HTMLElement): void {
       badge.textContent = 'Locked — complete missions to unlock';
       item.appendChild(badge);
     } else {
-      // Not built, not tutorial — show build cost + button.
+      // 'build' — not built, not tutorial — show build cost + button.
       const costGroup: HTMLDivElement = document.createElement('div');
       costGroup.className = 'cp-cost-group';
 
       const discountedCost: number = getDiscountedMoneyCost(def.cost, _state.reputation ?? 50);
-      const hasDiscount: boolean = def.cost > 0 && discountedCost < def.cost;
+      const buildCost = formatBuildCost(def.cost, discountedCost);
 
       const moneyCostEl: HTMLSpanElement = document.createElement('span');
-      moneyCostEl.className = def.cost === 0
+      moneyCostEl.className = buildCost.isFree
         ? 'cp-facility-cost cp-facility-cost-free'
         : 'cp-facility-cost';
-      moneyCostEl.textContent = def.cost === 0
-        ? 'Free'
-        : `$${discountedCost.toLocaleString('en-US')}`;
+      moneyCostEl.textContent = buildCost.costLabel;
       costGroup.appendChild(moneyCostEl);
 
-      if (hasDiscount) {
+      if (buildCost.discountNote != null) {
         const discountNote: HTMLSpanElement = document.createElement('span');
         discountNote.className = 'cp-discount-note';
-        discountNote.textContent = `(was $${def.cost.toLocaleString('en-US')})`;
+        discountNote.textContent = buildCost.discountNote;
         costGroup.appendChild(discountNote);
       }
 
