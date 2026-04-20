@@ -386,6 +386,7 @@ function _serialisePhysicsState(ps: PhysicsState): PhysicsSnapshot {
       : null,
     capturedBody: ps.capturedBody,
     thrustAligned: ps.thrustAligned,
+    malfunctionMode: ps.malfunctionMode,
   };
 }
 
