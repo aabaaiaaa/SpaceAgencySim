@@ -64,7 +64,7 @@ interface GameStateSnapshot {
   money: number;
   tutorialMode: boolean;
   parts: string[];
-  facilities: Record<string, FacilitySnapshot>;
+  hubs: { facilities: Record<string, FacilitySnapshot> }[];
   currentPeriod: number;
   missions: {
     available: MissionSnapshot[];
@@ -116,9 +116,9 @@ test.describe('E2E Infrastructure — State Injection', () => {
     for (const partId of STARTER_PARTS) {
       expect(gs.parts).toContain(partId);
     }
-    expect(gs.facilities['launch-pad']?.built).toBe(true);
-    expect(gs.facilities['vab']?.built).toBe(true);
-    expect(gs.facilities['mission-control']?.built).toBe(true);
+    expect(gs.hubs[0].facilities['launch-pad']?.built).toBe(true);
+    expect(gs.hubs[0].facilities['vab']?.built).toBe(true);
+    expect(gs.hubs[0].facilities['mission-control']?.built).toBe(true);
 
     await page.close();
   });
@@ -149,9 +149,9 @@ test.describe('E2E Infrastructure — State Injection', () => {
     expect(gs.crew).toHaveLength(3);
     expect(gs.sciencePoints).toBe(45);
     expect(gs.missions.completed).toHaveLength(6);
-    expect(gs.facilities['crew-admin']?.built).toBe(true);
-    expect(gs.facilities['tracking-station']?.built).toBe(true);
-    expect(gs.facilities['rd-lab']?.built).toBe(true);
+    expect(gs.hubs[0].facilities['crew-admin']?.built).toBe(true);
+    expect(gs.hubs[0].facilities['tracking-station']?.built).toBe(true);
+    expect(gs.hubs[0].facilities['rd-lab']?.built).toBe(true);
 
     await page.close();
   });
@@ -446,7 +446,7 @@ test.describe('E2E Infrastructure — Full State Coverage', () => {
     expect(gs.techTree.researched).toContain('basic-rocketry');
     expect(gs.techTree.unlockedInstruments).toContain('thermometer-mk1');
     expect(gs.satelliteNetwork.satellites).toHaveLength(1);
-    expect(gs.facilities['crew-admin']?.built).toBe(true);
+    expect(gs.hubs[0].facilities['crew-admin']?.built).toBe(true);
     expect(gs.tutorialMode).toBe(false);
     expect(gs.contracts.completed).toHaveLength(1);
 

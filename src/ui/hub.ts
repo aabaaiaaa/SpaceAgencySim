@@ -995,7 +995,7 @@ function _bindDebugSavesShortcut(container: HTMLElement): void {
       }
     }
   };
-  _getListeners().add(document, 'keydown', handler as EventListener);
+  _getListeners().add(window, 'keydown', handler as EventListener);
 }
 
 /**

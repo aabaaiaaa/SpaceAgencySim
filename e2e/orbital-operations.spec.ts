@@ -59,7 +59,7 @@ interface SatelliteRecord {
 
 interface GameStateSnapshot {
   currentPeriod: number;
-  facilities: Record<string, { built: boolean; tier: number }>;
+  hubs: { facilities: Record<string, { built: boolean; tier: number }> }[];
   satelliteNetwork: {
     satellites: SatelliteRecord[];
   };
@@ -952,7 +952,7 @@ test.describe('Satellite Network Ops Centre tiers', () => {
 
     const gs = await getGameState(page) as GameStateSnapshot | null;
     expect(gs).not.toBeNull();
-    expect(gs!.facilities[FacilityId.SATELLITE_OPS].tier).toBe(1);
+    expect(gs!.hubs[0].facilities[FacilityId.SATELLITE_OPS].tier).toBe(1);
     expect(gs!.satelliteNetwork.satellites.length).toBe(5);
     // Tier 1 cap is 6 — we have 5, one more should fit.
     expect(gs!.satelliteNetwork.satellites.length).toBeLessThanOrEqual(6);
@@ -977,7 +977,7 @@ test.describe('Satellite Network Ops Centre tiers', () => {
 
     const gs = await getGameState(page) as GameStateSnapshot | null;
     expect(gs).not.toBeNull();
-    expect(gs!.facilities[FacilityId.SATELLITE_OPS].tier).toBe(2);
+    expect(gs!.hubs[0].facilities[FacilityId.SATELLITE_OPS].tier).toBe(2);
     expect(gs!.satelliteNetwork.satellites.length).toBe(10);
     expect(gs!.satelliteNetwork.satellites.length).toBeLessThanOrEqual(12);
   });
@@ -1001,7 +1001,7 @@ test.describe('Satellite Network Ops Centre tiers', () => {
 
     const gs = await getGameState(page) as GameStateSnapshot | null;
     expect(gs).not.toBeNull();
-    expect(gs!.facilities[FacilityId.SATELLITE_OPS].tier).toBe(3);
+    expect(gs!.hubs[0].facilities[FacilityId.SATELLITE_OPS].tier).toBe(3);
     expect(gs!.satelliteNetwork.satellites.length).toBe(20);
     expect(gs!.satelliteNetwork.satellites.length).toBeLessThanOrEqual(24);
   });

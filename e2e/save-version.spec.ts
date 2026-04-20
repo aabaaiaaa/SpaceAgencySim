@@ -43,7 +43,7 @@ test.describe('Save Version Indicator', () => {
     const badge = slot0Card.locator('[data-testid="version-warning"]');
     await expect(badge).toBeVisible({ timeout: 5_000 });
     await expect(badge).toContainText('v0', { timeout: 5_000 });
-    await expect(badge).toContainText('current: v4', { timeout: 5_000 });
+    await expect(badge).toContainText('current: v6', { timeout: 5_000 });
   });
 
   test('topbar load modal: mismatched-version save shows version warning', async ({ page }) => {

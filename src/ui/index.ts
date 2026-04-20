@@ -9,6 +9,7 @@ import type { FlightReturnSummary } from '../core/flightReturn.ts';
 import { initMainMenu } from './mainmenu.ts';
 import { initHubUI, destroyHubUI, showWelcomeModal, showReturnResultsOverlay } from './hub.ts';
 import { initTopBar, destroyTopBar, refreshTopBar, setCurrentScreen } from './topbar.ts';
+import { stopFlightScene } from './flightController.ts';
 import { showHubScene } from '../render/hub.ts';
 import { showVabScene, hideVabScene } from '../render/vab.ts';
 import { hasFacility } from '../core/construction.ts';
@@ -35,7 +36,6 @@ let _cachedTrackingStation: typeof import('./trackingStation.ts') | null = null;
 let _cachedLibrary: typeof import('./library.ts') | null = null;
 let _cachedRdLab: typeof import('./rdLab.ts') | null = null;
 let _cachedLogistics: typeof import('./logistics/index.ts') | null = null;
-let _cachedFlightController: typeof import('./flightController.ts') | null = null;
 
 export { initFlightHud, destroyFlightHud } from './flightHud.ts';
 export { showReturnResultsOverlay } from './hub.ts';
@@ -212,7 +212,7 @@ export function returnToHubFromFlight(
  * hamburger dropdown in the top bar.
  */
 function _handleExitToMenu(): void {
-  _cachedFlightController?.stopFlightScene(); // safe to call even if no flight is active
+  stopFlightScene(); // safe to call even if no flight is active
   hideVabScene();           // hide VAB PixiJS container (no-op if already hidden)
   destroyTopBar();
   destroyHubUI(); // no-op if hub is not the current screen
@@ -273,7 +273,7 @@ function _handleExitToMenu(): void {
  * Called when the player loads a save from the in-game hamburger menu modal.
  */
 function _handleLoadGame(loadedState: GameState): void {
-  _cachedFlightController?.stopFlightScene();
+  stopFlightScene();
   hideVabScene();
   destroyTopBar();
   destroyHubUI();

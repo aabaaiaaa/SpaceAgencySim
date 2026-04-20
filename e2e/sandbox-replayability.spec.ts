@@ -167,7 +167,7 @@ test.describe('Sandbox mode', () => {
       'tracking-station', 'rd-lab', 'satellite-ops', 'library',
     ];
     for (const fid of facilityIds) {
-      expect(gs.facilities[fid]?.built).toBe(true);
+      expect(gs.hubs[0].facilities[fid]?.built).toBe(true);
     }
 
     await page.close();
