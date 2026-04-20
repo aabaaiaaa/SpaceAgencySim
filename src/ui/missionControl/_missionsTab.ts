@@ -291,7 +291,11 @@ export function showUnlockNotification(facilityId: string | null, partIds: strin
   const btn = document.createElement('button');
   btn.className = 'confirm-btn confirm-btn-primary';
   btn.textContent = 'Continue';
-  _addTracked(btn, 'click', dismiss);
+  // Direct listener, not _addTracked: this modal is also shown from the
+  // post-flight flow where Mission Control is closed and its tracker is null.
+  // The handler only removes the self-contained backdrop — no tracker cleanup
+  // is needed because the node (and its listener) are GC'd on removal.
+  btn.addEventListener('click', dismiss);
   btnRow.appendChild(btn);
 
   modal.appendChild(btnRow);

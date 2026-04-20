@@ -360,20 +360,27 @@ async function returnToHub(page: Page): Promise<void> {
   }
 
   // Dismiss unlock notification modal if present (new parts unlocked).
-  try {
-    const unlockBackdrop = page.locator('#unlock-notification-backdrop');
-    await unlockBackdrop.waitFor({ state: 'visible', timeout: 5_000 });
+  // Absent = fine; present-but-won't-dismiss = real bug, must fail loudly.
+  const unlockBackdrop = page.locator('#unlock-notification-backdrop');
+  const unlockAppeared = await unlockBackdrop
+    .waitFor({ state: 'visible', timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (unlockAppeared) {
     await unlockBackdrop.locator('.confirm-btn').click();
-    await unlockBackdrop.waitFor({ state: 'hidden', timeout: 3_000 }).catch(() => {});
-  } catch { /* no unlock notification */ }
+    await unlockBackdrop.waitFor({ state: 'hidden', timeout: 3_000 });
+  }
 
-  // Dismiss return-results overlay if present.
-  try {
-    const dismissBtn = page.locator('#return-results-dismiss-btn');
-    await dismissBtn.waitFor({ state: 'visible', timeout: 10_000 });
-    await dismissBtn.click();
-    await page.waitForSelector('#return-results-overlay', { state: 'hidden', timeout: 5_000 }).catch(() => {});
-  } catch { /* no return results overlay */ }
+  // Dismiss return-results overlay if present. Same rule as above.
+  const resultsOverlay = page.locator('#return-results-overlay');
+  const resultsAppeared = await page.locator('#return-results-dismiss-btn')
+    .waitFor({ state: 'visible', timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (resultsAppeared) {
+    await page.locator('#return-results-dismiss-btn').click();
+    await resultsOverlay.waitFor({ state: 'hidden', timeout: 5_000 });
+  }
   await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
 }
 

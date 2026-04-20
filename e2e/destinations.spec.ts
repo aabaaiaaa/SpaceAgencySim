@@ -287,8 +287,8 @@ async function returnToAgency(page: Page): Promise<void> {
     await dismissBtn.click();
   } catch { /* no return results overlay */ }
 
-  // Wait for hub to appear.
-  await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 }).catch(() => {});
+  // Wait for hub to appear. Terminal success condition — do not swallow.
+  await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
 }
 
 // ═══════════════════════════════════════════════════════════════════════════

@@ -1254,7 +1254,8 @@
         "src/ui/missionControl/_state.ts"
       ],
       "unit": [
-        "src/tests/ui-mcState.test.ts"
+        "src/tests/ui-mcState.test.ts",
+        "src/tests/ui-unlockNotification.test.ts"
       ],
       "e2e": [
         "e2e/missions.spec.ts"

@@ -320,23 +320,29 @@ async function returnToHub(page: Page): Promise<void> {
   }
 
   // An unlock notification modal may appear for newly unlocked parts — dismiss it.
-  try {
-    const unlockBackdrop = page.locator('#unlock-notification-backdrop');
-    await unlockBackdrop.waitFor({ state: 'visible', timeout: 5_000 });
+  // "Didn't appear" is fine (no new unlocks); "appeared but didn't dismiss" is a
+  // real bug and must fail loudly. Previously a .catch(() => {}) on the hidden-wait
+  // masked a regression where the Continue button's listener was silently dropped.
+  const unlockBackdrop = page.locator('#unlock-notification-backdrop');
+  const unlockAppeared = await unlockBackdrop
+    .waitFor({ state: 'visible', timeout: 5_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (unlockAppeared) {
     await unlockBackdrop.locator('.confirm-btn').click();
-    await unlockBackdrop.waitFor({ state: 'hidden', timeout: 3_000 }).catch(() => {});
-  } catch {
-    // No unlock notification — proceed.
+    await unlockBackdrop.waitFor({ state: 'hidden', timeout: 3_000 });
   }
 
   // A return-results overlay may appear on top of the hub — dismiss it.
-  try {
-    const dismissBtn = page.locator('#return-results-dismiss-btn');
-    await dismissBtn.waitFor({ state: 'visible', timeout: 10_000 });
-    await dismissBtn.click();
-    await page.waitForSelector('#return-results-overlay', { state: 'hidden', timeout: 5_000 }).catch(() => {});
-  } catch {
-    // No return results overlay — proceed.
+  // Same rule as the unlock modal above: absent = fine, present-but-won't-dismiss = fail loud.
+  const resultsOverlay = page.locator('#return-results-overlay');
+  const resultsAppeared = await page.locator('#return-results-dismiss-btn')
+    .waitFor({ state: 'visible', timeout: 10_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (resultsAppeared) {
+    await page.locator('#return-results-dismiss-btn').click();
+    await resultsOverlay.waitFor({ state: 'hidden', timeout: 5_000 });
   }
   await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 10_000 });
 }
