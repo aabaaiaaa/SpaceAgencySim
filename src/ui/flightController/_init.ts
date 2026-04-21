@@ -35,6 +35,7 @@ import {
   handleMenuReturnToAgency,
   handleAbortReturnToAgency,
   handleMenuFlightLog,
+  handleMenuSettings,
 } from './_menuActions.ts';
 import { logger } from '../../core/logger.ts';
 import { initPhysicsWorker, resyncWorkerState, terminatePhysicsWorker } from './_workerBridge.ts';
@@ -274,6 +275,11 @@ export async function startFlightScene(
       label: 'Flight Log',
       title: 'View a log of all flight events.',
       onClick: handleMenuFlightLog,
+    },
+    {
+      label: 'Settings',
+      title: 'Adjust difficulty, auto-save, and performance settings.',
+      onClick: handleMenuSettings,
     },
   ]);
 

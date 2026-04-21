@@ -21,7 +21,7 @@ import {
   InjuryDuration,
 } from '../core/constants.ts';
 import { getDifficultySettings, updateDifficultySettings } from '../core/settings.ts';
-import { saveSettings } from '../core/settingsStore.ts';
+import { loadSettings, saveSettings } from '../core/settingsStore.ts';
 import type { PersistedSettings } from '../core/settingsStore.ts';
 import { createListenerTracker } from './listenerTracker.ts';
 import { showPerfDashboard, hidePerfDashboard } from './perfDashboard.ts';
@@ -40,6 +40,8 @@ import type { DifficultySettings, MalfunctionMode as MalfunctionModeType } from 
  */
 function persistCurrentSettings(state: GameState): void {
   const persisted: PersistedSettings = {
+    // Preserve fields that live only in settingsStore (e.g. overlay positions).
+    ...loadSettings(),
     difficultySettings: { ...getDifficultySettings(state) },
     autoSaveEnabled:    state.autoSaveEnabled,
     debugMode:          state.debugMode,
@@ -115,21 +117,35 @@ const SETTING_DEFS: SettingDef[] = [
 // ---------------------------------------------------------------------------
 
 /**
+ * Options for opening the settings panel.
+ */
+export interface OpenSettingsPanelOptions {
+  /** Invoked after the panel closes (via button click or Escape). */
+  onClose?: () => void;
+}
+
+/**
  * Open the settings panel overlay.
  *
  * @param container  The #ui-overlay div.
  * @param state
+ * @param options    Optional lifecycle hooks (e.g. `onClose`).
  */
-export function openSettingsPanel(container: HTMLElement, state: GameState): void {
+export function openSettingsPanel(
+  container: HTMLElement,
+  state: GameState,
+  options?: OpenSettingsPanelOptions,
+): void {
   // Prevent duplicate.
   if (document.getElementById('settings-panel')) return;
 
   const tracker = createListenerTracker();
 
-  /** Remove all tracked listeners, then remove the panel from the DOM. */
+  /** Remove all tracked listeners, remove the panel from the DOM, and fire onClose. */
   function closePanel(): void {
     tracker.removeAll();
     panel.remove();
+    options?.onClose?.();
   }
 
   const panel: HTMLDivElement = document.createElement('div');
@@ -374,7 +390,7 @@ export function openSettingsPanel(container: HTMLElement, state: GameState): voi
   // -- Close button --
   const closeBtn: HTMLButtonElement = document.createElement('button');
   closeBtn.className = 'settings-close-btn';
-  closeBtn.textContent = '\u2190 Hub';
+  closeBtn.textContent = '\u2190 Back';
   tracker.add(closeBtn, 'click', () => closePanel());
   content.appendChild(closeBtn);
 

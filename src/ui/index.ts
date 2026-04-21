@@ -177,6 +177,28 @@ export function initUI(container: HTMLElement, state: GameState): void {
 }
 
 /**
+ * Common tail logic for all flight-end → hub return paths: displays the
+ * financial summary overlay (when return results are present) and triggers
+ * the auto-save toast.
+ *
+ * Callers are responsible for navigating back to the hub (destroying the
+ * flight UI and mounting the hub) before invoking this. Skip this helper
+ * entirely when the caller is navigating directly to the VAB instead of
+ * the hub (e.g. "Adjust Build" from the post-flight summary).
+ */
+export function handleFlightEndReturnToHub(
+  container: HTMLElement,
+  state: GameState | null | undefined,
+  returnResults: unknown,
+): void {
+  if (!state) return;
+  if (returnResults) {
+    showReturnResultsOverlay(container, returnResults as FlightReturnSummary);
+  }
+  triggerAutoSave(state, 'hub-return');
+}
+
+/**
  * Re-show the hub after a flight ends (used by the E2E test flight API).
  * Assumes the flight scene has already been stopped and the topbar is still
  * mounted.
@@ -192,14 +214,7 @@ export function returnToHubFromFlight(
   initHubUI(container, state, (destination: string) => {
     void _handleNavigation(container, state, destination);
   });
-  if (returnResults) {
-    showReturnResultsOverlay(container, returnResults as FlightReturnSummary);
-  }
-
-  // Trigger auto-save on return to hub from flight.
-  if (state) {
-    triggerAutoSave(state, 'hub-return');
-  }
+  handleFlightEndReturnToHub(container, state, returnResults);
 }
 
 // ---------------------------------------------------------------------------

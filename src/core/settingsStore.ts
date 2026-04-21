@@ -34,7 +34,7 @@ import type { GameState } from './gameState.ts';
 const STORAGE_KEY = 'spaceAgency_settings';
 
 /** Current schema version — bump when the shape changes. */
-const SCHEMA_VERSION = 1;
+const SCHEMA_VERSION = 2;
 
 // ---------------------------------------------------------------------------
 // Schema migration infrastructure
@@ -54,7 +54,14 @@ type MigrationFn = (settings: Partial<PersistedSettings>) => Partial<PersistedSe
  * Example — when SCHEMA_VERSION is bumped to 2, add:
  *   MIGRATIONS.push([1, (s) => { s.newField = 'default'; return s; }]);
  */
-const MIGRATIONS: Array<[number, MigrationFn]> = [];
+const MIGRATIONS: Array<[number, MigrationFn]> = [
+  // v1 → v2: add perf-overlay positions. Defaults to null (use CSS default).
+  [1, (s) => {
+    if (!('fpsMonitorPosition' in s))   s.fpsMonitorPosition = null;
+    if (!('perfDashboardPosition' in s)) s.perfDashboardPosition = null;
+    return s;
+  }],
+];
 
 /**
  * Apply any pending schema migrations to a settings envelope.
@@ -92,6 +99,12 @@ function _migrateSettings(envelope: SettingsEnvelope): SettingsEnvelope {
  *
  * This is the public contract — consumers read and write these fields.
  */
+/** On-screen position for a draggable HUD overlay. */
+export interface OverlayPosition {
+  x: number;
+  y: number;
+}
+
 export interface PersistedSettings {
   /** Difficulty sliders (malfunction frequency, weather, finance, injury). */
   difficultySettings: DifficultySettings;
@@ -103,6 +116,10 @@ export interface PersistedSettings {
   showPerfDashboard: boolean;
   /** Malfunction mode override ('normal', 'off', 'forced'). */
   malfunctionMode: MalfunctionModeType;
+  /** Player-set position for the FPS monitor overlay; null = CSS default. */
+  fpsMonitorPosition: OverlayPosition | null;
+  /** Player-set position for the perf dashboard overlay; null = CSS default. */
+  perfDashboardPosition: OverlayPosition | null;
 }
 
 /** Internal envelope stored in IDB (wraps settings + metadata). */
@@ -143,6 +160,8 @@ function defaultSettings(): PersistedSettings {
     debugMode: false,
     showPerfDashboard: false,
     malfunctionMode: MalfunctionMode.NORMAL,
+    fpsMonitorPosition: null,
+    perfDashboardPosition: null,
   };
 }
 
@@ -316,5 +335,21 @@ function mergeWithDefaults(stored: Partial<PersistedSettings>): PersistedSetting
       typeof stored.malfunctionMode === 'string'
         ? stored.malfunctionMode as MalfunctionModeType
         : defaults.malfunctionMode,
+    fpsMonitorPosition:
+      _validOverlayPosition(stored.fpsMonitorPosition) ? stored.fpsMonitorPosition : defaults.fpsMonitorPosition,
+    perfDashboardPosition:
+      _validOverlayPosition(stored.perfDashboardPosition) ? stored.perfDashboardPosition : defaults.perfDashboardPosition,
   };
+}
+
+/**
+ * True when the value is either `null` or an OverlayPosition with finite
+ * numeric x/y. `null` is explicitly allowed — it means "use CSS default".
+ */
+function _validOverlayPosition(v: unknown): v is OverlayPosition | null {
+  if (v === null) return true;
+  if (typeof v !== 'object') return false;
+  const p = v as Record<string, unknown>;
+  return typeof p.x === 'number' && Number.isFinite(p.x)
+      && typeof p.y === 'number' && Number.isFinite(p.y);
 }

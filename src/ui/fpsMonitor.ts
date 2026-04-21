@@ -12,6 +12,8 @@
  */
 
 import './fpsMonitor.css';
+import { makeDraggableOverlay, type DraggableOverlayHandle } from './draggableOverlay.ts';
+import { loadSettings, saveSettings } from '../core/settingsStore.ts';
 
 interface PerfStats {
   fps: number;
@@ -55,6 +57,9 @@ let _ftText: HTMLDivElement | null = null;
 let _canvas: HTMLCanvasElement | null = null;
 let _ctx: CanvasRenderingContext2D | null = null;
 
+/** Drag handle returned by makeDraggableOverlay — cleaned up on destroy. */
+let _dragHandle: DraggableOverlayHandle | null = null;
+
 /** Whether the monitor is currently active. */
 let _active = false;
 
@@ -91,6 +96,15 @@ export function initFpsMonitor(): void {
   _container.appendChild(_ftText);
   _container.appendChild(_canvas);
   document.body.appendChild(_container);
+
+  // Make the overlay draggable and restore any persisted position.
+  const initialPosition = loadSettings().fpsMonitorPosition;
+  _dragHandle = makeDraggableOverlay(_container, {
+    initialPosition,
+    onPositionChange: (pos) => {
+      void saveSettings({ ...loadSettings(), fpsMonitorPosition: pos });
+    },
+  });
 
   // Reset ring buffer.
   _frameTimes.fill(0);
@@ -185,6 +199,10 @@ export function recordFrame(frameTimeMs: number, timestamp: number): void {
  * Tear down the FPS monitor — remove DOM elements and clear state.
  */
 export function destroyFpsMonitor(): void {
+  if (_dragHandle) {
+    _dragHandle.destroy();
+    _dragHandle = null;
+  }
   if (_container) {
     _container.remove();
     _container = null;

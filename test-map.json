@@ -403,6 +403,7 @@
         "src/tests/surfaceOps.test.ts",
         "src/tests/techtree.test.ts",
         "src/tests/trackingStationTiers.test.ts",
+        "src/tests/ui-handleFlightEndReturnToHub.test.ts",
         "src/tests/ui-listenerLifecycle.test.ts",
         "src/tests/ui-modalFocus.test.ts",
         "src/tests/vabTiers.test.ts",
@@ -603,7 +604,8 @@
         "src/tests/perfMonitor.test.ts"
       ],
       "e2e": [
-        "e2e/fps-monitor.spec.ts"
+        "e2e/fps-monitor.spec.ts",
+        "e2e/perf-overlay-drag.spec.ts"
       ]
     },
     "core/physics": {
@@ -808,6 +810,7 @@
         "src/tests/storageErrors.test.ts"
       ],
       "e2e": [
+        "e2e/auto-save-launchpad.spec.ts",
         "e2e/auto-save.spec.ts",
         "e2e/save-version.spec.ts",
         "e2e/saveload.spec.ts"
@@ -1074,6 +1077,15 @@
         "e2e/crew.spec.ts"
       ]
     },
+    "ui/draggableOverlay": {
+      "sources": [
+        "src/ui/draggableOverlay.ts"
+      ],
+      "unit": [
+        "src/tests/ui-draggableOverlay.test.ts"
+      ],
+      "e2e": []
+    },
     "ui/fatalError": {
       "sources": [
         "src/ui/fatalError.ts"
@@ -1112,6 +1124,7 @@
       ],
       "e2e": [
         "e2e/core-mechanics.spec.ts",
+        "e2e/flight-settings.spec.ts",
         "e2e/flight.spec.ts",
         "e2e/keyboard-nav.spec.ts",
         "e2e/landing.spec.ts",
@@ -1199,6 +1212,7 @@
         "src/tests/ui-listenerLifecycle.test.ts"
       ],
       "e2e": [
+        "e2e/auto-save-launchpad.spec.ts",
         "e2e/launchpad-relaunch.spec.ts",
         "e2e/launchpad.spec.ts",
         "e2e/relaunch.spec.ts"
@@ -1300,7 +1314,9 @@
       ],
       "e2e": [
         "e2e/debug-mode.spec.ts",
+        "e2e/flight-settings.spec.ts",
         "e2e/fps-monitor.spec.ts",
+        "e2e/perf-overlay-drag.spec.ts",
         "e2e/sandbox-replayability.spec.ts"
       ]
     },
@@ -1340,6 +1356,7 @@
         "src/tests/ui-rocketCardUtil.test.ts"
       ],
       "e2e": [
+        "e2e/auto-save-launchpad.spec.ts",
         "e2e/auto-save.spec.ts"
       ]
     },

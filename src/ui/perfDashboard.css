@@ -11,9 +11,25 @@
   padding: var(--space-sm, 8px) var(--space-md, 12px);
   font-family: monospace;
   color: #a8e8c0;
-  pointer-events: none;
+  pointer-events: auto;
   user-select: none;
   min-width: 160px;
+  cursor: grab;
+  touch-action: none;
+}
+#perf-dashboard.dragging {
+  cursor: grabbing;
+}
+/* Child elements shouldn't intercept pointerdown — the container handles it. */
+#perf-dashboard .perf-fps-large,
+#perf-dashboard .perf-fps-details,
+#perf-dashboard .perf-metrics,
+#perf-dashboard .perf-histogram,
+#perf-dashboard .perf-histogram-bars,
+#perf-dashboard .perf-histogram-bar,
+#perf-dashboard .perf-metric-label,
+#perf-dashboard .perf-metric-value {
+  pointer-events: none;
 }
 
 .perf-fps-large {

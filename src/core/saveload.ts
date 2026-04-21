@@ -283,6 +283,8 @@ export async function saveGame(state: GameState, slotIndex: number, saveName: st
   // awaited so a settings-sync failure does not block or fail the main
   // save. Surface any failure through the logger so it is not invisible.
   saveSettings({
+    // Preserve fields that live only in settingsStore (e.g. overlay positions).
+    ...loadSettings(),
     difficultySettings: { ...state.difficultySettings },
     autoSaveEnabled:    state.autoSaveEnabled,
     debugMode:          state.debugMode,

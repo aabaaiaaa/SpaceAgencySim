@@ -17,6 +17,7 @@ import { showPhaseNotification } from './_flightPhase.ts';
 import { showPostFlightSummary, buildFlightEventList } from './_postFlight.ts';
 import { stopFlightScene, startFlightScene } from './_init.ts';
 import { getFlightControllerListenerTracker } from './_listenerTracker.ts';
+import { openSettingsPanel } from '../settings.ts';
 
 import type { RocketAssembly } from '../../core/rocketbuilder.ts';
 import type { GameState } from '../../core/gameState.ts';
@@ -531,4 +532,27 @@ export function handleMenuFlightLog(): void {
   _addTracked(content, 'click', (e: Event) => e.stopPropagation());
 
   host.appendChild(overlay);
+}
+
+/**
+ * Menu action: open the Settings panel while keeping the flight paused.
+ *
+ * The topbar dropdown-toggle callback pauses time when the hamburger opens
+ * and restores it when the hamburger closes — which happens before this
+ * handler fires. So we re-read the restored warp, pause again for the
+ * duration of the Settings panel, and restore on close.
+ */
+export function handleMenuSettings(): void {
+  const s = getFCState();
+  if (!s.container || !s.state) return;
+
+  // The dropdown has just closed, so s.timeWarp is back to the pre-menu value.
+  const savedWarp: number = s.timeWarp;
+  s.timeWarp = 0;
+
+  openSettingsPanel(s.container, s.state, {
+    onClose: () => {
+      s.timeWarp = savedWarp || 1;
+    },
+  });
 }

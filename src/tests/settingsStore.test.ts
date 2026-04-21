@@ -81,6 +81,8 @@ function customSettings(): PersistedSettings {
     debugMode: true,
     showPerfDashboard: true,
     malfunctionMode: MalfunctionMode.FORCED,
+    fpsMonitorPosition: { x: 50, y: 200 },
+    perfDashboardPosition: { x: 80, y: 300 },
   };
 }
 
@@ -92,6 +94,8 @@ function expectedDefaults(): PersistedSettings {
     debugMode: false,
     showPerfDashboard: false,
     malfunctionMode: MalfunctionMode.NORMAL,
+    fpsMonitorPosition: null,
+    perfDashboardPosition: null,
   };
 }
 
@@ -371,6 +375,58 @@ describe('settingsStore', () => {
       await initSettings();
       const loaded = loadSettings();
       expect(loaded).to.deep.equal(expectedDefaults());
+    });
+
+    it('v1 → v2: populates fpsMonitorPosition and perfDashboardPosition as null @smoke', async () => {
+      // A v1 envelope predates overlay positions. After load, the fields
+      // should exist (as null) because _migrateSettings adds them.
+      const v1Settings = {
+        difficultySettings: { ...DEFAULT_DIFFICULTY_SETTINGS },
+        autoSaveEnabled: true,
+        debugMode: false,
+        showPerfDashboard: false,
+        malfunctionMode: MalfunctionMode.NORMAL,
+      };
+      _idbStore.set(STORAGE_KEY, JSON.stringify({ version: 1, settings: v1Settings }));
+
+      await initSettings();
+      const loaded = loadSettings();
+
+      expect(loaded.fpsMonitorPosition).to.equal(null);
+      expect(loaded.perfDashboardPosition).to.equal(null);
+    });
+
+    it('preserves explicit overlay positions through a round-trip', async () => {
+      const input: PersistedSettings = {
+        ...expectedDefaults(),
+        fpsMonitorPosition: { x: 100, y: 200 },
+        perfDashboardPosition: { x: 50, y: 400 },
+      };
+      await saveSettings(input);
+      _resetCacheForTesting();
+      await initSettings();
+
+      const loaded = loadSettings();
+      expect(loaded.fpsMonitorPosition).to.deep.equal({ x: 100, y: 200 });
+      expect(loaded.perfDashboardPosition).to.deep.equal({ x: 50, y: 400 });
+    });
+
+    it('rejects invalid overlay position shapes and falls back to null', async () => {
+      // Save a v2 envelope with garbage overlay positions; loader should
+      // reject them and use null.
+      _idbStore.set(STORAGE_KEY, JSON.stringify({
+        version: 2,
+        settings: {
+          ...expectedDefaults(),
+          fpsMonitorPosition: { x: 'oops', y: 200 },
+          perfDashboardPosition: 'not an object',
+        },
+      }));
+
+      await initSettings();
+      const loaded = loadSettings();
+      expect(loaded.fpsMonitorPosition).to.equal(null);
+      expect(loaded.perfDashboardPosition).to.equal(null);
     });
   });
 

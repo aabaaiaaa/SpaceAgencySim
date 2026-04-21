@@ -10,9 +10,8 @@ import { getCurrentWeather } from '../../core/weather.ts';
 import { getActiveCrew } from '../../core/crew.ts';
 import { createRocketDesign, createFlightState } from '../../core/gameState.ts';
 import type { GameState } from '../../core/gameState.ts';
-import type { FlightReturnSummary } from '../../core/flightReturn.ts';
 import { startFlightScene } from '../flightController.ts';
-import { showReturnResultsOverlay } from '../hub.ts';
+import { handleFlightEndReturnToHub } from '../index.ts';
 import { getVabState } from './_state.ts';
 import { getActiveHub } from '../../core/hubs.ts';
 import { getVabListenerTracker } from './_listenerTracker.ts';
@@ -304,10 +303,8 @@ function doLaunch(crewIds: string[]): void {
         if (vabRoot) vabRoot.style.display = '';
         S.onBack?.();
 
-        if (returnResults) {
-          const uiOverlay = container;
-          showReturnResultsOverlay(uiOverlay, returnResults as FlightReturnSummary);
-        }
+        // Show the financial summary overlay and trigger auto-save.
+        handleFlightEndReturnToHub(container, S.gameState, returnResults);
       },
     );
   }

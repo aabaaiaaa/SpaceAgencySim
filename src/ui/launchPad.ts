@@ -17,7 +17,6 @@
 
 import type { GameState, RocketDesign } from '../core/gameState.ts';
 import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.ts';
-import type { FlightReturnSummary } from '../core/flightReturn.ts';
 import type { PartDef } from '../data/parts.ts';
 import { getPartById } from '../data/parts.ts';
 import { PartType, FacilityId, LAUNCH_PAD_MAX_MASS, LAUNCH_PAD_TIER_LABELS, DEATH_FINE_PER_ASTRONAUT } from '../core/constants.ts';
@@ -34,7 +33,7 @@ import { getFacilityTier } from '../core/construction.ts';
 import { getTotalMass } from '../core/rocketvalidator.ts';
 import { createFlightState } from '../core/gameState.ts';
 import { startFlightScene } from './flightController/_init.ts';
-import { showReturnResultsOverlay } from './hub.ts';
+import { handleFlightEndReturnToHub } from './index.ts';
 import { buildRocketCard } from './rocketCardUtil.ts';
 import { createListenerTracker, type ListenerTracker } from './listenerTracker.ts';
 import './launchPad.css';
@@ -807,17 +806,18 @@ function _doLaunch(
         // Return to hub.
         if (onBack) onBack();
 
-        // Show the post-flight results overlay if applicable.
-        if (returnResults) {
-          showReturnResultsOverlay(container, returnResults as FlightReturnSummary);
-        }
-
-        // "Retry with Same Design" — auto-navigate to the VAB.  The hub
-        // is already mounted by onBack(); click the VAB building to enter.
+        // "Retry with Same Design" — auto-navigate to the VAB. The hub is
+        // already mounted by onBack(); click the VAB building to enter.
+        // Skip the hub-return side effects (results overlay, auto-save) since
+        // the player is not staying at the hub.
         if (navigateTo === 'vab') {
           const vabEl = document.querySelector('[data-building-id="vab"]');
           if (vabEl) (vabEl as HTMLElement).click();
+          return;
         }
+
+        // Show the financial summary overlay and trigger auto-save.
+        handleFlightEndReturnToHub(container, state, returnResults);
       },
     );
   }

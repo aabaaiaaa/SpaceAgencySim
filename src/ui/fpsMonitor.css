@@ -10,9 +10,20 @@
   font-family: var(--font-family, monospace);
   font-size: var(--font-size-tiny, 0.72rem);
   color: #a8e8c0;
-  pointer-events: none;
+  pointer-events: auto;
   user-select: none;
   line-height: 1.4;
+  cursor: grab;
+  touch-action: none;
+}
+#fps-monitor.dragging {
+  cursor: grabbing;
+}
+/* Text and graph children shouldn't intercept pointerdown — the container handles it. */
+#fps-monitor-fps,
+#fps-monitor-ft,
+#fps-monitor-graph {
+  pointer-events: none;
 }
 #fps-monitor-graph {
   display: block;

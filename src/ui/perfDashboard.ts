@@ -14,6 +14,8 @@
 
 import './perfDashboard.css';
 import { getMetrics } from '../core/perfMonitor.ts';
+import { makeDraggableOverlay, type DraggableOverlayHandle } from './draggableOverlay.ts';
+import { loadSettings, saveSettings } from '../core/settingsStore.ts';
 
 
 // ---------------------------------------------------------------------------
@@ -38,6 +40,9 @@ let _histBar2: HTMLDivElement | null = null;
 let _histBar3: HTMLDivElement | null = null;
 
 let _intervalId: ReturnType<typeof setInterval> | null = null;
+
+/** Drag handle returned by makeDraggableOverlay — cleaned up on destroy. */
+let _dragHandle: DraggableOverlayHandle | null = null;
 
 // ---------------------------------------------------------------------------
 // Internal — lazy DOM creation
@@ -103,6 +108,15 @@ function _createDOM(): void {
   _container.appendChild(histSection);
 
   document.body.appendChild(_container);
+
+  // Make the overlay draggable and restore any persisted position.
+  const initialPosition = loadSettings().perfDashboardPosition;
+  _dragHandle = makeDraggableOverlay(_container, {
+    initialPosition,
+    onPositionChange: (pos) => {
+      void saveSettings({ ...loadSettings(), perfDashboardPosition: pos });
+    },
+  });
 }
 
 function _createMetricRow(parent: HTMLElement, label: string): HTMLSpanElement {
@@ -233,6 +247,11 @@ export function destroyPerfDashboard(): void {
   if (_intervalId !== null) {
     clearInterval(_intervalId);
     _intervalId = null;
+  }
+
+  if (_dragHandle) {
+    _dragHandle.destroy();
+    _dragHandle = null;
   }
 
   if (_container) {

@@ -29,15 +29,22 @@ interface MockCanvasContext {
 
 interface MockElement {
   id: string;
-  style: { display: string };
+  style: Record<string, string>;
   textContent: string;
   className: string;
   classList: { add: ReturnType<typeof vi.fn>; remove: ReturnType<typeof vi.fn> };
   width: number;
   height: number;
+  offsetWidth: number;
+  offsetHeight: number;
   appendChild: ReturnType<typeof vi.fn>;
   remove: ReturnType<typeof vi.fn>;
   getContext: ReturnType<typeof vi.fn>;
+  addEventListener: ReturnType<typeof vi.fn>;
+  removeEventListener: ReturnType<typeof vi.fn>;
+  setPointerCapture: ReturnType<typeof vi.fn>;
+  releasePointerCapture: ReturnType<typeof vi.fn>;
+  getBoundingClientRect: ReturnType<typeof vi.fn>;
 }
 
 // We need a minimal DOM for the module to function.
@@ -48,12 +55,14 @@ const mockDocument = {
   createElement: vi.fn((_tag: string): MockElement => {
     const el: MockElement = {
       id: '',
-      style: { display: '' },
+      style: {},
       textContent: '',
       className: '',
       classList: { add: vi.fn(), remove: vi.fn() },
       width: 0,
       height: 0,
+      offsetWidth: 100,
+      offsetHeight: 40,
       appendChild: vi.fn(),
       remove: vi.fn(),
       getContext: vi.fn((): MockCanvasContext => ({
@@ -68,6 +77,14 @@ const mockDocument = {
         strokeStyle: '',
         lineWidth: 0,
       })),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      setPointerCapture: vi.fn(),
+      releasePointerCapture: vi.fn(),
+      getBoundingClientRect: vi.fn(() => ({
+        left: 0, top: 0, right: 100, bottom: 40,
+        width: 100, height: 40, x: 0, y: 0, toJSON: () => ({}),
+      })),
     };
     return el;
   }),
@@ -80,10 +97,24 @@ const mockDocument = {
 // Set up globals before importing the module.
 vi.stubGlobal('document', mockDocument);
 
-// Ensure window exists and has __perfStats slot
-if (typeof globalThis.window === 'undefined') {
-  vi.stubGlobal('window', { __perfStats: null });
-}
+// Ensure window exists with the APIs the draggable overlay wiring needs.
+const mockWindow = {
+  __perfStats: null,
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  innerWidth: 1024,
+  innerHeight: 768,
+};
+vi.stubGlobal('window', mockWindow);
+
+// The module also imports settingsStore.ts which touches idbStorage — mock
+// it to avoid the real IndexedDB code path during these DOM-focused tests.
+vi.mock('../core/idbStorage.ts', () => ({
+  idbSet: vi.fn(() => Promise.resolve()),
+  idbGet: vi.fn(() => Promise.resolve(null)),
+  idbDelete: vi.fn(() => Promise.resolve()),
+  idbGetAllKeys: vi.fn(() => Promise.resolve([])),
+}));
 
 import {
   initFpsMonitor,
