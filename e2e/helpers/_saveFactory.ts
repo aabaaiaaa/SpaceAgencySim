@@ -115,6 +115,13 @@ export interface SaveEnvelopeParams {
   autoSaveEnabled?: boolean;
   debugMode?: boolean;
   welcomeShown?: boolean;
+  /**
+   * Test-only flag — when true, `initWeather` always produces clear skies.
+   * Defaults to true so multi-flight tests stay deterministic across
+   * flight-return weather re-rolls. Set false in tests that exercise the
+   * real weather system (e.g. reliability-risk.spec.ts).
+   */
+  _weatherLocked?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -179,6 +186,7 @@ export interface SaveEnvelopeState {
   autoSaveEnabled: boolean;
   debugMode: boolean;
   welcomeShown: boolean;
+  _weatherLocked: boolean;
 }
 
 export interface SaveEnvelope {
@@ -230,7 +238,18 @@ export function buildSaveEnvelope(params: SaveEnvelopeParams = {}): SaveEnvelope
     techTree        = { researched: [], unlockedInstruments: [] },
     satelliteNetwork= { satellites: [] },
     partInventory   = [],
-    weather         = null,
+    // Default to clear-skies weather so E2E flights are deterministic. Without
+    // a preset value, the hub auto-generates random (potentially extreme) wind
+    // when the save is loaded, which destabilises flight timing tests. Tests
+    // that exercise weather explicitly (e.g. reliability-risk.spec.ts) override
+    // `gs.weather` after hub load, so they are unaffected by this default.
+    weather         = {
+      current: {
+        windSpeed: 0, windAngle: 0, temperature: 1.0, visibility: 0,
+        extreme: false, description: 'Clear skies', bodyId: 'EARTH',
+      },
+      skipCount: 0, seed: 0,
+    },
     surfaceItems    = [],
     achievements    = [],
     challenges      = { active: null, results: {} },
@@ -242,6 +261,7 @@ export function buildSaveEnvelope(params: SaveEnvelopeParams = {}): SaveEnvelope
     autoSaveEnabled    = true,
     debugMode          = false,
     welcomeShown       = true,
+    _weatherLocked     = true,
   } = params;
 
   // Default hubs — Earth HQ with starter facilities.
@@ -343,6 +363,7 @@ export function buildSaveEnvelope(params: SaveEnvelopeParams = {}): SaveEnvelope
       autoSaveEnabled,
       debugMode,
       welcomeShown,
+      _weatherLocked,
     },
   };
 }

@@ -212,6 +212,25 @@ export function generateWeather(
  * Called when the player first enters the hub or after flight return.
  */
 export function initWeather(state: GameState, bodyId: string = 'EARTH'): void {
+  // Test-only: when `_weatherLocked` is set on state, always produce clear skies.
+  // E2E saves opt in via buildSaveEnvelope so atmospheric flight is deterministic
+  // across the hub-load and flight-return paths (both call initWeather).
+  if ((state as { _weatherLocked?: boolean })._weatherLocked === true) {
+    state.weather = {
+      current: {
+        windSpeed: 0,
+        windAngle: 0,
+        temperature: 1.0,
+        visibility: 0,
+        extreme: false,
+        description: 'Clear skies',
+        bodyId,
+      },
+      skipCount: 0,
+      seed: 0,
+    };
+    return;
+  }
   // Sandbox mode with weather disabled: always perfect conditions.
   if (state.gameMode === GameMode.SANDBOX && !state.sandboxSettings?.weatherEnabled) {
     state.weather = {
