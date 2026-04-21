@@ -70,6 +70,7 @@ export async function startTestFlight(
 ): Promise<void> {
   await page.waitForFunction(
     () => typeof window.__e2eStartFlight === 'function',
+    undefined,
     { timeout: 10_000 },
   );
 
@@ -78,10 +79,12 @@ export async function startTestFlight(
     { parts: partIds, options: opts },
   );
 
-  // Wait for flight scene to be ready.
-  await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 10_000 });
+  // Wait for flight scene to be ready. 20s accommodates Vite cold-start
+  // compilation of flightController + PixiJS + physics worker.
+  await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 20_000 });
   await page.waitForFunction(
     () => typeof window.__flightPs !== 'undefined' && window.__flightPs !== null,
+    undefined,
     { timeout: 5_000 },
   );
 }
@@ -237,6 +240,7 @@ export async function waitForOrbit(
 ): Promise<void> {
   await page.waitForFunction(
     () => window.__flightState?.phase === 'ORBIT' && window.__flightState?.inOrbit === true,
+    undefined,
     { timeout },
   );
 }

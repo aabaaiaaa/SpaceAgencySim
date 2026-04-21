@@ -205,6 +205,7 @@ test.describe('Launch Pad', () => {
     await page.waitForFunction(
       (): boolean =>
         typeof window.__flightPs !== 'undefined',
+      undefined,
       { timeout: 5_000 },
     );
 

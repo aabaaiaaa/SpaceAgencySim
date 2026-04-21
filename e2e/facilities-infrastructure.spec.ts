@@ -204,6 +204,7 @@ test.describe('Facility upgrade purchase from construction menu', () => {
     await upgradeBtn.click();
     await page.waitForFunction(
       () => window.__gameState?.hubs?.[0]?.facilities?.['launch-pad']?.tier === 2,
+      undefined,
       { timeout: 5_000 },
     );
     await page.click('.cp-close-btn');
@@ -224,6 +225,7 @@ test.describe('Facility upgrade purchase from construction menu', () => {
     await upgradeBtn.click();
     await page.waitForFunction(
       () => window.__gameState?.hubs?.[0]?.facilities?.['vab']?.tier === 2,
+      undefined,
       { timeout: 5_000 },
     );
     await page.click('.cp-close-btn');
@@ -240,6 +242,7 @@ test.describe('Facility upgrade purchase from construction menu', () => {
     await upgradeBtn.click();
     await page.waitForFunction(
       () => window.__gameState?.hubs?.[0]?.facilities?.['mission-control']?.tier === 2,
+      undefined,
       { timeout: 5_000 },
     );
     await page.click('.cp-close-btn');
@@ -257,6 +260,7 @@ test.describe('Facility upgrade purchase from construction menu', () => {
     await upgradeBtn.click();
     await page.waitForFunction(
       () => window.__gameState?.hubs?.[0]?.facilities?.['launch-pad']?.tier === 3,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1119,6 +1123,7 @@ test.describe('Library — free construction', () => {
     await buildBtn.click();
     await page.waitForFunction(
       () => window.__gameState?.hubs?.[0]?.facilities?.['library']?.built === true,
+      undefined,
       { timeout: 5_000 },
     );
     await page.click('.cp-close-btn');

@@ -235,6 +235,7 @@ async function setTransferState(page: Page, origin: string, destination: string)
 
   await page.waitForFunction(
     () => window.__flightState?.phase === 'TRANSFER',
+    undefined,
     { timeout: 5_000 },
   );
 }
@@ -475,7 +476,7 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
       return (fs?.events ?? []).some((e: { type: string }) =>
         e.type === 'PART_DESTROYED' || e.type === 'HEAT_DAMAGE'
       );
-    }, { timeout: 10_000 });
+    }, undefined, { timeout: 10_000 });
 
     // Check for heat-related effects — parts should accumulate heat.
     // Heat is tracked in ps.heatMap (Map<string, number>).
@@ -519,7 +520,7 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
       return ps?.crashed === true ||
         ps?.activeParts?.size === 0 ||
         (fs?.events ?? []).some((e: { type: string }) => e.type === 'PART_DESTROYED');
-    }, { timeout: 30_000 });
+    }, undefined, { timeout: 30_000 });
 
     // All parts should be destroyed — check for crash or destruction state.
     const state = await page.evaluate((): DestructionState => {
@@ -745,6 +746,7 @@ test.describe('Landing on airless and atmospheric bodies', () => {
     // Wait for landed state to persist through the worker round-trip.
     await page.waitForFunction(
       () => window.__flightPs?.landed === true,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -769,6 +771,7 @@ test.describe('Landing on airless and atmospheric bodies', () => {
     // Wait for landed state to persist through the worker round-trip.
     await page.waitForFunction(
       () => window.__flightPs?.landed === true,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -792,6 +795,7 @@ test.describe('Landing on airless and atmospheric bodies', () => {
     // Wait for landed state to persist through the worker round-trip.
     await page.waitForFunction(
       () => window.__flightPs?.landed === true,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1057,6 +1061,7 @@ test.describe('Surface operations — sample collection and return', () => {
     // Wait for landed state and active parts to persist through worker sync.
     await page.waitForFunction(
       () => window.__flightPs?.landed === true && (window.__flightPs?.activeParts?.size ?? 0) > 0,
+      undefined,
       { timeout: 5_000 },
     );
 

@@ -141,6 +141,7 @@ async function returnToAgency(page: Page): Promise<void> {
 
   await page.waitForFunction(
     () => window.__flightState === null || window.__flightState === undefined,
+    undefined,
     { timeout: 5_000 },
   );
 }
@@ -202,6 +203,7 @@ test.describe('Construction menu — building a facility', () => {
     // Wait for facility to be built in game state
     await page.waitForFunction(
       () => window.__gameState?.hubs?.[0]?.facilities?.['crew-admin']?.built === true,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -691,7 +693,7 @@ test.describe('Contract BUDGET_LIMIT and MAX_PARTS constraints', () => {
         { contracts?: { active?: { id: string; objectives?: { completed?: boolean }[] }[] } } | undefined;
       const contract = gs?.contracts?.active?.find(c => c.id === 'contract-constraints');
       return contract?.objectives?.some(o => o.completed === true);
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     const gs = await getGameState(page) as GameState;
     const contract = (gs.contracts.active as ContractSnapshot[]).find(
@@ -758,7 +760,7 @@ test.describe('Contract over-performance bonus', () => {
         { contracts?: { active?: { id: string; objectives?: { completed?: boolean }[] }[] } } | undefined;
       const contract = gs?.contracts?.active?.find(c => c.id === 'contract-bonus');
       return contract?.objectives?.[0]?.completed === true;
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     const gs = await getGameState(page) as GameState;
     const contract = (gs.contracts.active as ContractSnapshot[]).find(
@@ -1864,7 +1866,7 @@ test.describe('Contract RESTRICT_PART constraint objective', () => {
         { contracts?: { active?: { id: string; objectives?: { completed?: boolean }[] }[] } } | undefined;
       const contract = gs?.contracts?.active?.find(c => c.id === 'contract-restrict');
       return contract?.objectives?.[0]?.completed === true;
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     const gs = await getGameState(page) as GameState;
     const contract = (gs.contracts.active as ContractSnapshot[]).find(
@@ -1932,7 +1934,7 @@ test.describe('Contract MINIMUM_CREW constraint objective', () => {
         { contracts?: { active?: { id: string; objectives?: { completed?: boolean }[] }[] } } | undefined;
       const contract = gs?.contracts?.active?.find(c => c.id === 'contract-mincrew');
       return contract?.objectives?.[0]?.completed === true;
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     const gs = await getGameState(page) as GameState;
     const contract = (gs.contracts.active as ContractSnapshot[]).find(

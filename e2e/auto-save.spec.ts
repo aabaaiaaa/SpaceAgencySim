@@ -47,6 +47,7 @@ test.describe('Auto-Save System', () => {
         const toast = document.getElementById('auto-save-toast');
         return toast?.textContent?.includes('Saved') ?? false;
       },
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -77,7 +78,7 @@ test.describe('Auto-Save System', () => {
     await expect(page.locator('#auto-save-toast')).toBeVisible({ timeout: 5_000 });
     await page.click('#auto-save-cancel-btn');
 
-    await page.waitForFunction((): boolean => !document.getElementById('auto-save-toast'), { timeout: 5_000 });
+    await page.waitForFunction((): boolean => !document.getElementById('auto-save-toast'), undefined, { timeout: 5_000 });
 
     const autoSaveRaw = await readIdb(page, 'spaceAgencySave_auto');
     expect(autoSaveRaw).toBeNull();
@@ -123,6 +124,7 @@ test.describe('Auto-Save System', () => {
         const toast = document.getElementById('auto-save-toast');
         return toast?.textContent?.includes('Saved') ?? false;
       },
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -216,6 +218,7 @@ test.describe('Auto-Save System', () => {
         const toast = document.getElementById('auto-save-toast');
         return toast?.textContent?.includes('Saved') ?? false;
       },
+      undefined,
       { timeout: 5_000 },
     );
   });

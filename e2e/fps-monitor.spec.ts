@@ -69,6 +69,7 @@ test.describe('FPS Monitor', () => {
     // Wait for perf stats to be populated (requires at least one render frame)
     await page.waitForFunction(
       () => window.__perfStats?.fps != null && window.__perfStats.fps > 0,
+      undefined,
       { timeout: 5_000 },
     );
 

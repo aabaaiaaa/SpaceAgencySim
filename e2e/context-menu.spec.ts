@@ -26,7 +26,7 @@ async function setupFlightWithParachute(page: Page): Promise<void> {
   await page.waitForFunction(() => {
     const ps = window.__flightPs;
     return ((ps?.posY as number) ?? 0) > 5;
-  }, { timeout: 5_000 });
+  }, undefined, { timeout: 5_000 });
 }
 
 /** Sweep right-clicks to find the parachute and open context menu. */

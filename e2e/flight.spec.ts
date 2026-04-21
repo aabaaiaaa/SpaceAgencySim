@@ -72,6 +72,7 @@ async function stageAndLiftoff(page: Page): Promise<void> {
   await pressStage(page);
   await page.waitForFunction(
     (): boolean => (window.__flightPs?.posY ?? 0) > 0,
+    undefined,
     { timeout: 3_000 },
   );
 }
@@ -252,6 +253,7 @@ test.describe('Flight — Launch & Basic Flight', () => {
     // Wait for some altitude
     await page.waitForFunction(
       (): boolean => (window.__flightPs?.posY ?? 0) > 10,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -275,6 +277,7 @@ test.describe('Flight — Launch & Basic Flight', () => {
 
     await page.waitForFunction(
       (): boolean => window.__flightPs !== null && window.__flightPs !== undefined,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -305,6 +308,7 @@ test.describe('Flight — Launch & Basic Flight', () => {
     await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 10_000 });
     await page.waitForFunction(
       (): boolean => typeof window.__vabAssembly !== 'undefined',
+      undefined,
       { timeout: 5_000 },
     );
 

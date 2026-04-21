@@ -315,6 +315,7 @@ async function waitLanded(page: Page, timeout: number = 30_000): Promise<void> {
 async function setWarp(page: Page, factor: number): Promise<void> {
   await page.waitForFunction(
     () => !(document.querySelector('.hud-warp-btn') as HTMLButtonElement | null)?.disabled,
+    undefined,
     { timeout: 5_000 },
   );
   await page.evaluate((f: number) => window.__testSetTimeWarp?.(f), factor);
@@ -526,10 +527,11 @@ test.describe('Tutorial Revisions', () => {
       await stage(page); // fire engine
       await pressThrottleUp(page);
       await waitForAltitude(page, 50);
-      // Wait for fuel depletion.
+      // Wait for fuel depletion. 30s: full-throttle engine-spark + tank-small burn ~20-25s.
       await page.waitForFunction(
         () => window.__flightPs?.firingEngines?.size === 0,
-        { timeout: 15_000 },
+        undefined,
+        { timeout: 30_000 },
       );
       await stage(page); // deploy parachute
       await setWarp(page, 100);
@@ -584,6 +586,7 @@ test.describe('Tutorial Revisions', () => {
           const ps = window.__flightPs;
           return ps && ps.posY <= 1_400 && ps.velY <= 0;
         },
+        undefined,
         { timeout: 30_000 },
       );
       await setWarp(page, 5);
@@ -591,6 +594,7 @@ test.describe('Tutorial Revisions', () => {
       // Wait until inside the altitude band (<= 1200m).
       await page.waitForFunction(
         () => (window.__flightPs?.posY ?? Infinity) <= 1_200,
+        undefined,
         { timeout: 15_000 },
       );
 
@@ -688,6 +692,7 @@ test.describe('Tutorial Revisions', () => {
           const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-017');
           return m?.objectives?.find(o => o.type === 'REACH_ORBIT')?.completed;
         },
+        undefined,
         { timeout: 5_000 },
       );
 
@@ -698,6 +703,7 @@ test.describe('Tutorial Revisions', () => {
           const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-017');
           return m?.objectives?.every(o => o.completed);
         },
+        undefined,
         { timeout: 5_000 },
       );
 
@@ -822,6 +828,7 @@ test.describe('Tutorial Revisions', () => {
           const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-020');
           return m?.objectives?.every(o => o.completed);
         },
+        undefined,
         { timeout: 5_000 },
       );
 
@@ -871,10 +878,11 @@ test.describe('Tutorial Revisions', () => {
       await pressThrottleUp(page);
       await waitForAltitude(page, 50);
 
-      // Wait for fuel depletion.
+      // Wait for fuel depletion. 30s: full-throttle engine-spark + tank-small burn ~20-25s.
       await page.waitForFunction(
         () => window.__flightPs?.firingEngines?.size === 0,
-        { timeout: 15_000 },
+        undefined,
+        { timeout: 30_000 },
       );
 
       // Deploy parachute.
@@ -933,6 +941,7 @@ test.describe('Tutorial Revisions', () => {
       // Wait for science to be collected.
       await page.waitForFunction(
         () => window.__gameState?.currentFlight?.events?.some(e => e.type === 'SCIENCE_COLLECTED'),
+        undefined,
         { timeout: 15_000 },
       );
 
@@ -985,6 +994,7 @@ test.describe('Tutorial Revisions', () => {
       // Wait for science data to be collected.
       await page.waitForFunction(
         () => window.__gameState?.currentFlight?.events?.some(e => e.type === 'SCIENCE_COLLECTED'),
+        undefined,
         { timeout: 15_000 },
       );
 
@@ -995,6 +1005,7 @@ test.describe('Tutorial Revisions', () => {
           const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-021');
           return m?.objectives?.find(o => o.type === 'REACH_ORBIT')?.completed;
         },
+        undefined,
         { timeout: 10_000 },
       );
 
@@ -1044,6 +1055,7 @@ test.describe('Tutorial Revisions', () => {
           const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-022');
           return m?.objectives?.find(o => o.type === 'REACH_ORBIT')?.completed;
         },
+        undefined,
         { timeout: 5_000 },
       );
 
@@ -1061,6 +1073,7 @@ test.describe('Tutorial Revisions', () => {
           const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-022');
           return m?.objectives?.every(o => o.completed);
         },
+        undefined,
         { timeout: 10_000 },
       );
 
@@ -1105,6 +1118,7 @@ test.describe('Tutorial Revisions', () => {
         () => (window.__gameState?.currentFlight?.events as { type: string; partType?: string }[] | undefined)?.some(
           e => e.type === 'PART_ACTIVATED' && e.partType === 'SERVICE_MODULE',
         ),
+        undefined,
         { timeout: 5_000 },
       );
 
@@ -1158,6 +1172,7 @@ test.describe('Tutorial Revisions', () => {
           const ps = window.__flightPs;
           return ps && ps.posY <= 1_400 && ps.velY <= 0;
         },
+        undefined,
         { timeout: 30_000 },
       );
       await setWarp(page, 5);
@@ -1165,6 +1180,7 @@ test.describe('Tutorial Revisions', () => {
       // Wait until inside the altitude band.
       await page.waitForFunction(
         () => (window.__flightPs?.posY ?? Infinity) <= 1_200,
+        undefined,
         { timeout: 15_000 },
       );
 
@@ -1228,6 +1244,7 @@ test.describe('Tutorial Revisions', () => {
           const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-014');
           return m?.objectives?.every(o => o.completed);
         },
+        undefined,
         { timeout: 5_000 },
       );
 
@@ -1269,6 +1286,7 @@ test.describe('Tutorial Revisions', () => {
           const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-015');
           return m?.objectives?.find(o => o.type === 'REACH_ORBIT')?.completed;
         },
+        undefined,
         { timeout: 5_000 },
       );
 
@@ -1279,6 +1297,7 @@ test.describe('Tutorial Revisions', () => {
           const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-015');
           return m?.objectives?.every(o => o.completed);
         },
+        undefined,
         { timeout: 5_000 },
       );
 
@@ -1310,6 +1329,7 @@ test.describe('Tutorial Revisions', () => {
           const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-016');
           return m?.objectives?.every(o => o.completed);
         },
+        undefined,
         { timeout: 5_000 },
       );
 
@@ -1348,6 +1368,7 @@ test.describe('Tutorial Revisions', () => {
           const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-017');
           return m?.objectives?.find(o => o.type === 'REACH_ORBIT')?.completed;
         },
+        undefined,
         { timeout: 5_000 },
       );
 
@@ -1358,6 +1379,7 @@ test.describe('Tutorial Revisions', () => {
           const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-017');
           return m?.objectives?.every(o => o.completed);
         },
+        undefined,
         { timeout: 5_000 },
       );
 

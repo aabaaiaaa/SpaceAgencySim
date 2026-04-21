@@ -10,9 +10,11 @@ export default defineConfig({
   // Run all tests in parallel
   fullyParallel: true,
 
-  // Limit parallel workers to avoid overwhelming the Vite dev server and
-  // exhausting Chromium process handles on Windows.
-  workers: 2,
+  // Use a single worker. A 2-worker run is ~20min faster than serial but
+  // significantly flakier under load (tests that pass in isolation fail when
+  // they compete for Vite/WebGL/CPU with a parallel peer). Trading ~20min for
+  // stability is worth it for a ~1h suite.
+  workers: 1,
 
   // Fail the build on CI if you accidentally left test.only in the source code
   forbidOnly: !!process.env.CI,

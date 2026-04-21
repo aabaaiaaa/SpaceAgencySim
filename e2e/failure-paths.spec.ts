@@ -92,6 +92,7 @@ async function returnToAgencyViaSummary(page: Page): Promise<void> {
   await page.click('#post-flight-return-btn');
   await page.waitForFunction(
     () => window.__flightState === null || window.__flightState === undefined,
+    undefined,
     { timeout: 5_000 },
   );
 }
@@ -168,6 +169,7 @@ test.describe('Malfunction during flight', () => {
     // Wait for at least one malfunction to appear on the physics state.
     await page.waitForFunction(
       () => (window.__flightPs?.malfunctions?.size ?? 0) > 0,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -206,6 +208,7 @@ test.describe('Malfunction during flight', () => {
     // Wait for malfunctions.
     await page.waitForFunction(
       () => (window.__flightPs?.malfunctions?.size ?? 0) > 0,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -293,6 +296,7 @@ test.describe('Crew KIA on crash', () => {
     // Wait for the craft to crash.
     await page.waitForFunction(
       () => window.__flightPs?.crashed === true,
+      undefined,
       { timeout: 15_000 },
     );
 
@@ -319,6 +323,7 @@ test.describe('Crew KIA on crash', () => {
     await page.click('#post-flight-return-btn');
     await page.waitForFunction(
       () => window.__flightState === null || window.__flightState === undefined,
+      undefined,
       { timeout: 5_000 },
     );
     await dismissReturnResults(page);

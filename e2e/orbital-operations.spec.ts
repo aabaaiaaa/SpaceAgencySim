@@ -207,6 +207,7 @@ async function returnToAgency(page: Page): Promise<void> {
 
   await page.waitForFunction(
     () => window.__flightState === null || window.__flightState === undefined,
+    undefined,
     { timeout: 10_000 },
   );
 
@@ -280,6 +281,7 @@ test.describe('Orbit entry detection', () => {
     // Wait for orbitBandId to be assigned (may take a frame after orbit entry).
     await page.waitForFunction(
       () => window.__flightState?.orbitBandId != null,
+      undefined,
       { timeout: 5_000 },
     );
     const fs = await getFlightState(page) as FlightStateSnapshot | null;
@@ -339,6 +341,7 @@ test.describe('Orbit exit warning and transition', () => {
         const phase = window.__flightState?.phase;
         return phase && phase !== 'ORBIT' && phase !== 'MANOEUVRE';
       },
+      undefined,
       { timeout: 10_000 },
     );
 
@@ -395,6 +398,7 @@ test.describe('Orbital manoeuvres', () => {
     // Wait for MANOEUVRE phase.
     await page.waitForFunction(
       () => window.__flightState?.phase === 'MANOEUVRE',
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -419,6 +423,7 @@ test.describe('Orbital manoeuvres', () => {
     // Wait for return to ORBIT.
     await page.waitForFunction(
       () => window.__flightState?.phase === 'ORBIT',
+      undefined,
       { timeout: 10_000 },
     );
 
@@ -490,6 +495,7 @@ test.describe('Docking mode local positioning', () => {
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
     await page.waitForFunction(
       () => window.__flightPs?.controlMode === 'DOCKING',
+      undefined,
       { timeout: 10_000 },
     );
 
@@ -510,11 +516,13 @@ test.describe('Docking mode local positioning', () => {
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
     await page.waitForFunction(
       () => window.__flightPs?.controlMode !== 'DOCKING',
+      undefined,
       { timeout: 10_000 },
     );
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
     await page.waitForFunction(
       () => window.__flightPs?.controlMode === 'DOCKING',
+      undefined,
       { timeout: 10_000 },
     );
 
@@ -527,6 +535,7 @@ test.describe('Docking mode local positioning', () => {
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true })));
     await page.waitForFunction(
       () => window.__flightPs?.controlMode === 'RCS',
+      undefined,
       { timeout: 10_000 },
     );
 
@@ -537,6 +546,7 @@ test.describe('Docking mode local positioning', () => {
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true })));
     await page.waitForFunction(
       () => window.__flightPs?.controlMode !== 'RCS',
+      undefined,
       { timeout: 10_000 },
     );
   });
@@ -548,6 +558,7 @@ test.describe('Docking mode local positioning', () => {
       await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
       await page.waitForFunction(
         () => window.__flightPs?.controlMode === 'DOCKING',
+        undefined,
         { timeout: 10_000 },
       );
     }
@@ -566,6 +577,7 @@ test.describe('Docking mode local positioning', () => {
     // Wait for at least one render frame to exercise the docking target draw code.
     await page.waitForFunction(
       () => (window.__flightPs?.dockingPortStates?.size ?? 0) > 0,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -592,6 +604,7 @@ test.describe('Docking mode local positioning', () => {
     // Wait for at least one render frame after docked state change.
     await page.waitForFunction(
       () => window.__flightPs?.dockingPortStates?.get('test-port') === 'docked',
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -723,6 +736,7 @@ test.describe('Satellite deployment and benefits', () => {
     // (the main loop replaces fs.events with the worker's version each frame).
     await page.waitForFunction(
       () => (window.__flightState?.events ?? []).some((e: { type: string }) => e.type === 'SATELLITE_DEPLOYED'),
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1033,6 +1047,7 @@ test.describe('Docking approach and guidance', () => {
     // Ensure docking state is initialised.
     await page.waitForFunction(
       () => window.__flightState?.dockingState != null,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1209,6 +1224,7 @@ test.describe('Undocking and control assignment', () => {
     // Wait for docking state to initialise.
     await page.waitForFunction(
       () => window.__flightState?.dockingState != null,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1243,6 +1259,7 @@ test.describe('Undocking and control assignment', () => {
     // Wait for the undocking state to persist through the worker snapshot round-trip.
     await page.waitForFunction(
       () => window.__flightState?.dockingState?.state === 'IDLE',
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1289,6 +1306,7 @@ test.describe('Crew transfer and fuel transfer', () => {
     // Wait for docking state.
     await page.waitForFunction(
       () => window.__flightState?.dockingState != null,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1314,6 +1332,7 @@ test.describe('Crew transfer and fuel transfer', () => {
     // Wait for the event to persist through the worker snapshot round-trip.
     await page.waitForFunction(
       () => (window.__flightState?.events ?? []).some((e: { type: string }) => e.type === 'CREW_TRANSFER'),
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1342,6 +1361,7 @@ test.describe('Crew transfer and fuel transfer', () => {
     // Wait for the event to persist through the worker snapshot round-trip.
     await page.waitForFunction(
       () => (window.__flightState?.events ?? []).some((e: { type: string }) => e.type === 'FUEL_TRANSFER'),
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1379,6 +1399,7 @@ test.describe('Power system', () => {
     // Wait for power state to be populated.
     await page.waitForFunction(
       () => window.__flightPs?.powerState?.solarPanelArea! > 0,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1401,6 +1422,7 @@ test.describe('Power system', () => {
   test('(2) solar generation is positive when craft is sunlit', async () => {
     await page.waitForFunction(
       () => window.__flightPs?.powerState != null,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1458,6 +1480,7 @@ test.describe('Power system', () => {
     await waitForOrbit(page);
     await page.waitForFunction(
       () => window.__flightPs?.powerState != null,
+      undefined,
       { timeout: 10_000 },
     );
 
@@ -1525,6 +1548,7 @@ test.describe('Grabbing arm and satellite repair', () => {
     // Wait for the flight assembly to be populated.
     await page.waitForFunction(
       () => (window.__flightAssembly?.parts?.size ?? 0) > 0,
+      undefined,
       { timeout: 10_000 },
     );
 
@@ -1659,6 +1683,7 @@ test.describe('Integrated orbital operations', () => {
 
     await page.waitForFunction(
       () => window.__flightState?.phase === 'MANOEUVRE',
+      undefined,
       { timeout: 10_000 },
     );
 
@@ -1673,6 +1698,7 @@ test.describe('Integrated orbital operations', () => {
 
     await page.waitForFunction(
       () => window.__flightState?.phase === 'ORBIT',
+      undefined,
       { timeout: 15_000 },
     );
 
@@ -1725,6 +1751,7 @@ test.describe('Docking thresholds', () => {
 
     await page.waitForFunction(
       () => window.__flightState?.dockingState != null,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1905,6 +1932,7 @@ test.describe('Power system eclipse behaviour', () => {
     await waitForOrbit(page);
     await page.waitForFunction(
       () => window.__flightPs?.powerState != null,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1936,6 +1964,7 @@ test.describe('Power system eclipse behaviour', () => {
 
     await page.waitForFunction(
       () => (window.__flightPs?.powerState?.batteryCharge as number) > 0,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -2037,6 +2066,7 @@ test.describe('Orbital elements tracking', () => {
     // Wait for orbital elements to be computed after orbit detection.
     await page.waitForFunction(
       () => window.__flightState?.orbitalElements != null,
+      undefined,
       { timeout: 10_000 },
     );
 
@@ -2117,6 +2147,7 @@ test.describe('Complete orbital lifecycle', () => {
 
     await page.waitForFunction(
       () => window.__flightState?.phase === 'MANOEUVRE',
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -2131,6 +2162,7 @@ test.describe('Complete orbital lifecycle', () => {
 
     await page.waitForFunction(
       () => window.__flightState?.phase === 'ORBIT',
+      undefined,
       { timeout: 10_000 },
     );
 

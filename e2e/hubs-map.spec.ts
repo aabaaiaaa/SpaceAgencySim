@@ -57,6 +57,7 @@ test.describe('Hub markers on map @smoke', () => {
     // Wait for hubs to be loaded in game state before reading.
     await page.waitForFunction(
       () => (window.__gameState?.hubs?.length ?? 0) >= 2,
+      undefined,
       { timeout: 5_000 },
     );
 

@@ -36,6 +36,7 @@ test.describe('Tipping physics — ground-contact rotation', () => {
     await dispatchKeyDown(page, 'd');
     await page.waitForFunction(
       () => Math.abs(window.__flightPs?.angle ?? 0) > 0.4,
+      undefined,
       { timeout: 5_000 },
     );
     await dispatchKeyUp(page, 'd');
@@ -92,6 +93,7 @@ test.describe('Tipping physics — ground-contact rotation', () => {
     // Wait for gravity torque to topple it past crash threshold.
     await page.waitForFunction(
       () => window.__flightPs?.crashed === true,
+      undefined,
       { timeout: 15_000 },
     );
 

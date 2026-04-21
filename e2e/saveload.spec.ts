@@ -146,7 +146,13 @@ test.describe('Save & Load Flow', () => {
     await page.waitForSelector('#mm-modal-confirm', { state: 'visible', timeout: 5_000 });
     await page.click('#mm-modal-confirm');
 
-    // Navigate again — no saves remain, so New Game screen must appear.
+    // The confirm click triggers an async delete + screen switch; wait for
+    // the in-memory switch to newgame first so the IDB write has landed
+    // before we reload. Otherwise the goto('/') below can race the async
+    // delete and land on the still-populated load screen.
+    await page.waitForSelector('#mm-newgame-screen', { state: 'visible', timeout: 10_000 });
+
+    // Navigate again — no saves remain, so New Game screen must still appear.
     await page.goto('/');
     await page.waitForSelector('#mm-newgame-screen', { state: 'visible', timeout: 10_000 });
     await expect(page.locator('[data-screen="newgame"]')).toBeVisible({ timeout: 5_000 });
@@ -190,6 +196,7 @@ test.describe('Save & Load Flow', () => {
     await dragPartToCanvas(page, 'probe-core-mk1', 525, 400);
     await page.waitForFunction(
       () => (window.__vabAssembly?.parts?.size ?? 0) >= 1,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -211,6 +218,7 @@ test.describe('Save & Load Flow', () => {
     await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 10_000 });
     await page.waitForFunction(
       () => (window.__vabAssembly?.parts?.size ?? 0) >= 1,
+      undefined,
       { timeout: 5_000 },
     );
 

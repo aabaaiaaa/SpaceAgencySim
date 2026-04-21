@@ -86,6 +86,7 @@ async function gainAltitudeAndSeparate(page: Page): Promise<void> {
   await pressStage(page);
   const fired = await page.waitForFunction(
     (): boolean => (window.__flightPs?.firingEngines?.size ?? 0) > 0,
+    undefined,
     { timeout: 10_000 },
   ).then(() => true).catch(() => false);
   if (!fired) {
@@ -93,26 +94,31 @@ async function gainAltitudeAndSeparate(page: Page): Promise<void> {
     await pressStage(page);
     await page.waitForFunction(
       (): boolean => (window.__flightPs?.firingEngines?.size ?? 0) > 0,
+      undefined,
       { timeout: 10_000 },
     ).catch(() => {});
   }
+  // Heavy two-stage rocket (cmd + decoupler + tank + engine) on default TWR
+  // mode — climbs slowly; allow up to 30s for altitude 300m. Previously this
+  // worked implicitly because Playwright's default 30s timeout applied when
+  // options were incorrectly passed as the 2nd arg.
   await page.waitForFunction(() => {
     const ps = window.__flightPs;
     return (ps?.posY ?? 0) > 300;
-  }, { timeout: 15_000 });
+  }, undefined, { timeout: 30_000 });
 
   await pressStage(page); // Stage 2: decoupler
   await page.waitForFunction(() => {
     const ps = window.__flightPs;
     return (ps?.debris?.length ?? 0) > 0;
-  }, { timeout: 5_000 });
+  }, undefined, { timeout: 5_000 });
 
   // Wait for visible separation.
   await page.waitForFunction(() => {
     const ps = window.__flightPs;
     if (!ps?.debris?.length) return false;
     return Math.abs(ps.posY - ps.debris[0].posY) > 0.1;
-  }, { timeout: 5_000 });
+  }, undefined, { timeout: 5_000 });
 }
 
 // ---------------------------------------------------------------------------
@@ -129,6 +135,7 @@ test.describe('Collision — Stage Separation', () => {
     // Guard: ensure debris array is populated before accessing [0].
     await page.waitForFunction(
       () => (window.__flightPs?.debris?.length ?? 0) > 0,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -148,6 +155,7 @@ test.describe('Collision — Stage Separation', () => {
     // Guard: ensure debris array is populated before accessing [0].
     await page.waitForFunction(
       () => (window.__flightPs?.debris?.length ?? 0) > 0,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -168,7 +176,7 @@ test.describe('Collision — Stage Separation', () => {
       const ps = window.__flightPs;
       if (!ps?.debris?.length) return false;
       return Math.abs(ps.posY - ps.debris[0].posY) > 1;
-    }, { timeout: 10_000 });
+    }, undefined, { timeout: 10_000 });
 
     const result: DistanceResult = await page.evaluate((): DistanceResult => {
       const ps = window.__flightPs;

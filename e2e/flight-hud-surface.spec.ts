@@ -56,6 +56,7 @@ test.describe('Flight HUD — Surface Ops layout', () => {
     // guarantees it has real geometry rather than a zero-height initial frame.
     await page.waitForFunction(
       () => (document.querySelectorAll('#flight-hud-surface .surface-btn').length ?? 0) > 0,
+      undefined,
       { timeout: 5_000 },
     );
 

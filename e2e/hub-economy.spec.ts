@@ -58,6 +58,7 @@ async function completeFlightCycle(page: import('@playwright/test').Page): Promi
   // Wait for the craft to gain some altitude before crashing
   await page.waitForFunction(
     () => (window.__flightPs?.posY ?? 0) > 50,
+    undefined,
     { timeout: 15_000 },
   );
 

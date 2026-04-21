@@ -85,7 +85,7 @@ test.describe('VAB — Rocket Builder Flow', () => {
 
     const cashBefore = await page.evaluate(() => window.__gameState?.money ?? 0);
     await dragPartToCanvas(page, 'cmd-mk1', CENTRE_X, CMD_DROP_Y);
-    await page.waitForFunction(() => (window.__vabAssembly?.parts?.size ?? 0) >= 1, { timeout: 3_000 });
+    await page.waitForFunction(() => (window.__vabAssembly?.parts?.size ?? 0) >= 1, undefined, { timeout: 3_000 });
 
     const cashAfter = await page.evaluate(() => window.__gameState?.money ?? 0);
     expect(cashAfter).toBe(cashBefore - CMD_COST);
@@ -188,6 +188,7 @@ test.describe('VAB — Rocket Builder Flow', () => {
 
     await page.waitForFunction(
       () => document.querySelectorAll('.vab-offscreen-indicator').length > 0,
+      undefined,
       { timeout: 2_000 },
     );
     expect(await page.locator('.vab-offscreen-indicator').count()).toBeGreaterThanOrEqual(1);
@@ -200,6 +201,7 @@ test.describe('VAB — Rocket Builder Flow', () => {
 
     await page.waitForFunction(
       () => document.querySelectorAll('.vab-offscreen-indicator').length === 0,
+      undefined,
       { timeout: 2_000 },
     );
   });

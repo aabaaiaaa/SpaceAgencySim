@@ -124,6 +124,7 @@ test.describe('Resource contracts — early chain', () => {
     // Wait for state to stabilize after UI interaction
     await page.waitForFunction(
       () => window.__gameState?.contracts?.completed?.length >= 1,
+      undefined,
       { timeout: 5_000 },
     );
 

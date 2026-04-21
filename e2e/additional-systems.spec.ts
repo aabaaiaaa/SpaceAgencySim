@@ -176,7 +176,7 @@ test.describe('Thermal system', () => {
       if (!ps?.heatMap) return false;
       for (const h of ps.heatMap.values()) { if (h > 0) return true; }
       return false;
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     const heatData = await page.evaluate(() => {
       const ps = window.__flightPs;
@@ -205,7 +205,7 @@ test.describe('Thermal system', () => {
       if (!ps?.heatMap) return false;
       for (const h of ps.heatMap.values()) { if (h > 0) return true; }
       return false;
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     const beforeHeat = await page.evaluate(() => {
       const ps = window.__flightPs!;
@@ -298,7 +298,7 @@ test.describe('Thermal system', () => {
       if (!ps?.heatMap) return false;
       for (const h of ps.heatMap.values()) { if (h > 0) return true; }
       return false;
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     // The heat shield should be leading face (lowest Y); parts above (probe, tank, engine)
     // should be shielded and accumulate less or zero heat.
@@ -346,7 +346,7 @@ test.describe('Thermal system', () => {
       if (!ps?.heatMap) return false;
       for (const h of ps.heatMap.values()) { if (h > 0) return true; }
       return false;
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     const ascendingHeat = await page.evaluate(() => {
       const ps = window.__flightPs!;
@@ -418,6 +418,7 @@ test.describe('Thermal system', () => {
     // Wait for physics to run several frames (gravity pulls craft down, proving sim is running)
     await page.waitForFunction(
       () => (window.__flightPs?.posY ?? 20_000) < 19_500,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -471,7 +472,7 @@ test.describe('Thermal system', () => {
       if (!ps?.heatMap) return false;
       for (const h of ps.heatMap.values()) { if (h > 0) return true; }
       return false;
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     // The heat glow is a PixiJS rendering effect. We verify indirectly that
     // the heat ratio is above the 0.1 threshold for rendering.
@@ -626,6 +627,7 @@ test.describe('Tech tree parts', () => {
     await pressThrottleCut(page);
     await page.waitForFunction(
       () => (window.__flightPs?.throttle ?? 1) === 0,
+      undefined,
       { timeout: 5_000 },
     );
     await pressStage(page);
@@ -633,6 +635,7 @@ test.describe('Tech tree parts', () => {
     // Wait for descent — velocity should slow.
     await page.waitForFunction(
       () => Math.abs(window.__flightPs?.velY ?? 999) < 200,
+      undefined,
       { timeout: 10_000 },
     );
 
@@ -969,6 +972,7 @@ test.describe('Satellite components', () => {
     await waitForOrbit(page);
     await page.waitForFunction(
       () => (window.__flightPs?.powerState?.solarPanelArea ?? 0) > 0,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1213,6 +1217,7 @@ test.describe('Comms range', () => {
         const fs = window.__flightState;
         return (fs?.commsState?.status ?? fs?.comms?.status) != null;
       },
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1257,6 +1262,7 @@ test.describe('Comms range', () => {
         const fs = window.__flightState;
         return (fs?.commsState?.status ?? fs?.comms?.status) != null;
       },
+      undefined,
       { timeout: 15_000 },
     );
 
@@ -1298,6 +1304,7 @@ test.describe('Comms range', () => {
         const fs = window.__flightState;
         return (fs?.commsState?.status ?? fs?.comms?.status) != null;
       },
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1346,6 +1353,7 @@ test.describe('Comms range', () => {
         const fs = window.__flightState;
         return (fs?.commsState?.status ?? fs?.comms?.status) != null;
       },
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1429,6 +1437,7 @@ test.describe('Comms range', () => {
         const fs = window.__flightState;
         return (fs?.commsState?.status ?? fs?.comms?.status) != null;
       },
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1505,6 +1514,7 @@ test.describe('Comms range', () => {
         const fs = window.__flightState;
         return (fs?.commsState?.status ?? fs?.comms?.status) != null;
       },
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1546,6 +1556,7 @@ test.describe('Comms range', () => {
         const fs = window.__flightState;
         return (fs?.commsState?.status ?? fs?.comms?.status) != null;
       },
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1572,6 +1583,7 @@ test.describe('Comms range', () => {
         const s = fs?.commsState?.status ?? fs?.comms?.status;
         return s === 'CONNECTED';
       },
+      undefined,
       { timeout: 10_000 },
     );
 
@@ -1609,6 +1621,7 @@ test.describe('Comms range', () => {
         const fs = window.__flightState;
         return (fs?.commsState?.status ?? fs?.comms?.status) != null;
       },
+      undefined,
       { timeout: 5_000 },
     );
 

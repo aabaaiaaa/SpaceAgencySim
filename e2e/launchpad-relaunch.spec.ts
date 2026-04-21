@@ -86,6 +86,7 @@ async function launchFromPad(page: Page): Promise<void> {
     (): boolean =>
       typeof window.__flightPs !== 'undefined' &&
       window.__flightPs !== null,
+    undefined,
     { timeout: 5_000 },
   );
 }
@@ -99,6 +100,7 @@ async function fireStageAndVerifyLiftoff(page: Page): Promise<void> {
   // Wait for the staging system to be ready before pressing stage.
   await page.waitForFunction(
     () => (window.__flightPs?.activeParts?.size ?? 0) > 0,
+    undefined,
     { timeout: 5_000 },
   );
 
@@ -108,6 +110,7 @@ async function fireStageAndVerifyLiftoff(page: Page): Promise<void> {
     await pressStage(page);
     const fired = await page.waitForFunction(
       (): boolean => (window.__flightPs?.firingEngines?.size ?? 0) > 0,
+      undefined,
       { timeout: 3_000 },
     ).then(() => true).catch(() => false);
     if (fired) break;
@@ -120,6 +123,7 @@ async function fireStageAndVerifyLiftoff(page: Page): Promise<void> {
 
   await page.waitForFunction(
     (): boolean => (window.__flightPs?.posY ?? 0) > 5,
+    undefined,
     { timeout: 5_000 },
   );
 }
@@ -185,6 +189,7 @@ test.describe('Launch Pad — Relaunch Engine Bug', () => {
     // before starting the second flight.
     await page.waitForFunction(
       () => window.__flightPs == null,
+      undefined,
       { timeout: 10_000 },
     ).catch(() => { /* may already be null */ });
 

@@ -332,7 +332,7 @@ test.describe('Route Interactions', () => {
     await page.waitForFunction(() => {
       const legs = document.querySelectorAll('.logistics-route-map .proven-leg-line');
       return legs.length > 0;
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     // Step 2: Click the Earth->Moon proven leg (index 0, outbound from Earth)
     const leg0 = page.locator('#route-leg-proven-0');
@@ -343,7 +343,7 @@ test.describe('Route Interactions', () => {
     await page.waitForFunction(() => {
       const items = document.querySelectorAll('.logistics-builder-leg-item');
       return items.length >= 1;
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     // Step 3: Click the Moon->Mars proven leg (index 1, now outbound from Moon)
     const leg1 = page.locator('#route-leg-proven-1');
@@ -354,7 +354,7 @@ test.describe('Route Interactions', () => {
     await page.waitForFunction(() => {
       const items = document.querySelectorAll('.logistics-builder-leg-item');
       return items.length >= 2;
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     // Step 4: Click "Create Route" confirm button
     const confirmBtn = builderPanel.locator('.logistics-builder-confirm-btn');
@@ -457,7 +457,7 @@ test.describe('Route Interactions', () => {
     await page.waitForFunction(() => {
       const legs = document.querySelectorAll('.logistics-route-map .proven-leg-line');
       return legs.length > 0;
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     // Click the highlighted proven leg line
     const provenLegLine = page.locator('.logistics-route-map .proven-leg-line');
@@ -467,7 +467,7 @@ test.describe('Route Interactions', () => {
     await page.waitForFunction(() => {
       const legsDisplay = document.querySelector('.logistics-builder-legs');
       return legsDisplay && !legsDisplay.textContent?.includes('No legs added');
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     // Click "Create Route" confirm button
     const confirmBtn = builderPanel.locator('.logistics-builder-confirm-btn');
@@ -580,7 +580,7 @@ test.describe('Route Interactions', () => {
     await page.waitForFunction(() => {
       const legs = document.querySelectorAll('.logistics-route-map .proven-leg-line');
       return legs.length > 0;
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     // Click the proven leg (Earth -> Moon, index 0)
     const provenLeg = page.locator('#route-leg-proven-0');
@@ -591,7 +591,7 @@ test.describe('Route Interactions', () => {
     await page.waitForFunction(() => {
       const items = document.querySelectorAll('.logistics-builder-leg-item');
       return items.length >= 1;
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     // Click "Create Route" confirm button
     const confirmBtn = builderPanel.locator('.logistics-builder-confirm-btn');

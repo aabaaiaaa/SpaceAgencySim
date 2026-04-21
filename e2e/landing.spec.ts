@@ -55,6 +55,7 @@ async function buildAndLaunch(page: Page): Promise<void> {
 async function waitForWarpUnlocked(page: Page): Promise<void> {
   await page.waitForFunction(
     () => !(document.querySelector('.hud-warp-btn') as HTMLButtonElement | null)?.disabled,
+    undefined,
     { timeout: 5_000 },
   );
 }
@@ -63,6 +64,7 @@ async function fireStage1(page: Page): Promise<void> {
   await pressStage(page);
   await page.waitForFunction(
     () => (window.__flightPs?.posY ?? 0) > 0,
+    undefined,
     { timeout: 3_000 },
   );
 }
@@ -72,6 +74,7 @@ async function fireStage2(page: Page): Promise<void> {
   await pressStage(page);
   await page.waitForFunction(
     () => (window.__flightPs?.debris?.length ?? 0) > 0,
+    undefined,
     { timeout: 5_000 },
   );
 }
@@ -84,6 +87,7 @@ async function waitForLanding(page: Page): Promise<void> {
       const ps = window.__flightPs;
       return ps?.landed === true || ps?.crashed === true;
     },
+    undefined,
     { timeout: 15_000 },
   );
 }
@@ -107,11 +111,13 @@ test.describe('Flight — Landing', () => {
 
     await page.waitForFunction(
       () => window.__flightPs?.grounded === true,
+      undefined,
       { timeout: 5_000 },
     );
     await fireStage1(page);
     await page.waitForFunction(
       () => (window.__flightPs?.posY ?? 0) > 0,
+      undefined,
       { timeout: 5_000 },
     );
   });
@@ -130,7 +136,7 @@ test.describe('Flight — Landing', () => {
         if (entry.state === 'deploying' || entry.state === 'deployed') return true;
       }
       return false;
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     const chuteState: string = await page.evaluate((): string => {
       const ps = window.__flightPs;
@@ -171,6 +177,7 @@ test.describe('Flight — Landing', () => {
 
     await page.waitForFunction(
       () => (window.__gameState?.currentFlight?.events ?? []).some((e: { type: string }) => e.type === 'LANDING'),
+      undefined,
       { timeout: 5_000 },
     );
 

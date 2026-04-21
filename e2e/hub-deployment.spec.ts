@@ -69,6 +69,7 @@ async function startAndLandOnMoon(page: Page): Promise<void> {
   // Wait for landed state to persist through the worker round-trip.
   await page.waitForFunction(
     () => window.__flightPs?.landed === true,
+    undefined,
     { timeout: 5_000 },
   );
 }

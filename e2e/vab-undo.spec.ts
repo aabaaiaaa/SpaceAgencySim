@@ -55,6 +55,7 @@ test.describe('VAB — Undo/Redo', () => {
     // Wait for the undo to take effect.
     await page.waitForFunction(
       () => (window.__vabAssembly?.parts?.size ?? 0) === 0,
+      undefined,
       { timeout: 5_000 },
     );
 

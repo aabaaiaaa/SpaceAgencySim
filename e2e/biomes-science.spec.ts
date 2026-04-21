@@ -107,6 +107,7 @@ test.describe('Biome label transitions', () => {
     // Wait for HUD biome label to update
     await page.waitForFunction(
       (): boolean => document.querySelector('#hud-biome')?.textContent === 'Low Atmosphere',
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -125,6 +126,7 @@ test.describe('Biome label transitions', () => {
 
     await page.waitForFunction(
       (): boolean => document.querySelector('#hud-biome')?.textContent === 'Mid Atmosphere',
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -151,6 +153,7 @@ test.describe('Biome label transitions', () => {
         const el: Element | null = document.querySelector('#hud-biome');
         return el !== null && el.textContent === 'Low Atmosphere';
       },
+      undefined,
       { timeout: 15_000 },
     );
 
@@ -203,6 +206,7 @@ test.describe('Science multiplier per biome', () => {
         const events: FlightEvent[] = w.__gameState?.currentFlight?.events ?? [];
         return events.some((e: FlightEvent) => e.type === 'SCIENCE_COLLECTED');
       },
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -480,6 +484,7 @@ test.describe('Science module instruments', () => {
         }
         return false;
       },
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -559,6 +564,7 @@ test.describe('Instrument activation via staging', () => {
         }
         return false;
       },
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -586,6 +592,7 @@ test.describe('Instrument activation via staging', () => {
         }
         return false;
       },
+      undefined,
       { timeout: 15_000 },
     );
 
@@ -653,6 +660,7 @@ test.describe('Science data types', () => {
         }
         return false;
       },
+      undefined,
       { timeout: 10_000 },
     );
 
@@ -716,6 +724,7 @@ test.describe('Science data types', () => {
         }
         return false;
       },
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1044,7 +1053,7 @@ test.describe('Instrument biome validity', () => {
         if (entry.instrumentId === 'barometer') return true;
       }
       return false;
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     // Check for INSTRUMENT_INVALID_BIOME event.
     const invalidBiomeEvent: FlightEvent | null = await page.evaluate((): FlightEvent | null => {
@@ -1105,7 +1114,7 @@ test.describe('Instrument biome validity', () => {
         if (entry.instrumentId === 'radiation-detector') return true;
       }
       return false;
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     const radState: string | null = await page.evaluate((): string | null => {
       const w = window;
@@ -1860,6 +1869,7 @@ test.describe('Science collection integration', () => {
         const events: FlightEvent[] = w.__gameState?.currentFlight?.events ?? [];
         return events.some((e: FlightEvent) => e.type === 'SCIENCE_COLLECTED');
       },
+      undefined,
       { timeout: 5_000 },
     );
 

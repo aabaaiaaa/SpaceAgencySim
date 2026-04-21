@@ -49,6 +49,7 @@ test.describe('Relaunch — Takeoff, Land, Takeoff Again', () => {
 
     await page.waitForFunction(
       () => (window.__flightPs?.posY ?? 0) > 50,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -66,6 +67,7 @@ test.describe('Relaunch — Takeoff, Land, Takeoff Again', () => {
     // Gain some altitude first.
     await page.waitForFunction(
       () => (window.__flightPs?.posY ?? 0) > 30,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -76,17 +78,20 @@ test.describe('Relaunch — Takeoff, Land, Takeoff Again', () => {
     // Wait for the teleported position to take effect before checking landing.
     await page.waitForFunction(
       () => (window.__flightPs?.posY ?? 999) < 5,
+      undefined,
       { timeout: 5_000 },
     );
 
     await page.waitForFunction(
       () => window.__flightPs?.landed === true,
+      undefined,
       { timeout: 5_000 },
     );
 
     // Wait for physics to settle position and velocity after landing.
     await page.waitForFunction(
       () => window.__flightPs?.landed === true && window.__flightPs?.posY === 0 && window.__flightPs?.velY === 0,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -107,6 +112,7 @@ test.describe('Relaunch — Takeoff, Land, Takeoff Again', () => {
     // Gain altitude.
     await page.waitForFunction(
       () => (window.__flightPs?.posY ?? 0) > 30,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -117,11 +123,13 @@ test.describe('Relaunch — Takeoff, Land, Takeoff Again', () => {
     // Wait for the teleported position to take effect before checking landing.
     await page.waitForFunction(
       () => (window.__flightPs?.posY ?? 999) < 5,
+      undefined,
       { timeout: 5_000 },
     );
 
     await page.waitForFunction(
       () => window.__flightPs?.landed === true,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -148,6 +156,7 @@ test.describe('Relaunch — Takeoff, Land, Takeoff Again', () => {
 
     await page.waitForFunction(
       () => (window.__flightPs?.posY ?? 0) > 5,
+      undefined,
       { timeout: 5_000 },
     );
 

@@ -386,6 +386,7 @@ test.describe('Asteroid Belt — zone definitions', () => {
   test('@smoke belt zones are defined on the Sun body with correct boundaries', async () => {
     await page.waitForFunction(
       () => window.__celestialBodies?.SUN?.altitudeBands?.length > 0,
+      undefined,
       { timeout: 10_000 },
     );
 
@@ -1159,6 +1160,7 @@ test.describe('Asteroid Belt — transfer trajectory safety', () => {
     // Wait for the TRANSFER phase to persist through the worker round-trip.
     await page.waitForFunction(
       () => window.__flightState?.phase === 'TRANSFER',
+      undefined,
       { timeout: 5_000 },
     );
 

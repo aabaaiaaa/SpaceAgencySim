@@ -74,6 +74,7 @@ async function disconnectTank(page: Page): Promise<string> {
   await dragPlacedPart(page, tankId!, CENTRE_X + 200, CANVAS_CENTRE_Y + 100);
   await page.waitForFunction(
     () => (window.__vabAssembly?.connections?.length ?? 99) === 0,
+    undefined,
     { timeout: 5_000 },
   );
   return tankId!;
@@ -83,6 +84,7 @@ async function reconnectTank(page: Page, tankId: string): Promise<void> {
   await dragPlacedPart(page, tankId, CENTRE_X, TANK_DROP_Y);
   await page.waitForFunction(
     () => (window.__vabAssembly?.connections?.length ?? 0) >= 2,
+    undefined,
     { timeout: 5_000 },
   );
 }
@@ -112,6 +114,7 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
 
     await page.waitForFunction(
       () => !(document.querySelector('#vab-btn-launch') as HTMLButtonElement | null)?.disabled,
+      undefined,
       { timeout: 5_000 },
     );
   });
@@ -159,6 +162,7 @@ test.describe('VAB — Part Disconnection & Reconnection', () => {
 
     await page.waitForFunction(
       () => !(document.querySelector('#vab-btn-launch') as HTMLButtonElement | null)?.disabled,
+      undefined,
       { timeout: 5_000 },
     );
     await page.locator('#vab-engineer-close').click();

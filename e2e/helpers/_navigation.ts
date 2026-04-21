@@ -57,6 +57,7 @@ export async function navigateToVab(page: Page): Promise<void> {
   await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 10_000 });
   await page.waitForFunction(
     () => typeof window.__vabAssembly !== 'undefined',
+    undefined,
     { timeout: 10_000 },
   );
 
@@ -105,6 +106,7 @@ export async function launchFromVab(page: Page): Promise<void> {
       const btn = document.querySelector('#vab-btn-launch') as HTMLButtonElement | null;
       return btn && !btn.disabled;
     },
+    undefined,
     { timeout: 5_000 },
   );
   await page.click('#vab-btn-launch');
@@ -117,10 +119,12 @@ export async function launchFromVab(page: Page): Promise<void> {
     // No crew dialog — proceed directly to flight.
   }
 
-  // Wait for flight scene.
-  await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 10_000 });
+  // Wait for flight scene. 20s accommodates Vite cold-start compilation of
+  // flightController + PixiJS + physics worker on the first flight of a suite.
+  await page.waitForSelector('#flight-hud', { state: 'visible', timeout: 20_000 });
   await page.waitForFunction(
     () => typeof window.__flightPs !== 'undefined' && window.__flightPs !== null,
+    undefined,
     { timeout: 5_000 },
   );
 }
@@ -182,6 +186,7 @@ export async function stageAndLaunch(page: Page): Promise<void> {
   // Wait for the staging system to be ready.
   await page.waitForFunction(
     () => (window.__flightPs?.activeParts?.size ?? 0) > 0,
+    undefined,
     { timeout: 5_000 },
   );
 
@@ -213,6 +218,7 @@ export async function stageAndLaunch(page: Page): Promise<void> {
       if (!ps) return false;
       return (ps.firingEngines?.size ?? 0) > 0 || ps.posY > 2;
     },
+    undefined,
     { timeout: 10_000 },
   ).then(() => true).catch(() => false);
 
@@ -225,6 +231,7 @@ export async function stageAndLaunch(page: Page): Promise<void> {
         if (!ps) return false;
         return (ps.firingEngines?.size ?? 0) > 0 || ps.posY > 2;
       },
+      undefined,
       { timeout: 10_000 },
     ).catch(() => { /* best effort */ });
   }

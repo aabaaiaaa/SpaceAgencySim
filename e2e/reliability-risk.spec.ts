@@ -124,6 +124,7 @@ async function returnToAgency(page: Page): Promise<void> {
 
   await page.waitForFunction(
     () => window.__flightState === null || window.__flightState === undefined,
+    undefined,
     { timeout: 5_000 },
   );
 }
@@ -166,6 +167,7 @@ test.describe('Malfunction toggle and biome-transition triggering', () => {
     // Wait for physics to process across the biome boundary
     await page.waitForFunction(
       () => (window.__flightPs?.posY ?? 0) > 160,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -194,6 +196,7 @@ test.describe('Malfunction toggle and biome-transition triggering', () => {
     // Wait for malfunction check to process
     await page.waitForFunction(
       () => (window.__flightPs?.malfunctions?.size ?? 0) > 0,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -483,6 +486,7 @@ test.describe('SRB early burnout malfunction', () => {
     // Wait for SRB to start firing
     await page.waitForFunction(
       () => (window.__flightPs?.firingEngines?.size ?? 0) > 0,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1071,6 +1075,7 @@ test.describe('Wind force during flight and ISP modifier', () => {
     // Wait for wind to produce measurable displacement
     await page.waitForFunction(
       () => Math.abs(window.__flightPs?.posX ?? 0) > 0.01,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1216,6 +1221,7 @@ test.describe('Extreme weather warning', () => {
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
     await page.waitForFunction(
       () => (document.querySelector('#hub-overlay')?.children.length ?? 0) > 0,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1247,6 +1253,7 @@ test.describe('Extreme weather warning', () => {
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
     await page.waitForFunction(
       () => (document.querySelector('#hub-overlay')?.children.length ?? 0) > 0,
+      undefined,
       { timeout: 5_000 },
     );
 
@@ -1518,6 +1525,7 @@ test.describe('Reputation tier effects', () => {
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
     await page.waitForFunction(
       () => document.querySelector('.hub-rep-tier') !== null,
+      undefined,
       { timeout: 5_000 },
     );
 

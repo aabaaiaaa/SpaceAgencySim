@@ -179,6 +179,7 @@ test.describe('Hub Switcher', () => {
     // Wait for the hub UI to re-render by checking the active hub changed in state.
     await page.waitForFunction(
       () => window.__gameState?.activeHubId === 'moon-base',
+      undefined,
       { timeout: 5_000 },
     );
 

@@ -740,6 +740,7 @@ test.describe('Custom mission creator', () => {
     // Verify form closed (re-rendered tab)
     await page.waitForFunction(
       () => !document.querySelector('.mc-creator-form'),
+      undefined,
       { timeout: 5_000 },
     );
 

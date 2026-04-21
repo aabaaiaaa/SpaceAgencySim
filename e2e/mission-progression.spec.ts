@@ -235,6 +235,7 @@ async function stage(page: Page): Promise<void> {
 async function waitWarpUnlocked(page: Page): Promise<void> {
   await page.waitForFunction(
     (): boolean => !(document.querySelector('.hud-warp-btn') as HTMLButtonElement | null)?.disabled,
+    undefined,
     { timeout: 5_000 },
   );
 }
@@ -454,7 +455,7 @@ test.describe('Mission Progression', () => {
     await page.waitForFunction((): boolean => {
       const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-004');
       return m?.objectives?.find(o => o.type === 'REACH_HORIZONTAL_SPEED')?.completed ?? false;
-    }, { timeout: 10_000 });
+    }, undefined, { timeout: 10_000 });
 
     // Now teleport to near-ground with very low velocity for a gentle crash.
     // allowCrash: true means a crash at ≤30 m/s satisfies SAFE_LANDING.
@@ -497,10 +498,12 @@ test.describe('Mission Progression', () => {
 
     // Wait for fuel depletion (engine stops firing when tank empties).
     // Dry mass 250kg → terminal velocity with mk1 chute ≈ 4.12 m/s ≤ 5 m/s.
+    // 30s timeout: full-throttle engine-spark + tank-small burn takes ~20-25s.
     await waitAlt(page, 50); // confirm engine is firing
     await page.waitForFunction(
       (): boolean => window.__flightPs?.firingEngines?.size === 0,
-      { timeout: 15_000 },
+      undefined,
+      { timeout: 30_000 },
     );
 
     // Stage 1: deploy parachute — mass now ≈ 250kg < 1200kg maxSafeMass.
@@ -748,6 +751,7 @@ test.describe('Mission Progression', () => {
         const ps = window.__flightPs;
         return ps != null && ps.posY <= 1400 && ps.velY <= 0;
       },
+      undefined,
       { timeout: 30_000 },
     );
     await setWarp(page, 5);
@@ -755,6 +759,7 @@ test.describe('Mission Progression', () => {
     // Wait until we descend into the altitude band (≤ 1200m).
     await page.waitForFunction(
       (): boolean => (window.__flightPs?.posY ?? Infinity) <= 1200,
+      undefined,
       { timeout: 15_000 },
     );
 
@@ -822,12 +827,14 @@ test.describe('Mission Progression', () => {
     await pressThrottleCut(page);
 
     // Wait until descending past ~150m, then eject at ≥100m.
+    // 30s: rocket must coast to peak, reverse, and fall back past 250m.
     await page.waitForFunction(
       (): boolean => {
         const ps = window.__flightPs;
         return ps != null && ps.velY < 0 && ps.posY < 250 && ps.posY > 100;
       },
-      { timeout: 10_000 },
+      undefined,
+      { timeout: 30_000 },
     );
     await waitWarpUnlocked(page);
     await stage(page); // eject crew
@@ -991,7 +998,7 @@ test.describe('Mission Progression', () => {
     await page.waitForFunction((): boolean => {
       const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-015');
       return m?.objectives?.find(o => o.type === 'REACH_ORBIT')?.completed ?? false;
-    }, { timeout: 10_000 });
+    }, undefined, { timeout: 10_000 });
 
     // Re-teleport to maintain altitude for satellite release (>80km required).
     await teleportCraft(page, { posX: 0, posY: 82_000, velX: 8000, velY: 0, orbit: true });
@@ -1043,7 +1050,7 @@ test.describe('Mission Progression', () => {
     await page.waitForFunction((): boolean => {
       const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-016');
       return m?.objectives?.every(o => o.completed) ?? false;
-    }, { timeout: 10_000 });
+    }, undefined, { timeout: 10_000 });
 
     // Return via menu.
     await page.click('#topbar-menu-btn', { force: true });
@@ -1096,7 +1103,7 @@ test.describe('Mission Progression', () => {
     await page.waitForFunction((): boolean => {
       const m = window.__gameState?.missions?.accepted?.find(x => x.id === 'mission-017');
       return m?.objectives?.find(o => o.type === 'REACH_ORBIT')?.completed ?? false;
-    }, { timeout: 10_000 });
+    }, undefined, { timeout: 10_000 });
 
     // Re-teleport to maintain altitude for satellite release (>80km required).
     await teleportCraft(page, { posX: 0, posY: 82_000, velX: 8000, velY: 0, orbit: true });

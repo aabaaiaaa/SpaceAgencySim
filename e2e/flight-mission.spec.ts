@@ -69,6 +69,7 @@ test.describe('Flight — First Flight Mission Completion', () => {
 
     await page.waitForFunction(
       (): boolean => (window.__flightPs?.posY ?? 0) >= 100,
+      undefined,
       { timeout: 15_000 },
     );
 

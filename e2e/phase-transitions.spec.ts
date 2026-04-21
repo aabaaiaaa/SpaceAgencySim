@@ -176,6 +176,7 @@ test.describe('Phase Transition: LAUNCH → FLIGHT', () => {
     // Verify physics state: not grounded, posY > 0.
     await page.waitForFunction(
       () => window.__flightPs?.grounded === false && (window.__flightPs?.posY ?? 0) > 0,
+      undefined,
       { timeout: 5_000 },
     );
     const ps: { grounded: boolean | undefined; posY: number | undefined } = await page.evaluate(() => ({
@@ -495,7 +496,7 @@ test.describe('Phase Transition: Landing', () => {
         if (entry.state === 'deploying' || entry.state === 'deployed') return true;
       }
       return false;
-    }, { timeout: 5_000 });
+    }, undefined, { timeout: 5_000 });
 
     // Let physics run with time warp for the descent.
     await setTestTimeWarp(page, 50);
@@ -503,12 +504,14 @@ test.describe('Phase Transition: Landing', () => {
     // Wait for landing.
     await page.waitForFunction(
       () => window.__flightPs?.landed === true,
+      undefined,
       { timeout: 15_000 },
     );
 
     // Verify it was a safe landing, not a crash.
     await page.waitForFunction(
       () => window.__flightPs?.landed === true && (window.__flightPs?.posY ?? 999) <= 1,
+      undefined,
       { timeout: 5_000 },
     );
     const result: { landed: boolean | undefined; crashed: boolean | undefined; posY: number | undefined } =
@@ -524,6 +527,7 @@ test.describe('Phase Transition: Landing', () => {
     // Verify a LANDING event was recorded through the physics pipeline.
     await page.waitForFunction(
       () => (window.__gameState?.currentFlight?.events ?? []).some((e: { type: string }) => e.type === 'LANDING'),
+      undefined,
       { timeout: 5_000 },
     );
     const events: { type: string }[] = await page.evaluate(
@@ -563,6 +567,7 @@ test.describe('Phase Transition: Crash', () => {
     // Let physics detect the impact.
     await page.waitForFunction(
       () => window.__flightPs?.crashed === true,
+      undefined,
       { timeout: 10_000 },
     );
 
@@ -577,6 +582,7 @@ test.describe('Phase Transition: Crash', () => {
     // Verify a CRASH event was recorded through the physics pipeline.
     await page.waitForFunction(
       () => (window.__gameState?.currentFlight?.events ?? []).some((e: { type: string }) => e.type === 'CRASH'),
+      undefined,
       { timeout: 5_000 },
     );
     const events: { type: string }[] = await page.evaluate(
