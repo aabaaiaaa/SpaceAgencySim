@@ -108,6 +108,8 @@
         "src/tests/contracts.test.ts",
         "src/tests/controlMode.test.ts",
         "src/tests/crew.test.ts",
+        "src/tests/debugSavesFactories.test.ts",
+        "src/tests/debugSavesLateGame.test.ts",
         "src/tests/docking.test.ts",
         "src/tests/dragCoefficient.test.ts",
         "src/tests/e2e-infrastructure.test.ts",
@@ -235,6 +237,21 @@
       ],
       "unit": [
         "src/tests/debris.test.ts"
+      ],
+      "e2e": []
+    },
+    "core/debugSaves": {
+      "sources": [
+        "src/core/debugSaves.ts",
+        "src/core/debugSaves/definitions.ts",
+        "src/core/debugSaves/designFactory.ts",
+        "src/core/debugSaves/factories.ts",
+        "src/core/debugSaves/lateGameStages.ts"
+      ],
+      "unit": [
+        "src/tests/debugSavesDesignFactory.test.ts",
+        "src/tests/debugSavesFactories.test.ts",
+        "src/tests/debugSavesLateGame.test.ts"
       ],
       "e2e": []
     },
@@ -1016,6 +1033,8 @@
       ],
       "unit": [
         "src/tests/atmosphere.test.ts",
+        "src/tests/debugSavesDesignFactory.test.ts",
+        "src/tests/debugSavesLateGame.test.ts",
         "src/tests/fuelsystem.test.ts",
         "src/tests/grabbing.test.ts",
         "src/tests/hubs-outpost-core.test.ts",

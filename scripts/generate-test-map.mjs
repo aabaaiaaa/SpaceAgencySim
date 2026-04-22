@@ -206,6 +206,7 @@ const SOURCE_GROUPS = {
   'core/parachute':     ['src/core/parachute.ts', 'src/core/legs.ts'],
   'core/biomes':        ['src/core/biomes.ts', 'src/core/sciencemodule.ts', 'src/core/surfaceOps.ts'],
   'core/satellites':    ['src/core/satellites.ts', 'src/core/comms.ts'],
+  'core/debugSaves':    ['src/core/debugSaves.ts', 'src/core/debugSaves/definitions.ts', 'src/core/debugSaves/designFactory.ts', 'src/core/debugSaves/factories.ts', 'src/core/debugSaves/lateGameStages.ts'],
   'core/docking':       ['src/core/docking.ts', 'src/core/grabbing.ts'],
   'core/dragCoefficient': ['src/core/dragCoefficient.ts'],
   'core/throttleControl': ['src/core/throttleControl.ts'],
@@ -240,9 +241,8 @@ const SKIP_SOURCES = new Set([
   'src/render/index.ts',
   'src/render/types.ts',       // internal render type definitions
   'src/core/transferObjects.ts', // internal helper
-  'src/core/debugSaves.ts',    // dev utility
   'src/ui/library.ts',         // internal helper
-  'src/ui/debugSaves.ts',      // dev utility
+  'src/ui/debugSaves.ts',      // UI glue for the debug-save menu (dev utility)
 ]);
 
 function classifySource(srcPath) {
