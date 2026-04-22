@@ -19,7 +19,7 @@
  *   - Grabbing arm attachment and satellite repair
  */
 
-import { test, expect, type Page, type Browser } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import {
   VP_W, VP_H,
   buildSaveEnvelope,
@@ -238,19 +238,12 @@ async function injectOrbitalObject(page: Page, obj: Record<string, unknown>): Pr
 // =========================================================================
 
 test.describe('Orbit entry detection', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('@smoke (1) craft transitions to ORBIT when periapsis is above minimum altitude', async () => {
+  test('@smoke (1) craft transitions to ORBIT when periapsis is above minimum altitude', async ({ page }) => {
     test.setTimeout(60_000);
     await startTestFlight(page, ORBITAL_ROCKET, { crewIds: ['crew-1'] });
 
@@ -269,7 +262,7 @@ test.describe('Orbit entry detection', () => {
     expect(fs!.orbitalElements!.semiMajorAxis).toBeGreaterThan(0);
   });
 
-  test('(2) orbit entry populates the orbitBandId field', async () => {
+  test('(2) orbit entry populates the orbitBandId field', async ({ page }) => {
     test.setTimeout(60_000);
     // Ensure we're in orbit (resilient to test 1 leaving bad state).
     const needsSetup = await page.evaluate(() => window.__flightState?.phase !== 'ORBIT');
@@ -290,7 +283,7 @@ test.describe('Orbit entry detection', () => {
     expect(fs!.orbitBandId).toBeTruthy();
   });
 
-  test('(3) phase log records the orbit entry transition', async () => {
+  test('(3) phase log records the orbit entry transition', async ({ page }) => {
     const fs = await getFlightState(page) as FlightStateSnapshot | null;
     expect(fs).not.toBeNull();
     const orbitEntry = fs!.phaseLog.find((t: { from: string; to: string }) => t.to === 'ORBIT');
@@ -303,19 +296,12 @@ test.describe('Orbit entry detection', () => {
 // =========================================================================
 
 test.describe('Orbit exit warning and transition', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) retrograde burn in orbit triggers de-orbit / phase change', async () => {
+  test('(1) retrograde burn in orbit triggers de-orbit / phase change', async ({ page }) => {
     test.setTimeout(60_000);
     await startTestFlight(page, ORBITAL_ROCKET, { crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
@@ -358,19 +344,12 @@ test.describe('Orbit exit warning and transition', () => {
 // =========================================================================
 
 test.describe('Orbital manoeuvres', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) prograde burn increases orbital velocity and raises apoapsis', async () => {
+  test('(1) prograde burn increases orbital velocity and raises apoapsis', async ({ page }) => {
     test.setTimeout(60_000);
     await startTestFlight(page, ORBITAL_ROCKET, { crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
@@ -438,7 +417,7 @@ test.describe('Orbital manoeuvres', () => {
     expect(velDuringBurn).not.toBe(0);
   });
 
-  test('(2) retrograde burn decreases orbital velocity', async () => {
+  test('(2) retrograde burn decreases orbital velocity', async ({ page }) => {
     // Ensure we're in orbit with known velocity (may not be if test 1 left bad state).
     const needsSetup = await page.evaluate(() => !window.__flightPs || window.__flightPs.velX === 0);
     if (needsSetup) {
@@ -469,19 +448,12 @@ test.describe('Orbital manoeuvres', () => {
 // =========================================================================
 
 test.describe('Docking mode local positioning', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) pressing V toggles docking mode in orbit', async () => {
+  test('(1) pressing V toggles docking mode in orbit', async ({ page }) => {
     test.setTimeout(60_000);
     await startTestFlight(page, DOCKING_ROCKET, { crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
@@ -503,7 +475,7 @@ test.describe('Docking mode local positioning', () => {
     expect(modeAfter).toBe('DOCKING');
   });
 
-  test('(2) throttle is cut to zero on docking mode toggle', async () => {
+  test('(2) throttle is cut to zero on docking mode toggle', async ({ page }) => {
     test.setTimeout(60_000);
     // Set throttle high first.
     await page.evaluate(async () => {
@@ -530,7 +502,7 @@ test.describe('Docking mode local positioning', () => {
     expect(throttle).toBe(0);
   });
 
-  test('(3) RCS mode is available inside docking mode', async () => {
+  test('(3) RCS mode is available inside docking mode', async ({ page }) => {
     // Already in docking mode. Press R for RCS.
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true })));
     await page.waitForFunction(
@@ -551,7 +523,7 @@ test.describe('Docking mode local positioning', () => {
     );
   });
 
-  test('(4) docking target HUD renders without errors when offsets are set', async () => {
+  test('(4) docking target HUD renders without errors when offsets are set', async ({ page }) => {
     // Enter docking mode if not already in it.
     const mode = await page.evaluate(() => window.__flightPs?.controlMode);
     if (mode !== 'DOCKING') {
@@ -621,18 +593,11 @@ test.describe('Docking mode local positioning', () => {
 // =========================================================================
 
 test.describe('Satellite deployment and benefits', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) communication satellite provides transmit yield bonus', async () => {
+  test('(1) communication satellite provides transmit yield bonus', async ({ page }) => {
     test.setTimeout(60_000);
     const fixture = orbitalOpsFixture({
       satelliteNetwork: {
@@ -651,7 +616,7 @@ test.describe('Satellite deployment and benefits', () => {
     expect(commSats[0].health).toBe(100);
   });
 
-  test('(2) weather satellite is tracked in network', async () => {
+  test('(2) weather satellite is tracked in network', async ({ page }) => {
     test.setTimeout(60_000);
     const fixture = orbitalOpsFixture({
       satelliteNetwork: {
@@ -669,7 +634,7 @@ test.describe('Satellite deployment and benefits', () => {
     expect(weatherSats.length).toBeGreaterThanOrEqual(1);
   });
 
-  test('(3) science satellite is tracked in network', async () => {
+  test('(3) science satellite is tracked in network', async ({ page }) => {
     test.setTimeout(60_000);
     const fixture = orbitalOpsFixture({
       satelliteNetwork: {
@@ -687,7 +652,7 @@ test.describe('Satellite deployment and benefits', () => {
     expect(sciSats.length).toBeGreaterThanOrEqual(1);
   });
 
-  test('(4) GPS satellite is tracked in network', async () => {
+  test('(4) GPS satellite is tracked in network', async ({ page }) => {
     test.setTimeout(60_000);
     const fixture = orbitalOpsFixture({
       satelliteNetwork: {
@@ -705,7 +670,7 @@ test.describe('Satellite deployment and benefits', () => {
     expect(gpsSats.length).toBeGreaterThanOrEqual(1);
   });
 
-  test('(5) satellite deployment via flight creates an orbital record', async () => {
+  test('(5) satellite deployment via flight creates an orbital record', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, orbitalOpsFixture());
     await startTestFlight(page, ['probe-core-mk1', 'satellite-comm', 'tank-small', 'engine-spark']);
@@ -753,18 +718,11 @@ test.describe('Satellite deployment and benefits', () => {
 // =========================================================================
 
 test.describe('Constellation bonus', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) no constellation bonus with fewer than 3 satellites of same type', async () => {
+  test('(1) no constellation bonus with fewer than 3 satellites of same type', async ({ page }) => {
     test.setTimeout(60_000);
     const fixture = orbitalOpsFixture({
       satelliteNetwork: {
@@ -783,7 +741,7 @@ test.describe('Constellation bonus', () => {
     expect(commSats.length).toBe(2);
   });
 
-  test('(2) constellation bonus activates with 3+ satellites of same type', async () => {
+  test('(2) constellation bonus activates with 3+ satellites of same type', async ({ page }) => {
     test.setTimeout(60_000);
     const fixture = orbitalOpsFixture({
       satelliteNetwork: {
@@ -803,7 +761,7 @@ test.describe('Constellation bonus', () => {
     expect(commSats.length).toBe(3);
   });
 
-  test('(3) mixed satellite types are tracked independently', async () => {
+  test('(3) mixed satellite types are tracked independently', async ({ page }) => {
     test.setTimeout(60_000);
     const fixture = orbitalOpsFixture({
       satelliteNetwork: {
@@ -835,18 +793,11 @@ test.describe('Constellation bonus', () => {
 // =========================================================================
 
 test.describe('Satellite degradation and maintenance', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) satellites degrade over time (health decreases per period)', async () => {
+  test('(1) satellites degrade over time (health decreases per period)', async ({ page }) => {
     test.setTimeout(60_000);
     const fixture = orbitalOpsFixture({
       satelliteNetwork: {
@@ -866,7 +817,7 @@ test.describe('Satellite degradation and maintenance', () => {
     expect(sat!.health).toBeGreaterThan(0);
   });
 
-  test('(2) auto-maintenance flag can be set on satellites', async () => {
+  test('(2) auto-maintenance flag can be set on satellites', async ({ page }) => {
     test.setTimeout(60_000);
     const fixture = orbitalOpsFixture({
       satelliteNetwork: {
@@ -884,7 +835,7 @@ test.describe('Satellite degradation and maintenance', () => {
     expect(sat!.autoMaintain).toBe(true);
   });
 
-  test('(3) manual maintenance can restore satellite health via game state', async () => {
+  test('(3) manual maintenance can restore satellite health via game state', async ({ page }) => {
     test.setTimeout(60_000);
     // Inject a degraded satellite and manually restore health.
     const fixture = orbitalOpsFixture({
@@ -910,7 +861,7 @@ test.describe('Satellite degradation and maintenance', () => {
     expect(sat!.health).toBe(100);
   });
 
-  test('(4) degraded satellite below threshold has reduced effectiveness', async () => {
+  test('(4) degraded satellite below threshold has reduced effectiveness', async ({ page }) => {
     test.setTimeout(60_000);
     // SATELLITE_DEGRADED_THRESHOLD is 30. Below this, benefits are halved.
     const fixture = orbitalOpsFixture({
@@ -936,18 +887,11 @@ test.describe('Satellite degradation and maintenance', () => {
 // =========================================================================
 
 test.describe('Satellite Network Ops Centre tiers', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) tier 1 allows up to 6 satellites', async () => {
+  test('(1) tier 1 allows up to 6 satellites', async ({ page }) => {
     test.setTimeout(60_000);
     const fixture = orbitalOpsFixture({
       facilities: {
@@ -972,7 +916,7 @@ test.describe('Satellite Network Ops Centre tiers', () => {
     expect(gs!.satelliteNetwork.satellites.length).toBeLessThanOrEqual(6);
   });
 
-  test('(2) tier 2 allows up to 12 satellites', async () => {
+  test('(2) tier 2 allows up to 12 satellites', async ({ page }) => {
     test.setTimeout(60_000);
     const fixture = orbitalOpsFixture({
       facilities: {
@@ -996,7 +940,7 @@ test.describe('Satellite Network Ops Centre tiers', () => {
     expect(gs!.satelliteNetwork.satellites.length).toBeLessThanOrEqual(12);
   });
 
-  test('(3) tier 3 allows up to 24 satellites', async () => {
+  test('(3) tier 3 allows up to 24 satellites', async ({ page }) => {
     test.setTimeout(60_000);
     const fixture = orbitalOpsFixture({
       facilities: {
@@ -1026,19 +970,12 @@ test.describe('Satellite Network Ops Centre tiers', () => {
 // =========================================================================
 
 test.describe('Docking approach and guidance', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) docking state initialises as IDLE', async () => {
+  test('(1) docking state initialises as IDLE', async ({ page }) => {
     test.setTimeout(60_000);
     await startTestFlight(page, DOCKING_ROCKET, { crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
@@ -1061,7 +998,7 @@ test.describe('Docking approach and guidance', () => {
     expect(dockingState!.targetId).toBeNull();
   });
 
-  test('(2) docking target can be selected when station is in visual range', async () => {
+  test('(2) docking target can be selected when station is in visual range', async ({ page }) => {
     // Inject a station orbital object at similar orbit.
     await injectOrbitalObject(page, {
       id: 'station-1',
@@ -1087,7 +1024,7 @@ test.describe('Docking approach and guidance', () => {
     expect(hasStation).toBe(true);
   });
 
-  test('(3) docking guidance state has all required tracking fields', async () => {
+  test('(3) docking guidance state has all required tracking fields', async ({ page }) => {
     // Verify the docking state structure has all required guidance fields.
     const guidance = await page.evaluate(() => {
       const ds = window.__flightState?.dockingState;
@@ -1121,7 +1058,7 @@ test.describe('Docking approach and guidance', () => {
     expect(guidance!.hasCombinedMass).toBe(true);
   });
 
-  test('(4) auto-dock conditions are met when distance <= 15m and all indicators OK', async () => {
+  test('(4) auto-dock conditions are met when distance <= 15m and all indicators OK', async ({ page }) => {
     // Verify the auto-dock logic: within 15m with all indicators green → auto-dock eligible.
     const autoDockCheck = await page.evaluate(() => {
       const DOCKING_AUTO_RANGE: number = 15;
@@ -1152,7 +1089,7 @@ test.describe('Docking approach and guidance', () => {
     expect(autoDockCheck.eligible3).toBe(false);   // Speed too high.
   });
 
-  test('(5) docked state is reached after docking completes', async () => {
+  test('(5) docked state is reached after docking completes', async ({ page }) => {
     // Simulate completed docking.
     await page.evaluate(async () => {
       const ds = window.__flightState?.dockingState;
@@ -1203,19 +1140,12 @@ test.describe('Docking approach and guidance', () => {
 // =========================================================================
 
 test.describe('Undocking and control assignment', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) undocking transitions from DOCKED to IDLE', async () => {
+  test('(1) undocking transitions from DOCKED to IDLE', async ({ page }) => {
     test.setTimeout(60_000);
     await startTestFlight(page, DOCKING_ROCKET, { crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
@@ -1285,19 +1215,12 @@ test.describe('Undocking and control assignment', () => {
 // =========================================================================
 
 test.describe('Crew transfer and fuel transfer', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) crew transfer event is logged during docked state', async () => {
+  test('(1) crew transfer event is logged during docked state', async ({ page }) => {
     test.setTimeout(60_000);
     await startTestFlight(page, DOCKING_ROCKET, { crewIds: ['crew-1', 'crew-2'] });
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
@@ -1344,7 +1267,7 @@ test.describe('Crew transfer and fuel transfer', () => {
     expect(crewEvents[0].direction).toBe('TO_STATION');
   });
 
-  test('(2) fuel transfer event is logged during docked state', async () => {
+  test('(2) fuel transfer event is logged during docked state', async ({ page }) => {
     await page.evaluate(async () => {
       const fs = window.__flightState;
       if (!fs) return;
@@ -1378,19 +1301,12 @@ test.describe('Crew transfer and fuel transfer', () => {
 // =========================================================================
 
 test.describe('Power system', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) solar panels initialise power state with panel area and battery capacity', async () => {
+  test('(1) solar panels initialise power state with panel area and battery capacity', async ({ page }) => {
     test.setTimeout(60_000);
     await startTestFlight(page, SOLAR_PROBE);
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
@@ -1419,7 +1335,7 @@ test.describe('Power system', () => {
     expect(powerInfo!.hasPower).toBe(true);
   });
 
-  test('(2) solar generation is positive when craft is sunlit', async () => {
+  test('(2) solar generation is positive when craft is sunlit', async ({ page }) => {
     await page.waitForFunction(
       () => window.__flightPs?.powerState != null,
       undefined,
@@ -1440,7 +1356,7 @@ test.describe('Power system', () => {
     expect(generation!.solarGeneration).toBeGreaterThanOrEqual(0);
   });
 
-  test('(3) battery charge is tracked and bounded by capacity', async () => {
+  test('(3) battery charge is tracked and bounded by capacity', async ({ page }) => {
     const batteryInfo = await page.evaluate(() => {
       const ps = window.__flightPs;
       if (!ps?.powerState) return null;
@@ -1455,7 +1371,7 @@ test.describe('Power system', () => {
     expect(batteryInfo!.charge).toBeLessThanOrEqual(batteryInfo!.capacity);
   });
 
-  test('(4) power draw is present when systems are active', async () => {
+  test('(4) power draw is present when systems are active', async ({ page }) => {
     const drawInfo = await page.evaluate(() => {
       const ps = window.__flightPs;
       if (!ps?.powerState) return null;
@@ -1469,7 +1385,7 @@ test.describe('Power system', () => {
     expect(drawInfo!.powerDraw).toBeGreaterThanOrEqual(0);
   });
 
-  test('(5) craft without solar panels has limited power from built-in battery', async () => {
+  test('(5) craft without solar panels has limited power from built-in battery', async ({ page }) => {
     test.setTimeout(60_000);
     // Return from current flight.
     await returnToAgency(page);
@@ -1506,12 +1422,7 @@ test.describe('Power system', () => {
 // =========================================================================
 
 test.describe('Grabbing arm and satellite repair', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture({
       satelliteNetwork: {
@@ -1537,9 +1448,7 @@ test.describe('Grabbing arm and satellite repair', () => {
     }));
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) craft with grabbing arm detects the arm in active parts', async () => {
+  test('(1) craft with grabbing arm detects the arm in active parts', async ({ page }) => {
     test.setTimeout(60_000);
     await startTestFlight(page, GRAB_ROCKET, { crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
@@ -1565,7 +1474,7 @@ test.describe('Grabbing arm and satellite repair', () => {
     expect(hasArm).toBe(true);
   });
 
-  test('(2) satellite repair event restores satellite health', async () => {
+  test('(2) satellite repair event restores satellite health', async ({ page }) => {
     // Simulate grabbing arm repair of the damaged satellite.
     await page.evaluate(async () => {
       const fs = window.__flightState;
@@ -1600,7 +1509,7 @@ test.describe('Grabbing arm and satellite repair', () => {
     expect(repairEvents.length).toBeGreaterThanOrEqual(1);
   });
 
-  test('(3) grab state machine has correct states', async () => {
+  test('(3) grab state machine has correct states', async ({ page }) => {
     // Verify the grab states exist and can be set.
     const stateCheck = await page.evaluate(() => {
       // Manually create a grab state object to verify the state machine.
@@ -1620,12 +1529,7 @@ test.describe('Grabbing arm and satellite repair', () => {
 // =========================================================================
 
 test.describe('Integrated orbital operations', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture({
       satelliteNetwork: {
@@ -1641,9 +1545,7 @@ test.describe('Integrated orbital operations', () => {
     }));
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) full satellite network is loaded with all types', async () => {
+  test('(1) full satellite network is loaded with all types', async ({ page }) => {
     const gs = await getGameState(page) as GameStateSnapshot | null;
     expect(gs).not.toBeNull();
     const sats = gs!.satelliteNetwork.satellites;
@@ -1656,14 +1558,14 @@ test.describe('Integrated orbital operations', () => {
     expect(types).toContain('GPS');
   });
 
-  test('(2) communication constellation has 3 satellites (bonus active)', async () => {
+  test('(2) communication constellation has 3 satellites (bonus active)', async ({ page }) => {
     const gs = await getGameState(page) as GameStateSnapshot | null;
     expect(gs).not.toBeNull();
     const commSats = gs!.satelliteNetwork.satellites.filter((s: SatelliteRecord) => s.satelliteType === 'COMMUNICATION' && s.health > 0);
     expect(commSats.length).toBe(3);
   });
 
-  test('(3) launch to orbit, perform manoeuvre, and return to agency', async () => {
+  test('(3) launch to orbit, perform manoeuvre, and return to agency', async ({ page }) => {
     await startTestFlight(page, ORBITAL_ROCKET, { crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
     await waitForOrbit(page);
@@ -1711,13 +1613,13 @@ test.describe('Integrated orbital operations', () => {
     expect(gs!.currentPeriod).toBeGreaterThanOrEqual(31);
   });
 
-  test('(4) satellite network persists after flight return', async () => {
+  test('(4) satellite network persists after flight return', async ({ page }) => {
     const gs = await getGameState(page) as GameStateSnapshot | null;
     expect(gs).not.toBeNull();
     expect(gs!.satelliteNetwork.satellites.length).toBe(6);
   });
 
-  test('(5) auto-maintenance flag is preserved across flights', async () => {
+  test('(5) auto-maintenance flag is preserved across flights', async ({ page }) => {
     const gs = await getGameState(page) as GameStateSnapshot | null;
     expect(gs).not.toBeNull();
     const weatherSat = gs!.satelliteNetwork.satellites.find((s: SatelliteRecord) => s.id === 'int-sat-w1');
@@ -1731,19 +1633,12 @@ test.describe('Integrated orbital operations', () => {
 // =========================================================================
 
 test.describe('Docking thresholds', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) speed OK when relative speed <= 2.0 m/s', async () => {
+  test('(1) speed OK when relative speed <= 2.0 m/s', async ({ page }) => {
     test.setTimeout(60_000);
     await startTestFlight(page, DOCKING_ROCKET, { crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
@@ -1769,7 +1664,7 @@ test.describe('Docking thresholds', () => {
     expect(result!.speedOk).toBe(true);
   });
 
-  test('(2) speed NOT OK when relative speed > 2.0 m/s', async () => {
+  test('(2) speed NOT OK when relative speed > 2.0 m/s', async ({ page }) => {
     const result = await page.evaluate(async () => {
       const ds = window.__flightState?.dockingState;
       if (!ds) return null;
@@ -1783,7 +1678,7 @@ test.describe('Docking thresholds', () => {
     expect(result!.speedOk).toBe(false);
   });
 
-  test('(3) orientation OK when diff <= 0.15 rad', async () => {
+  test('(3) orientation OK when diff <= 0.15 rad', async ({ page }) => {
     const result = await page.evaluate(async () => {
       const ds = window.__flightState?.dockingState;
       if (!ds) return null;
@@ -1797,7 +1692,7 @@ test.describe('Docking thresholds', () => {
     expect(result!.orientationOk).toBe(true);
   });
 
-  test('(4) lateral OK when offset <= 3.0 m', async () => {
+  test('(4) lateral OK when offset <= 3.0 m', async ({ page }) => {
     const result = await page.evaluate(async () => {
       const ds = window.__flightState?.dockingState;
       if (!ds) return null;
@@ -1811,7 +1706,7 @@ test.describe('Docking thresholds', () => {
     expect(result!.lateralOk).toBe(true);
   });
 
-  test('(5) auto-dock range is 15 m', async () => {
+  test('(5) auto-dock range is 15 m', async ({ page }) => {
     const result = await page.evaluate(async () => {
       const ds = window.__flightState?.dockingState;
       if (!ds) return null;
@@ -1836,12 +1731,7 @@ test.describe('Docking thresholds', () => {
 // =========================================================================
 
 test.describe('Grab arm thresholds', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture({
       orbitalObjects: [{
@@ -1860,9 +1750,7 @@ test.describe('Grab arm thresholds', () => {
     }));
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) grab arm reach is 25 m', async () => {
+  test('(1) grab arm reach is 25 m', async ({ page }) => {
     test.setTimeout(60_000);
     await startTestFlight(page, GRAB_ROCKET, { crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
@@ -1881,7 +1769,7 @@ test.describe('Grab arm thresholds', () => {
     expect(withinRange.at30m).toBe(false);
   });
 
-  test('(2) max relative speed for grab is 1.0 m/s', async () => {
+  test('(2) max relative speed for grab is 1.0 m/s', async ({ page }) => {
     const speedCheck = await page.evaluate(() => {
       const GRAB_MAX_SPEED: number = 1.0;
       return {
@@ -1894,7 +1782,7 @@ test.describe('Grab arm thresholds', () => {
     expect(speedCheck.at1_5).toBe(false);
   });
 
-  test('(3) max lateral offset for grab is 5.0 m', async () => {
+  test('(3) max lateral offset for grab is 5.0 m', async ({ page }) => {
     const lateralCheck = await page.evaluate(() => {
       const GRAB_MAX_LATERAL: number = 5.0;
       return {
@@ -1913,19 +1801,12 @@ test.describe('Grab arm thresholds', () => {
 // =========================================================================
 
 test.describe('Power system eclipse behaviour', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) power state tracks sunlit/eclipse status', async () => {
+  test('(1) power state tracks sunlit/eclipse status', async ({ page }) => {
     test.setTimeout(60_000);
     await startTestFlight(page, SOLAR_PROBE);
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
@@ -1951,7 +1832,7 @@ test.describe('Power system eclipse behaviour', () => {
     expect(typeof sunlitInfo!.hasPower).toBe('boolean');
   });
 
-  test('(2) battery provides power when solar generation is zero', async () => {
+  test('(2) battery provides power when solar generation is zero', async ({ page }) => {
     // Force eclipse state — set solar generation to 0 and verify battery sustains.
     await page.evaluate(() => {
       const ps = window.__flightPs;
@@ -1989,18 +1870,11 @@ test.describe('Power system eclipse behaviour', () => {
 // =========================================================================
 
 test.describe('Satellite leasing', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) satellite lease flag is stored in network state', async () => {
+  test('(1) satellite lease flag is stored in network state', async ({ page }) => {
     test.setTimeout(60_000);
     const fixture = orbitalOpsFixture({
       facilities: {
@@ -2022,7 +1896,7 @@ test.describe('Satellite leasing', () => {
     expect(sat!.leased).toBe(true);
   });
 
-  test('(2) non-leased satellite has leased flag false', async () => {
+  test('(2) non-leased satellite has leased flag false', async ({ page }) => {
     const fixture = orbitalOpsFixture({
       satelliteNetwork: {
         satellites: [
@@ -2045,19 +1919,12 @@ test.describe('Satellite leasing', () => {
 // =========================================================================
 
 test.describe('Orbital elements tracking', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) circular orbit has near-zero eccentricity', async () => {
+  test('(1) circular orbit has near-zero eccentricity', async ({ page }) => {
     test.setTimeout(60_000);
     await startTestFlight(page, ORBITAL_ROCKET, { crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
@@ -2080,7 +1947,7 @@ test.describe('Orbital elements tracking', () => {
     expect(elements!.semiMajorAxis).toBeGreaterThan(6_000_000); // Above Earth surface.
   });
 
-  test('(2) elliptical orbit has non-zero eccentricity', async () => {
+  test('(2) elliptical orbit has non-zero eccentricity', async ({ page }) => {
     // Create an elliptical orbit by increasing velocity by ~10%.
     // teleportCraft resets phase to FLIGHT; physics auto-detects orbit
     // and computes the new orbital elements.
@@ -2101,19 +1968,12 @@ test.describe('Orbital elements tracking', () => {
 // =========================================================================
 
 test.describe('Complete orbital lifecycle', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }: { browser: Browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) launch -> orbit -> manoeuvre -> orbit -> return lifecycle', async () => {
+  test('(1) launch -> orbit -> manoeuvre -> orbit -> return lifecycle', async ({ page }) => {
     test.setTimeout(60_000);
     await startTestFlight(page, ORBITAL_ROCKET, { crewIds: ['crew-1'] });
 
@@ -2174,7 +2034,7 @@ test.describe('Complete orbital lifecycle', () => {
     expect(fsAfter).toBeNull();
   });
 
-  test('(2) period advances after orbital flight return', async () => {
+  test('(2) period advances after orbital flight return', async ({ page }) => {
     const gs = await getGameState(page) as GameStateSnapshot | null;
     expect(gs).not.toBeNull();
     // Started at period 30 — should now be 31.

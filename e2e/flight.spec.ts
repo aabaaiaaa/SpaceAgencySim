@@ -73,7 +73,7 @@ async function stageAndLiftoff(page: Page): Promise<void> {
   await page.waitForFunction(
     (): boolean => (window.__flightPs?.posY ?? 0) > 0,
     undefined,
-    { timeout: 3_000 },
+    { timeout: 8_000 },
   );
 }
 

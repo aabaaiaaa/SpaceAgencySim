@@ -255,7 +255,7 @@ async function waitAlt(page: Page, m: number, timeout: number = 30_000): Promise
   );
 }
 
-async function waitSpeed(page: Page, s: number, timeout: number = 45_000): Promise<void> {
+async function waitSpeed(page: Page, s: number, timeout: number = 60_000): Promise<void> {
   await page.waitForFunction(
     (spd: number): boolean => {
       const ps = window.__flightPs;

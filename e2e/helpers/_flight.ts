@@ -233,10 +233,17 @@ export async function teleportCraft(
 /**
  * Wait for the physics simulation to detect a valid orbit and transition
  * the flight phase to ORBIT.
+ *
+ * Default 30s: callers typically teleport to valid orbital kinematics and
+ * rely on the physics worker's next tick(s) to auto-promote FLIGHT → ORBIT.
+ * On a cold Vite/worker start the auto-promotion can exceed 20s when the
+ * teleport also switches celestial body (Mars, Moon, Sun) because the
+ * worker must re-initialise its body context before the orbital elements
+ * stabilise.
  */
 export async function waitForOrbit(
   page: Page,
-  timeout: number = 10_000,
+  timeout: number = 30_000,
 ): Promise<void> {
   await page.waitForFunction(
     () => window.__flightState?.phase === 'ORBIT' && window.__flightState?.inOrbit === true,

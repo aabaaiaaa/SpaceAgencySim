@@ -84,11 +84,15 @@ export async function areAllObjectivesComplete(
 
 /**
  * Wait for the rocket to reach a minimum altitude during flight.
+ *
+ * Default 30s: covers cold-start Vite/worker startup where the first
+ * test in a suite can run ~2-3× slower than warm runs. Callers that
+ * know their flight is short may pass a tighter timeout explicitly.
  */
 export async function waitForAltitude(
   page: Page,
   altitude: number,
-  timeout: number = 20_000,
+  timeout: number = 30_000,
 ): Promise<void> {
   await page.waitForFunction(
     (alt) => (window.__flightPs?.posY ?? 0) >= alt,

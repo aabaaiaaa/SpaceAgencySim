@@ -664,7 +664,10 @@ test.describe('Asteroid Belt — unsafe orbit hub-return rules', () => {
     });
 
     // Wait for the altitude to settle within the dense belt band after
-    // the worker has processed the orbital state.
+    // the worker has processed the orbital state. 40s accommodates cold
+    // Vite/worker startup combined with a Sun-body context switch,
+    // which on first load can exceed 25s before the physics loop
+    // stabilises orbital altitude.
     await page.waitForFunction(
       (mid: number) => {
         const ps = window.__flightPs;
@@ -674,7 +677,7 @@ test.describe('Asteroid Belt — unsafe orbit hub-return rules', () => {
         return alt > mid * 0.8 && alt < mid * 1.2;
       },
       denseMidpoint,
-      { timeout: 15_000 },
+      { timeout: 40_000 },
     );
 
     const orbitCheck = await page.evaluate<OrbitCheckResult | null>(() => {
@@ -1117,6 +1120,15 @@ test.describe('Asteroid Belt — transfer trajectory safety', () => {
       posX: denseMidpoint, posY: 0, velX: 0, velY: 25_000,
       bodyId: 'SUN', phase: 'TRANSFER',
     });
+
+    // Wait for the phase write to survive the worker snapshot round-trip.
+    // Without this, an in-flight PRELAUNCH snapshot from the worker can
+    // arrive after teleport's main-thread write and overwrite it.
+    await page.waitForFunction(
+      () => window.__flightState?.phase === 'TRANSFER',
+      undefined,
+      { timeout: 5_000 },
+    );
 
     const state = await page.evaluate<TransferPhaseState | null>(async () => {
       const w = window;

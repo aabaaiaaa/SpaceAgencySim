@@ -144,20 +144,13 @@ async function dismissReturnResults(page: Page): Promise<void> {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Malfunction during flight', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) forced malfunction triggers on biome transition, event logged, and flight can still complete', async () => {
+  test('(1) forced malfunction triggers on biome transition, event logged, and flight can still complete', async ({ page }) => {
     test.setTimeout(180_000);
     // Start flight with forced malfunctions — every part will malfunction on biome check.
     await startTestFlight(page, BASIC_ROCKET, { malfunctionMode: 'forced' });
@@ -197,7 +190,7 @@ test.describe('Malfunction during flight', () => {
     await expect(page.locator('#hub-overlay')).toBeVisible({ timeout: 5_000 });
   });
 
-  test('(2) malfunction event has correct structure with part name and type', async () => {
+  test('(2) malfunction event has correct structure with part name and type', async ({ page }) => {
     test.setTimeout(180_000);
     // Start another flight with forced malfunctions.
     await startTestFlight(page, BASIC_ROCKET, { malfunctionMode: 'forced' });
@@ -239,17 +232,11 @@ test.describe('Malfunction during flight', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Crew KIA on crash', () => {
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) crewed rocket crash shows Crew KIA in summary and applies death fine', async () => {
+  test('(1) crewed rocket crash shows Crew KIA in summary and applies death fine', async ({ page }) => {
     // Seed save with one crew member.
     const crewMember = buildCrewMember({
       id: 'crew-kia-test',
@@ -342,17 +329,11 @@ test.describe('Crew KIA on crash', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Contract deadline expiry', () => {
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) expired contract is moved to failed and reputation penalty applied', async () => {
+  test('(1) expired contract is moved to failed and reputation penalty applied', async ({ page }) => {
     // Create a contract with a deadline that has already passed.
     // currentPeriod will be 10; set deadlinePeriod to 9 so it expires on period advance.
     const contract = buildContract({
@@ -427,17 +408,11 @@ test.describe('Contract deadline expiry', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Loan default / bankruptcy', () => {
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) bankruptcy banner appears when funds are insufficient for cheapest rocket', async () => {
+  test('(1) bankruptcy banner appears when funds are insufficient for cheapest rocket', async ({ page }) => {
     // Set up a save where the player is bankrupt:
     //   - Very low cash (almost nothing)
     //   - Loan at max balance (no borrowing capacity left)

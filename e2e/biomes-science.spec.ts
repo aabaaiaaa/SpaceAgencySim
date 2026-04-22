@@ -96,13 +96,13 @@ test.describe('Biome label transitions', () => {
   });
 
   test('(2) biome label transitions to Low Atmosphere above 100 m', async ({ browser }) => {
-    test.setTimeout(30_000);
+    test.setTimeout(60_000);
     const page: Page = await setupBiomeFlight(browser);
 
     // Fire engine (space to stage) then set full throttle.
     await pressStage(page);
     await pressThrottleUp(page);
-    await waitForAltitude(page, 150, 10_000);
+    await waitForAltitude(page, 150, 20_000);
 
     // Wait for HUD biome label to update
     await page.waitForFunction(
@@ -554,29 +554,25 @@ test.describe('Instrument activation via staging', () => {
       if (typeof w.__resyncPhysicsWorker === 'function') { await w.__resyncPhysicsWorker(); }
     });
 
-    // Wait for the instrument state to persist through the worker round-trip.
-    await page.waitForFunction(
-      (): boolean => {
+    // Wait for the instrument state to persist through the worker round-trip,
+    // and capture the state at the exact moment the condition holds. A
+    // separate page.evaluate() after this point can race with worker
+    // snapshots and read a reverted value.
+    const stateAfterHandle = await page.waitForFunction(
+      (): string | null => {
         const ps = window.__flightPs;
-        if (!ps?.instrumentStates) return false;
+        if (!ps?.instrumentStates) return null;
         for (const [, entry] of ps.instrumentStates) {
-          if (entry.instrumentId === 'thermometer-mk1') return entry.state === 'running';
+          if (entry.instrumentId === 'thermometer-mk1' && entry.state === 'running') {
+            return entry.state;
+          }
         }
-        return false;
+        return null;
       },
       undefined,
       { timeout: 5_000 },
     );
-
-    const stateAfter: string | null = await page.evaluate((): string | null => {
-      const w = window;
-      const ps = w.__flightPs;
-      if (!ps?.instrumentStates) return null;
-      for (const [, entry] of ps.instrumentStates) {
-        if (entry.instrumentId === 'thermometer-mk1') return entry.state;
-      }
-      return null;
-    });
+    const stateAfter: string | null = await stateAfterHandle.jsonValue();
     expect(stateAfter).toBe('running');
 
     // Wait for the experiment to complete (timer counts down via physics tick).

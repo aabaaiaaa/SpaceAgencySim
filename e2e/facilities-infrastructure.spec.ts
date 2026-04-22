@@ -16,7 +16,7 @@
  *     narrative, construction menu explanation)
  */
 
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import {
   VP_W, VP_H,
   buildSaveEnvelope,
@@ -168,21 +168,14 @@ interface TutorialMissionNarrative {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Facility upgrade purchase from construction menu', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     // Non-tutorial, all facilities at tier 1, plenty of money
     const envelope = midGameFixture({ money: 5_000_000 });
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) upgrade button visible for upgradeable facility', async () => {
+  test('(1) upgrade button visible for upgradeable facility', async ({ page }) => {
     await openConstructionPanel(page);
 
     // Find the Launch Pad entry — it should show an upgrade button
@@ -193,7 +186,7 @@ test.describe('Facility upgrade purchase from construction menu', () => {
     await page.click('.cp-close-btn');
   });
 
-  test('(2) purchasing Launch Pad upgrade to tier 2 deducts money and updates tier', async () => {
+  test('(2) purchasing Launch Pad upgrade to tier 2 deducts money and updates tier', async ({ page }) => {
     const gsBefore = await getGameState(page) as GameState;
     const moneyBefore = gsBefore.money as number;
 
@@ -217,7 +210,7 @@ test.describe('Facility upgrade purchase from construction menu', () => {
     expect(moneyBefore - (gsAfter.money as number)).toBeLessThanOrEqual(200_000);
   });
 
-  test('(3) purchasing VAB upgrade to tier 2', async () => {
+  test('(3) purchasing VAB upgrade to tier 2', async ({ page }) => {
     await openConstructionPanel(page);
 
     const vabItem = page.locator('.cp-facility-item').filter({ hasText: 'Vehicle Assembly' });
@@ -234,7 +227,7 @@ test.describe('Facility upgrade purchase from construction menu', () => {
     expect(gs.hubs[0].facilities[FacilityId.VAB].tier).toBe(2);
   });
 
-  test('(4) purchasing Mission Control upgrade to tier 2', async () => {
+  test('(4) purchasing Mission Control upgrade to tier 2', async ({ page }) => {
     await openConstructionPanel(page);
 
     const mccItem = page.locator('.cp-facility-item').filter({ hasText: 'Mission Control' });
@@ -251,7 +244,7 @@ test.describe('Facility upgrade purchase from construction menu', () => {
     expect(gs.hubs[0].facilities[FacilityId.MISSION_CONTROL].tier).toBe(2);
   });
 
-  test('(5) max tier facility shows no upgrade button', async () => {
+  test('(5) max tier facility shows no upgrade button', async ({ page }) => {
     // Upgrade Launch Pad to tier 3
     await openConstructionPanel(page);
 
@@ -284,18 +277,11 @@ test.describe('Facility upgrade purchase from construction menu', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Launch Pad — mass limits per tier', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) tier 1 enforces 18,000 kg mass limit', async () => {
+  test('(1) tier 1 enforces 18,000 kg mass limit', async ({ page }) => {
     const envelope = freshStartFixture({
       money: 5_000_000,
       parts: ALL_PARTS,
@@ -315,7 +301,7 @@ test.describe('Launch Pad — mass limits per tier', () => {
     expect(massLimit.tier).toBe(1);
   });
 
-  test('(2) tier 2 raises limit to 80,000 kg', async () => {
+  test('(2) tier 2 raises limit to 80,000 kg', async ({ page }) => {
     // Upgrade to tier 2 programmatically
     await page.evaluate(() => {
       const w = window;
@@ -327,7 +313,7 @@ test.describe('Launch Pad — mass limits per tier', () => {
     expect(gs.hubs[0].facilities[FacilityId.LAUNCH_PAD].tier).toBe(2);
   });
 
-  test('(3) tier 3 has no mass limit', async () => {
+  test('(3) tier 3 has no mass limit', async ({ page }) => {
     await page.evaluate(() => {
       const w = window;
       const gs = w.__gameState;
@@ -344,18 +330,11 @@ test.describe('Launch Pad — mass limits per tier', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('VAB — part count and size limits per tier', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) tier 1 limits: 20 parts, 400px height, 120px width', async () => {
+  test('(1) tier 1 limits: 20 parts, 400px height, 120px width', async ({ page }) => {
     const envelope = freshStartFixture({
       money: 5_000_000,
       parts: ALL_PARTS,
@@ -375,7 +354,7 @@ test.describe('VAB — part count and size limits per tier', () => {
     // These are enforced by rocketvalidator — tested via state check
   });
 
-  test('(2) tier 2 raises limits: 40 parts, 800px height, 200px width', async () => {
+  test('(2) tier 2 raises limits: 40 parts, 800px height, 200px width', async ({ page }) => {
     await page.evaluate(() => {
       const w = window;
       const gs = w.__gameState;
@@ -386,7 +365,7 @@ test.describe('VAB — part count and size limits per tier', () => {
     expect(gs.hubs[0].facilities[FacilityId.VAB].tier).toBe(2);
   });
 
-  test('(3) tier 3 removes all limits', async () => {
+  test('(3) tier 3 removes all limits', async ({ page }) => {
     await page.evaluate(() => {
       const w = window;
       const gs = w.__gameState;
@@ -403,18 +382,11 @@ test.describe('VAB — part count and size limits per tier', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Mission Control — contract pool and active caps per tier', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) tier 1: max 2 active contracts, 4 board pool', async () => {
+  test('(1) tier 1: max 2 active contracts, 4 board pool', async ({ page }) => {
     // Create fixture with tier 1 MCC and multiple contracts on the board
     const contracts: Record<string, unknown>[] = [];
     for (let i = 0; i < 6; i++) {
@@ -450,7 +422,7 @@ test.describe('Mission Control — contract pool and active caps per tier', () =
     // The contract caps are enforced by the contract system
   });
 
-  test('(2) tier 2: max 5 active contracts, 8 board pool', async () => {
+  test('(2) tier 2: max 5 active contracts, 8 board pool', async ({ page }) => {
     await page.evaluate(() => {
       const w = window;
       const gs = w.__gameState;
@@ -461,7 +433,7 @@ test.describe('Mission Control — contract pool and active caps per tier', () =
     expect(gs.hubs[0].facilities[FacilityId.MISSION_CONTROL].tier).toBe(2);
   });
 
-  test('(3) tier 3: max 8 active contracts, 12 board pool', async () => {
+  test('(3) tier 3: max 8 active contracts, 12 board pool', async ({ page }) => {
     await page.evaluate(() => {
       const w = window;
       const gs = w.__gameState;
@@ -478,20 +450,13 @@ test.describe('Mission Control — contract pool and active caps per tier', () =
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Crew Admin — hire and fire', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) can hire a crew member via core API', async () => {
+  test('(1) can hire a crew member via core API', async ({ page }) => {
     const gsBefore = await getGameState(page) as GameState;
     const crewCountBefore = (gsBefore.crew as unknown as CrewSnapshot[]).length;
     const moneyBefore = gsBefore.money as number;
@@ -536,7 +501,7 @@ test.describe('Crew Admin — hire and fire', () => {
     expect(gsAfter.money).toBeLessThan(moneyBefore);
   });
 
-  test('(2) can fire a crew member', async () => {
+  test('(2) can fire a crew member', async ({ page }) => {
     const result = await page.evaluate((): HireFireResult => {
       const w = window;
       const gs = w.__gameState;
@@ -558,12 +523,7 @@ test.describe('Crew Admin — hire and fire', () => {
 });
 
 test.describe('Crew Admin — training system', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     // Crew Admin at tier 2 (1 training slot)
     const envelope = midGameFixture({
@@ -576,9 +536,7 @@ test.describe('Crew Admin — training system', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) tier 2 provides 1 training slot', async () => {
+  test('(1) tier 2 provides 1 training slot', async ({ page }) => {
     const slotInfo = await page.evaluate((): SlotInfoResult => {
       const w = window;
       const gs = w.__gameState;
@@ -596,7 +554,7 @@ test.describe('Crew Admin — training system', () => {
     expect(slotInfo.availableSlots).toBe(1);
   });
 
-  test('(2) assigning crew to training sets trainingSkill and trainingEnds', async () => {
+  test('(2) assigning crew to training sets trainingSkill and trainingEnds', async ({ page }) => {
     const result = await page.evaluate((): TrainingAssignmentResult => {
       const w = window;
       const gs = w.__gameState;
@@ -625,7 +583,7 @@ test.describe('Crew Admin — training system', () => {
     expect(result.cost).toBe(20_000);
   });
 
-  test('(3) crew in training is unavailable for flight assignment', async () => {
+  test('(3) crew in training is unavailable for flight assignment', async ({ page }) => {
     const gs = await getGameState(page) as GameState;
     const trainingCrew = (gs.crew as unknown as CrewSnapshot[]).find(c => c.trainingSkill != null);
     expect(trainingCrew).toBeTruthy();
@@ -644,7 +602,7 @@ test.describe('Crew Admin — training system', () => {
     expect(canAssign).toBe(false);
   });
 
-  test('(4) training completes after required periods with +15 skill gain', async () => {
+  test('(4) training completes after required periods with +15 skill gain', async ({ page }) => {
     const gsBefore = await getGameState(page) as GameState;
     const traineeBefore = (gsBefore.crew as unknown as CrewSnapshot[]).find(c => c.trainingSkill != null)!;
     const skillBefore = traineeBefore.skills.piloting;
@@ -677,7 +635,7 @@ test.describe('Crew Admin — training system', () => {
     expect(traineeAfter.skills.piloting).toBe(Math.min(100, skillBefore + 15));
   });
 
-  test('(5) slot limit prevents additional training at tier 2 (1 slot used)', async () => {
+  test('(5) slot limit prevents additional training at tier 2 (1 slot used)', async ({ page }) => {
     // Put one crew member in training again
     await page.evaluate((): void => {
       const w = window;
@@ -709,12 +667,7 @@ test.describe('Crew Admin — training system', () => {
 });
 
 test.describe('Crew Admin — tier 3 features', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({
       money: 5_000_000,
@@ -726,9 +679,7 @@ test.describe('Crew Admin — tier 3 features', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) tier 3 provides 3 training slots', async () => {
+  test('(1) tier 3 provides 3 training slots', async ({ page }) => {
     const slotInfo = await page.evaluate((): SlotInfoResult => {
       const w = window;
       const gs = w.__gameState;
@@ -741,7 +692,7 @@ test.describe('Crew Admin — tier 3 features', () => {
     expect(slotInfo.maxSlots).toBe(3);
   });
 
-  test('(2) experienced crew recruitment available at tier 3', async () => {
+  test('(2) experienced crew recruitment available at tier 3', async ({ page }) => {
     const gsBefore = await getGameState(page) as GameState;
     const crewBefore = (gsBefore.crew as unknown as CrewSnapshot[]).length;
 
@@ -806,11 +757,7 @@ test.describe('Crew Admin — tier 3 features', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Crew training opportunity cost — crew unavailable during training', () => {
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     // Set up crew: one in training, one available
     const crewInTraining = buildCrewMember({
@@ -847,9 +794,7 @@ test.describe('Crew training opportunity cost — crew unavailable during traini
     });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('crew in training cannot be assigned to flights', async () => {
+  test('crew in training cannot be assigned to flights', async ({ page }) => {
     const assignable = await page.evaluate((): string[] => {
       const w = window;
       const gs = w.__gameState;
@@ -873,18 +818,11 @@ test.describe('Crew training opportunity cost — crew unavailable during traini
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Tracking Station — map view scope per tier', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) tier 1: local body map view only', async () => {
+  test('(1) tier 1: local body map view only', async ({ page }) => {
     const envelope = orbitalFixture({
       facilities: {
         ...ALL_FACILITIES,
@@ -898,7 +836,7 @@ test.describe('Tracking Station — map view scope per tier', () => {
     // Tier 1: local body only — map shows objects around current body
   });
 
-  test('(2) tier 2: solar system map view', async () => {
+  test('(2) tier 2: solar system map view', async ({ page }) => {
     await page.evaluate((): void => {
       const w = window;
       const gs = w.__gameState;
@@ -910,7 +848,7 @@ test.describe('Tracking Station — map view scope per tier', () => {
     // Tier 2: solar system scope, debris tracking, weather windows
   });
 
-  test('(3) tier 3: deep space communications and transfer planning', async () => {
+  test('(3) tier 3: deep space communications and transfer planning', async ({ page }) => {
     await page.evaluate((): void => {
       const w = window;
       const gs = w.__gameState;
@@ -927,12 +865,7 @@ test.describe('Tracking Station — map view scope per tier', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Library — statistics dashboard', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     // Build comprehensive flight history for statistics
@@ -967,15 +900,13 @@ test.describe('Library — statistics dashboard', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) Library facility is built and accessible', async () => {
+  test('(1) Library facility is built and accessible', async ({ page }) => {
     const gs = await getGameState(page) as GameState;
     expect(gs.hubs[0].facilities[FacilityId.LIBRARY]).toBeTruthy();
     expect(gs.hubs[0].facilities[FacilityId.LIBRARY].built).toBe(true);
   });
 
-  test('(2) agency statistics correctly computed', async () => {
+  test('(2) agency statistics correctly computed', async ({ page }) => {
     const stats = await page.evaluate((): AgencyStatsResult => {
       const w = window;
       const gs = w.__gameState;
@@ -1004,7 +935,7 @@ test.describe('Library — statistics dashboard', () => {
     expect(stats.satellitesDeployed).toBe(2);
   });
 
-  test('(3) celestial body knowledge includes discovered bodies', async () => {
+  test('(3) celestial body knowledge includes discovered bodies', async ({ page }) => {
     const knowledge = await page.evaluate((): string[] => {
       const w = window;
       const gs = w.__gameState;
@@ -1025,7 +956,7 @@ test.describe('Library — statistics dashboard', () => {
     expect(knowledge).toContain('MOON');
   });
 
-  test('(4) top-5 frequently flown rockets computed correctly', async () => {
+  test('(4) top-5 frequently flown rockets computed correctly', async ({ page }) => {
     const topRockets = await page.evaluate((): TopRocketEntry[] => {
       const w = window;
       const gs = w.__gameState;
@@ -1062,7 +993,7 @@ test.describe('Library — statistics dashboard', () => {
     expect(topRockets[0].totalRevenue).toBe(150_000);
   });
 
-  test('(5) records: max altitude and max speed from flight history', async () => {
+  test('(5) records: max altitude and max speed from flight history', async ({ page }) => {
     const records = await page.evaluate((): RecordsResult => {
       const w = window;
       const gs = w.__gameState;
@@ -1088,12 +1019,7 @@ test.describe('Library — statistics dashboard', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Library — free construction', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     // Start without library built
     const envelope = freshStartFixture({
@@ -1103,14 +1029,12 @@ test.describe('Library — free construction', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) Library not initially built', async () => {
+  test('(1) Library not initially built', async ({ page }) => {
     const gs = await getGameState(page) as GameState;
     expect(gs.hubs[0].facilities[FacilityId.LIBRARY]).toBeFalsy();
   });
 
-  test('(2) building Library costs $0 and succeeds', async () => {
+  test('(2) building Library costs $0 and succeeds', async ({ page }) => {
     const gsBefore = await getGameState(page) as GameState;
     const moneyBefore = gsBefore.money as number;
 
@@ -1142,18 +1066,11 @@ test.describe('Library — free construction', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Tutorial missions — facility awards on accept', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) Mission 18 (Crew Admin tutorial) awards Crew Admin on acceptance', async () => {
+  test('(1) Mission 18 (Crew Admin tutorial) awards Crew Admin on acceptance', async ({ page }) => {
     // Set up: tutorial mode, with mission-018 available
     const envelope = buildSaveEnvelope({
       saveName: 'Tutorial Crew',
@@ -1227,7 +1144,7 @@ test.describe('Tutorial missions — facility awards on accept', () => {
     expect(gsAfter.hubs[0].facilities[FacilityId.CREW_ADMIN].built).toBe(true);
   });
 
-  test('(2) Mission 19 (R&D Lab tutorial) awards R&D Lab on acceptance', async () => {
+  test('(2) Mission 19 (R&D Lab tutorial) awards R&D Lab on acceptance', async ({ page }) => {
     // Set up with mission-019 available
     const envelope = buildSaveEnvelope({
       saveName: 'Tutorial RD',
@@ -1289,7 +1206,7 @@ test.describe('Tutorial missions — facility awards on accept', () => {
     expect(gsAfter.hubs[0].facilities[FacilityId.RD_LAB]).toBeTruthy();
   });
 
-  test('(3) Mission 20 (Tracking Station tutorial) awards Tracking Station on acceptance', async () => {
+  test('(3) Mission 20 (Tracking Station tutorial) awards Tracking Station on acceptance', async ({ page }) => {
     const envelope = buildSaveEnvelope({
       saveName: 'Tutorial TS',
       agencyName: 'Tutorial Agency',
@@ -1348,7 +1265,7 @@ test.describe('Tutorial missions — facility awards on accept', () => {
     expect(gsAfter.hubs[0].facilities[FacilityId.TRACKING_STATION]).toBeTruthy();
   });
 
-  test('(4) Mission 22 (Satellite Ops tutorial) awards Satellite Ops on acceptance', async () => {
+  test('(4) Mission 22 (Satellite Ops tutorial) awards Satellite Ops on acceptance', async ({ page }) => {
     const envelope = buildSaveEnvelope({
       saveName: 'Tutorial SatOps',
       agencyName: 'Tutorial Agency',
@@ -1418,11 +1335,7 @@ test.describe('Tutorial missions — facility awards on accept', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Tutorial mission descriptions contain narrative and construction hints', () => {
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     // Load state with all tutorial facility missions available
@@ -1483,9 +1396,7 @@ test.describe('Tutorial mission descriptions contain narrative and construction 
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('tutorial missions reference Construction Menu in their description', async () => {
+  test('tutorial missions reference Construction Menu in their description', async ({ page }) => {
     const descriptions = await page.evaluate((): TutorialMissionDesc[] => {
       const w = window;
       const gs = w.__gameState;
@@ -1505,7 +1416,7 @@ test.describe('Tutorial mission descriptions contain narrative and construction 
     }
   });
 
-  test('tutorial missions contain narrative context', async () => {
+  test('tutorial missions contain narrative context', async ({ page }) => {
     const missions = await page.evaluate((): TutorialMissionNarrative[] => {
       const w = window;
       const gs = w.__gameState;
@@ -1544,11 +1455,7 @@ test.describe('Tutorial mission descriptions contain narrative and construction 
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Comprehensive facility state — all tiers loaded correctly', () => {
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const envelope = orbitalFixture({
@@ -1566,9 +1473,7 @@ test.describe('Comprehensive facility state — all tiers loaded correctly', () 
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('all facilities loaded at correct tiers', async () => {
+  test('all facilities loaded at correct tiers', async ({ page }) => {
     const gs = await getGameState(page) as GameState;
 
     expect(gs.hubs[0].facilities[FacilityId.LAUNCH_PAD].tier).toBe(3);
@@ -1581,7 +1486,7 @@ test.describe('Comprehensive facility state — all tiers loaded correctly', () 
     expect(gs.hubs[0].facilities[FacilityId.LIBRARY].tier).toBe(1);
   });
 
-  test('non-upgradeable facility (Library) has no tier 2', async () => {
+  test('non-upgradeable facility (Library) has no tier 2', async ({ page }) => {
     const gs = await getGameState(page) as GameState;
     expect(gs.hubs[0].facilities[FacilityId.LIBRARY].tier).toBe(1);
     // Library has no upgrade definitions — max tier is 1
@@ -1593,11 +1498,7 @@ test.describe('Comprehensive facility state — all tiers loaded correctly', () 
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Launch Pad tier 3 — launch clamp support', () => {
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = orbitalFixture({
       money: 10_000_000,
@@ -1609,9 +1510,7 @@ test.describe('Launch Pad tier 3 — launch clamp support', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('tier 3 launch pad enables launch clamp features', async () => {
+  test('tier 3 launch pad enables launch clamp features', async ({ page }) => {
     const gs = await getGameState(page) as GameState;
     expect(gs.hubs[0].facilities[FacilityId.LAUNCH_PAD].tier).toBe(3);
     // Launch clamp support is a tier 3 feature — the tier is correctly set
@@ -1625,11 +1524,7 @@ test.describe('Launch Pad tier 3 — launch clamp support', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Facility upgrade — insufficient funds handling', () => {
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = freshStartFixture({
       money: 10_000, // Very low money
@@ -1638,9 +1533,7 @@ test.describe('Facility upgrade — insufficient funds handling', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('upgrade blocked when player cannot afford it', async () => {
+  test('upgrade blocked when player cannot afford it', async ({ page }) => {
     await openConstructionPanel(page);
 
     // Launch Pad tier 2 costs $200k — we only have $10k
@@ -1672,17 +1565,11 @@ test.describe('Facility upgrade — insufficient funds handling', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Reputation discount on facility upgrades', () => {
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('high reputation (90) gives 15% facility discount', async () => {
+  test('high reputation (90) gives 15% facility discount', async ({ page }) => {
     const envelope = orbitalFixture({
       money: 5_000_000,
       reputation: 90, // Elite tier — 15% discount
@@ -1710,7 +1597,7 @@ test.describe('Reputation discount on facility upgrades', () => {
     expect(gsAfter.hubs[0].facilities[FacilityId.LAUNCH_PAD].tier).toBe(2);
   });
 
-  test('low reputation (20) gives no discount', async () => {
+  test('low reputation (20) gives no discount', async ({ page }) => {
     const envelope = freshStartFixture({
       money: 5_000_000,
       reputation: 20, // Basic tier — 0% discount
@@ -1742,11 +1629,7 @@ test.describe('Reputation discount on facility upgrades', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('R&D Lab upgrade — dual cost (money + science)', () => {
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = orbitalFixture({
       money: 5_000_000,
@@ -1760,9 +1643,7 @@ test.describe('R&D Lab upgrade — dual cost (money + science)', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('R&D Lab tier 2 costs $600k + 100 science', async () => {
+  test('R&D Lab tier 2 costs $600k + 100 science', async ({ page }) => {
     const gsBefore = await getGameState(page) as GameState;
     const moneyBefore = gsBefore.money as number;
     const scienceBefore = gsBefore.sciencePoints as number;

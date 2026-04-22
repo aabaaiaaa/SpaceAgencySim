@@ -4,6 +4,10 @@ export default defineConfig({
   // Directory containing e2e test files
   testDir: './e2e',
 
+  // Warm Vite's module cache before the first spec runs so cold-start
+  // compilation cost doesn't land inside a test's waitForFunction budget.
+  globalSetup: './e2e/global-setup.ts',
+
   // Accept both .js and .ts spec files during the transition
   testMatch: '**/*.spec.ts',
 

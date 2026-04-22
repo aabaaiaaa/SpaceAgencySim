@@ -17,7 +17,7 @@
  *     craft behavior, comms overlay.
  */
 
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '@playwright/test';
 import {
   VP_W, VP_H,
   buildSaveEnvelope,
@@ -151,18 +151,11 @@ function fullFixture(overrides: SaveEnvelopeParams = {}): SaveEnvelope {
 // =========================================================================
 
 test.describe('Thermal system', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) heat accumulates during high-speed atmospheric flight', async () => {
+  test('(1) heat accumulates during high-speed atmospheric flight', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, BASIC_PROBE);
@@ -193,7 +186,7 @@ test.describe('Thermal system', () => {
     expect(heatData.partCount).toBeGreaterThan(0);
   });
 
-  test('(2) heat dissipates when slowing below threshold', async () => {
+  test('(2) heat dissipates when slowing below threshold', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, BASIC_PROBE);
@@ -205,7 +198,7 @@ test.describe('Thermal system', () => {
       if (!ps?.heatMap) return false;
       for (const h of ps.heatMap.values()) { if (h > 0) return true; }
       return false;
-    }, undefined, { timeout: 5_000 });
+    }, undefined, { timeout: 15_000 });
 
     const beforeHeat = await page.evaluate(() => {
       const ps = window.__flightPs!;
@@ -247,7 +240,7 @@ test.describe('Thermal system', () => {
     expect(afterHeat).toBeLessThan(beforeHeat);
   });
 
-  test('(3) parts are destroyed when thermal tolerance is exceeded', async () => {
+  test('(3) parts are destroyed when thermal tolerance is exceeded', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, BASIC_PROBE);
@@ -283,7 +276,7 @@ test.describe('Thermal system', () => {
     expect(result.partsNow < partsBefore || result.destroyEvents > 0).toBe(true);
   });
 
-  test('(4) heat shields protect parts behind them in stack', async () => {
+  test('(4) heat shields protect parts behind them in stack', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     // Build order is top-to-bottom: probe, tank, engine at the top, shield at bottom.
@@ -333,7 +326,7 @@ test.describe('Thermal system', () => {
     }
   });
 
-  test('(5) orientation matters — ascending heat distribution differs from descending', async () => {
+  test('(5) orientation matters — ascending heat distribution differs from descending', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'tank-small', 'engine-spark', 'heat-shield-mk2']);
@@ -365,7 +358,7 @@ test.describe('Thermal system', () => {
     expect(ascendingHeat.count).toBeGreaterThan(0);
   });
 
-  test('(6) body-specific heating — Mars low, Earth moderate, Venus extreme', async () => {
+  test('(6) body-specific heating — Mars low, Earth moderate, Venus extreme', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
 
@@ -403,7 +396,7 @@ test.describe('Thermal system', () => {
     expect(densities.mars).toBeLessThan(densities.venus);
   });
 
-  test('(7) airless bodies produce no atmospheric heating', async () => {
+  test('(7) airless bodies produce no atmospheric heating', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MOON' });
@@ -433,7 +426,7 @@ test.describe('Thermal system', () => {
     expect(heatOnMoon).toBe(0);
   });
 
-  test('(8) thermal ratings visible in VAB part tooltips', async () => {
+  test('(8) thermal ratings visible in VAB part tooltips', async ({ page }) => {
     test.setTimeout(30_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await navigateToVab(page);
@@ -451,28 +444,31 @@ test.describe('Thermal system', () => {
     expect(hasThermalInfo).toBe(true);
   });
 
-  test('(9) heat glow visual effect appears on heated parts', async () => {
-    test.setTimeout(60_000);
+  test('(9) heat glow visual effect appears on heated parts', async ({ page }) => {
+    test.setTimeout(90_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, BASIC_PROBE);
 
-    // Apply significant heat to parts.
-    await page.evaluate(async () => {
-      const w = window;
-      const ps = w.__flightPs!;
-      for (const id of ps.activeParts) {
-        ps.heatMap.set(id, 600); // ~50% of default tolerance — should trigger glow.
-      }
-      if (typeof w.__resyncPhysicsWorker === 'function') { await w.__resyncPhysicsWorker(); }
-    });
+    // Put craft in moderate reentry conditions so the physics model
+    // accumulates heat naturally. Manually seeding heatMap is unreliable
+    // because the worker recomputes heat on the next tick and zeroes it
+    // when the craft has no aero-heating forcing function. Moderate
+    // conditions (matching test (1)) give steady heat accumulation
+    // without destroying the part before it reaches the glow threshold.
+    await teleportCraft(page, { posY: 50_000, velY: -2000 });
 
-    // Wait for render frame to process the heat state
+    // Wait for at least one part to reach the 0.1 glow ratio
+    // (default tolerance 1200 → heat ≥ 120). 40s accounts for cold-start
+    // Vite/worker startup under batch-run load, where the first test in
+    // a run pays the per-context browser initialisation cost.
     await page.waitForFunction(() => {
       const ps = window.__flightPs;
       if (!ps?.heatMap) return false;
-      for (const h of ps.heatMap.values()) { if (h > 0) return true; }
+      for (const h of ps.heatMap.values()) {
+        if (h / 1200 >= 0.1) return true;
+      }
       return false;
-    }, undefined, { timeout: 5_000 });
+    }, undefined, { timeout: 40_000 });
 
     // The heat glow is a PixiJS rendering effect. We verify indirectly that
     // the heat ratio is above the 0.1 threshold for rendering.
@@ -503,19 +499,12 @@ test.describe('Thermal system', () => {
 // =========================================================================
 
 test.describe('Tech tree parts', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, asSave(fullFixture()));
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) improved engine (Spark II) has correct thrust and ISP', async () => {
+  test('(1) improved engine (Spark II) has correct thrust and ISP', async ({ page }) => {
     test.setTimeout(60_000);
     await startTestFlight(page, ['probe-core-mk1', 'tank-small', 'engine-spark-improved']);
 
@@ -541,7 +530,7 @@ test.describe('Tech tree parts', () => {
     expect(snap!.posY).toBeGreaterThan(0);
   });
 
-  test('(2) ion engine has very low thrust but is present', async () => {
+  test('(2) ion engine has very low thrust but is present', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'tank-small', 'engine-ion']);
@@ -556,7 +545,7 @@ test.describe('Tech tree parts', () => {
     expect(ionInfo.found).toBe(true);
   });
 
-  test('(3) deep space engine is placeable and functional', async () => {
+  test('(3) deep space engine is placeable and functional', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'tank-large', 'engine-deep-space']);
@@ -589,7 +578,7 @@ test.describe('Tech tree parts', () => {
     }
   });
 
-  test('(4) large fuel tank has correct capacity', async () => {
+  test('(4) large fuel tank has correct capacity', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'tank-large', 'engine-reliant']);
@@ -613,15 +602,17 @@ test.describe('Tech tree parts', () => {
     expect(snap!.posY).toBeGreaterThan(0);
   });
 
-  test('(5) parachute deploys and slows descent', async () => {
+  test('(5) parachute deploys and slows descent', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'parachute-mk1', 'tank-small', 'engine-spark']);
 
-    // Launch up.
+    // Launch up. The rocket naturally ascends under thrust; give the flight
+    // enough wall-clock headroom so cold-start Vite/worker startup doesn't
+    // push us past the altitude threshold deadline.
     await pressStage(page);
     await pressThrottleUp(page);
-    await waitForAltitude(page, 200, 15_000);
+    await waitForAltitude(page, 200, 30_000);
 
     // Cut engine and stage parachute.
     await pressThrottleCut(page);
@@ -645,7 +636,7 @@ test.describe('Tech tree parts', () => {
     expect(Math.abs(snap!.velY)).toBeLessThan(200);
   });
 
-  test('(6) drogue chute deploys at high altitude', async () => {
+  test('(6) drogue chute deploys at high altitude', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'parachute-drogue', 'parachute-mk1', 'tank-small', 'engine-spark']);
@@ -660,7 +651,7 @@ test.describe('Tech tree parts', () => {
     expect(found).toBe(true);
   });
 
-  test('(7) heat shields are placeable and have high tolerance', async () => {
+  test('(7) heat shields are placeable and have high tolerance', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'heat-shield-mk2', 'tank-small', 'engine-spark']);
@@ -675,7 +666,7 @@ test.describe('Tech tree parts', () => {
     expect(shieldInfo.found).toBe(true);
   });
 
-  test('(8) powered landing guidance auto-lands consuming fuel', async () => {
+  test('(8) powered landing guidance auto-lands consuming fuel', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'landing-legs-powered', 'tank-small', 'engine-spark']);
@@ -709,7 +700,7 @@ test.describe('Tech tree parts', () => {
     expect(hasAutoLand).toBe(true);
   });
 
-  test('(9) reusable booster module creates inventory parts on stage separation', async () => {
+  test('(9) reusable booster module creates inventory parts on stage separation', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, [
@@ -728,7 +719,7 @@ test.describe('Tech tree parts', () => {
     expect(found).toBe(true);
   });
 
-  test('(10) Science Lab generates additional science from collected data', async () => {
+  test('(10) Science Lab generates additional science from collected data', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'science-lab', 'tank-small', 'engine-spark']);
@@ -745,7 +736,7 @@ test.describe('Tech tree parts', () => {
     expect(labInfo.found).toBe(true);
   });
 
-  test('(11) deep space instruments work when present in assembly', async () => {
+  test('(11) deep space instruments work when present in assembly', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'instrument-telescope', 'tank-small', 'engine-spark']);
@@ -766,18 +757,11 @@ test.describe('Tech tree parts', () => {
 // =========================================================================
 
 test.describe('Satellite components', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) custom satellite buildable from individual parts', async () => {
+  test('(1) custom satellite buildable from individual parts', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     // Build a custom satellite: probe core + solar panel + battery + antenna + sensor.
@@ -807,7 +791,7 @@ test.describe('Satellite components', () => {
     expect(partIds).toContain('sensor-science');
   });
 
-  test('(2) solar panels provide power generation', async () => {
+  test('(2) solar panels provide power generation', async ({ page }) => {
     test.setTimeout(60_000);
 
     // Check that the power state recognizes solar panels.
@@ -827,7 +811,7 @@ test.describe('Satellite components', () => {
     }
   });
 
-  test('(3) batteries store electrical energy', async () => {
+  test('(3) batteries store electrical energy', async ({ page }) => {
     test.setTimeout(30_000);
     const powerInfo = await page.evaluate(() => {
       const ps = window.__flightPs;
@@ -844,7 +828,7 @@ test.describe('Satellite components', () => {
     }
   });
 
-  test('(4) standard antenna has short range property', async () => {
+  test('(4) standard antenna has short range property', async ({ page }) => {
     test.setTimeout(30_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'antenna-standard', 'tank-small', 'engine-spark']);
@@ -861,7 +845,7 @@ test.describe('Satellite components', () => {
     expect(antennaInfo.found).toBe(true);
   });
 
-  test('(5) high-power antenna has medium range property', async () => {
+  test('(5) high-power antenna has medium range property', async ({ page }) => {
     test.setTimeout(30_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'antenna-high-power', 'tank-small', 'engine-spark']);
@@ -876,7 +860,7 @@ test.describe('Satellite components', () => {
     expect(found).toBe(true);
   });
 
-  test('(6) relay dish has interplanetary range and relay capability', async () => {
+  test('(6) relay dish has interplanetary range and relay capability', async ({ page }) => {
     test.setTimeout(30_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'antenna-relay', 'tank-small', 'engine-spark']);
@@ -891,7 +875,7 @@ test.describe('Satellite components', () => {
     expect(found).toBe(true);
   });
 
-  test('(7) weather sensor provides correct sensor type', async () => {
+  test('(7) weather sensor provides correct sensor type', async ({ page }) => {
     test.setTimeout(30_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'sensor-weather', 'tank-small', 'engine-spark']);
@@ -906,7 +890,7 @@ test.describe('Satellite components', () => {
     expect(found).toBe(true);
   });
 
-  test('(8) science sensor provides correct sensor type', async () => {
+  test('(8) science sensor provides correct sensor type', async ({ page }) => {
     test.setTimeout(30_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'sensor-science', 'tank-small', 'engine-spark']);
@@ -921,7 +905,7 @@ test.describe('Satellite components', () => {
     expect(found).toBe(true);
   });
 
-  test('(9) GPS transponder provides correct sensor type', async () => {
+  test('(9) GPS transponder provides correct sensor type', async ({ page }) => {
     test.setTimeout(30_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'sensor-gps', 'tank-small', 'engine-spark']);
@@ -936,7 +920,7 @@ test.describe('Satellite components', () => {
     expect(found).toBe(true);
   });
 
-  test('(10) science telescope generates orbital science', async () => {
+  test('(10) science telescope generates orbital science', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, [
@@ -957,7 +941,7 @@ test.describe('Satellite components', () => {
     expect(telescopeInfo.found).toBe(true);
   });
 
-  test('(11) power draw from active components is tracked', async () => {
+  test('(11) power draw from active components is tracked', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, [
@@ -1000,18 +984,11 @@ test.describe('Satellite components', () => {
 // =========================================================================
 
 test.describe('Life support', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) supply countdown decrements per period for crew in orbit', async () => {
+  test('(1) supply countdown decrements per period for crew in orbit', async ({ page }) => {
     test.setTimeout(60_000);
     // Create a fixture and inject fieldCraft into the state manually.
     const fixture = fullFixture();
@@ -1037,7 +1014,7 @@ test.describe('Life support', () => {
     expect(fc!.suppliesRemaining).toBe(5);
   });
 
-  test('(2) warning at 1 period remaining', async () => {
+  test('(2) warning at 1 period remaining', async ({ page }) => {
     test.setTimeout(60_000);
     // Set up with 1 supply remaining — should be at warning threshold.
     const fixture = fullFixture();
@@ -1062,7 +1039,7 @@ test.describe('Life support', () => {
     expect(fc!.suppliesRemaining).toBeLessThanOrEqual(1);
   });
 
-  test('(3) crew death at 0 supplies — state reflects KIA after period advance', async () => {
+  test('(3) crew death at 0 supplies — state reflects KIA after period advance', async ({ page }) => {
     test.setTimeout(60_000);
     // Set up with 0 supplies — crew should die on next period advance.
     const fixture = fullFixture();
@@ -1095,7 +1072,7 @@ test.describe('Life support', () => {
     }
   });
 
-  test('(4) Extended Mission Module prevents supply countdown', async () => {
+  test('(4) Extended Mission Module prevents supply countdown', async ({ page }) => {
     test.setTimeout(60_000);
     const fixture = fullFixture();
     fixture.state.fieldCraft = [{
@@ -1121,7 +1098,7 @@ test.describe('Life support', () => {
     expect(fc!.suppliesRemaining).toBe(5);
   });
 
-  test('(5) countdown does not apply during active flight', async () => {
+  test('(5) countdown does not apply during active flight', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     // Start a crewed flight — life support should not tick during flight.
@@ -1135,7 +1112,7 @@ test.describe('Life support', () => {
     expect(activeCrew.length).toBe(0);
   });
 
-  test('(6) supply status visible in game state (Tracking Station data)', async () => {
+  test('(6) supply status visible in game state (Tracking Station data)', async ({ page }) => {
     test.setTimeout(60_000);
     const fixture = fullFixture();
     fixture.state.fieldCraft = [
@@ -1186,18 +1163,11 @@ test.describe('Life support', () => {
 // =========================================================================
 
 test.describe('Comms range', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) direct comms work within Earth orbit range', async () => {
+  test('(1) direct comms work within Earth orbit range', async ({ page }) => {
     test.setTimeout(60_000);
     await seedAndLoadSave(page, asSave(fullFixture({
       satelliteNetwork: { satellites: [] }, // No satellites — test pure direct link.
@@ -1241,7 +1211,7 @@ test.describe('Comms range', () => {
     expect(comms!.controlLocked).toBe(false);
   });
 
-  test('(2) comms fail beyond direct range limit without infrastructure', async () => {
+  test('(2) comms fail beyond direct range limit without infrastructure', async ({ page }) => {
     test.setTimeout(60_000);
     // No satellites, no T3 tracking station — only basic direct range.
     await seedAndLoadSave(page, asSave(fullFixture({
@@ -1283,7 +1253,7 @@ test.describe('Comms range', () => {
     }
   });
 
-  test('(3) Tracking Station T3 extends direct range within Earth system', async () => {
+  test('(3) Tracking Station T3 extends direct range within Earth system', async ({ page }) => {
     test.setTimeout(60_000);
     // T3 tracking station extends Earth direct range to 500,000 km.
     // Test at high Earth orbit — beyond basic 40,000 km but within T3 range.
@@ -1326,7 +1296,7 @@ test.describe('Comms range', () => {
     }
   });
 
-  test('(4) local comms network provides coverage via comm-sats', async () => {
+  test('(4) local comms network provides coverage via comm-sats', async ({ page }) => {
     test.setTimeout(60_000);
     // Deploy 3 comm-sats around the Moon for full coverage.
     await seedAndLoadSave(page, asSave(fullFixture({
@@ -1373,7 +1343,7 @@ test.describe('Comms range', () => {
     }
   });
 
-  test('(5) dark spots on far side with partial coverage', async () => {
+  test('(5) dark spots on far side with partial coverage', async ({ page }) => {
     test.setTimeout(60_000);
     // Only 1 comm-sat — partial coverage, dark spots possible.
     await seedAndLoadSave(page, asSave(fullFixture({
@@ -1409,7 +1379,7 @@ test.describe('Comms range', () => {
     }
   });
 
-  test('(6) relay antennas bridge interplanetary distances', async () => {
+  test('(6) relay antennas bridge interplanetary distances', async ({ page }) => {
     test.setTimeout(60_000);
     // Deploy relay sats at Earth and Mars to create a relay chain.
     await seedAndLoadSave(page, asSave(fullFixture({
@@ -1457,7 +1427,7 @@ test.describe('Comms range', () => {
     }
   });
 
-  test('(7) craft with relay antenna part has relay capability', async () => {
+  test('(7) craft with relay antenna part has relay capability', async ({ page }) => {
     test.setTimeout(60_000);
     // Verify the relay antenna part (antenna-relay) is present and has
     // the relayCapable property that the comms system checks.
@@ -1494,7 +1464,7 @@ test.describe('Comms range', () => {
     }
   });
 
-  test('(8) probe loses control without comms in orbital phase', async () => {
+  test('(8) probe loses control without comms in orbital phase', async ({ page }) => {
     test.setTimeout(60_000);
     // No infrastructure, no relay — probe at Mars should lose control.
     await seedAndLoadSave(page, asSave(fullFixture({
@@ -1536,7 +1506,7 @@ test.describe('Comms range', () => {
     }
   });
 
-  test('(9) probe regains control when comms are restored', async () => {
+  test('(9) probe regains control when comms are restored', async ({ page }) => {
     test.setTimeout(60_000);
     // Start with no infrastructure -> probe loses control.
     // Then inject satellite infrastructure -> probe should regain control.
@@ -1602,7 +1572,7 @@ test.describe('Comms range', () => {
     }
   });
 
-  test('(10) crewed craft retains control without comms but cannot transmit', async () => {
+  test('(10) crewed craft retains control without comms but cannot transmit', async ({ page }) => {
     test.setTimeout(60_000);
     // Crewed craft at Mars without comms — controls work, transmit doesn't.
     await seedAndLoadSave(page, asSave(fullFixture({
@@ -1645,7 +1615,7 @@ test.describe('Comms range', () => {
     }
   });
 
-  test('(11) comms coverage data available for map view overlay', async () => {
+  test('(11) comms coverage data available for map view overlay', async ({ page }) => {
     test.setTimeout(60_000);
     // Set up with satellites to verify coverage info is computed.
     await seedAndLoadSave(page, asSave(fullFixture({

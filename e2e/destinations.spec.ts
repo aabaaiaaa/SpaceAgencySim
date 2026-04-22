@@ -297,19 +297,12 @@ async function returnToAgency(page: Page): Promise<void> {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Celestial body data drives physics and rendering', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) body catalog is accessible and contains all expected bodies', async () => {
+  test('(1) body catalog is accessible and contains all expected bodies', async ({ page }) => {
     const _bodies = await page.evaluate((): string[] | null => {
       // @ts-expect-error — _bodyCache is an internal/private property not on the GameState type
       const mod = window.__celestialBodies || window.__gameState?._bodyCache;
@@ -330,7 +323,7 @@ test.describe('Celestial body data drives physics and rendering', () => {
     } catch { /* no overlay */ }
   });
 
-  test('(2) Earth flight uses Earth gravity (~9.81 m/s²)', async () => {
+  test('(2) Earth flight uses Earth gravity (~9.81 m/s²)', async ({ page }) => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'EARTH' });
     const ps1 = (await getPhysicsSnapshot(page))!;
     expect(ps1.posY).toBeCloseTo(0, 0);
@@ -350,7 +343,7 @@ test.describe('Celestial body data drives physics and rendering', () => {
     } catch { /* no overlay */ }
   });
 
-  test('(3) Moon flight uses lower gravity (~1.62 m/s²)', async () => {
+  test('(3) Moon flight uses lower gravity (~1.62 m/s²)', async ({ page }) => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MOON' });
     await stageAndLaunch(page);
     await waitForAltitude(page, 50, 15_000);
@@ -366,7 +359,7 @@ test.describe('Celestial body data drives physics and rendering', () => {
     } catch { /* no overlay */ }
   });
 
-  test('(4) Mars flight starts with body-appropriate settings', async () => {
+  test('(4) Mars flight starts with body-appropriate settings', async ({ page }) => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MARS' });
     const fs = (await getFlightState(page))!;
     expect(fs.bodyId).toBe('MARS');
@@ -383,7 +376,7 @@ test.describe('Celestial body data drives physics and rendering', () => {
     } catch { /* no overlay */ }
   });
 
-  test('(5) airless body (Moon) has no atmospheric drag', async () => {
+  test('(5) airless body (Moon) has no atmospheric drag', async ({ page }) => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MOON' });
     await stageAndLaunch(page);
     await waitForAltitude(page, 200, 15_000);
@@ -417,19 +410,12 @@ test.describe('Celestial body data drives physics and rendering', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Sun destruction altitude and escalating heat damage', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) craft near Sun above heat start altitude takes no heat damage', async () => {
+  test('(1) craft near Sun above heat start altitude takes no heat damage', async ({ page }) => {
     await startTestFlight(page, SOLAR_PROBE, { bodyId: 'SUN' });
 
     // Teleport above the heat start altitude.
@@ -458,7 +444,7 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
     } catch { /* no overlay */ }
   });
 
-  test('(2) craft inside heat zone takes escalating heat damage', async () => {
+  test('(2) craft inside heat zone takes escalating heat damage', async ({ page }) => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'SUN' });
 
     // Teleport inside the heat zone but above destruction.
@@ -507,7 +493,7 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
     } catch { /* no overlay */ }
   });
 
-  test('(3) craft below destruction altitude is instantly destroyed', async () => {
+  test('(3) craft below destruction altitude is instantly destroyed', async ({ page }) => {
     test.setTimeout(120_000);
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'SUN' });
 
@@ -545,7 +531,7 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
     } catch { /* no overlay */ }
   });
 
-  test('(4) solar heat shield provides protection from solar heat', async () => {
+  test('(4) solar heat shield provides protection from solar heat', async ({ page }) => {
     test.setTimeout(120_000);
     await startTestFlight(page, SOLAR_PROBE, { bodyId: 'SUN' });
 
@@ -589,19 +575,12 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Transfer gameplay mechanics', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) transfer state stores origin and destination bodies', async () => {
+  test('(1) transfer state stores origin and destination bodies', async ({ page }) => {
     await startTestFlight(page, DEEP_SPACE_SHIP, { bodyId: 'EARTH', crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
     await waitForOrbit(page);
@@ -620,7 +599,7 @@ test.describe('Transfer gameplay mechanics', () => {
     );
   });
 
-  test('(2) time warp during transfer does NOT advance period counter', async () => {
+  test('(2) time warp during transfer does NOT advance period counter', async ({ page }) => {
     const gsBefore = (await getGameState(page))!;
     const periodBefore: number = gsBefore.currentPeriod as number;
 
@@ -642,7 +621,7 @@ test.describe('Transfer gameplay mechanics', () => {
     expect(gsAfter.currentPeriod).toBe(periodBefore);
   });
 
-  test('(3) player is locked to craft during transfer (phase prevents return)', async () => {
+  test('(3) player is locked to craft during transfer (phase prevents return)', async ({ page }) => {
     // During TRANSFER phase, the player cannot leave the craft.
     // Verify the flight state confirms we're in transfer.
     const fs = (await getFlightState(page))!;
@@ -656,7 +635,7 @@ test.describe('Transfer gameplay mechanics', () => {
     expect(flightActive).toBe(true);
   });
 
-  test('(4) delta-v display shows values for transfer', async () => {
+  test('(4) delta-v display shows values for transfer', async ({ page }) => {
     const transferInfo = await page.evaluate((): TransferInfo | null => {
       const fs = window.__flightState;
       if (!fs?.transferState) return null;
@@ -689,7 +668,7 @@ test.describe('Transfer gameplay mechanics', () => {
     } catch { /* no overlay */ }
   });
 
-  test('(5) transfer delta-v calculation returns values for Earth-Moon', async () => {
+  test('(5) transfer delta-v calculation returns values for Earth-Moon', async ({ page }) => {
     const dvInfo = await page.evaluate((): DeltaVInfo | null => {
       if (typeof window.__computeTransferDeltaV === 'function') {
         return window.__computeTransferDeltaV('EARTH', 'MOON', 100000) as DeltaVInfo | null;
@@ -706,7 +685,7 @@ test.describe('Transfer gameplay mechanics', () => {
     // If not exposed, we already tested transfer state values in (1).
   });
 
-  test('(6) transfer delta-v calculation returns values for Earth-Mars', async () => {
+  test('(6) transfer delta-v calculation returns values for Earth-Mars', async ({ page }) => {
     const dvInfo = await page.evaluate((): DeltaVInfo | null => {
       if (typeof window.__computeTransferDeltaV === 'function') {
         return window.__computeTransferDeltaV('EARTH', 'MARS', 100000) as DeltaVInfo | null;
@@ -727,19 +706,12 @@ test.describe('Transfer gameplay mechanics', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Landing on airless and atmospheric bodies', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) landing on Moon (airless) — fully propulsive', async () => {
+  test('(1) landing on Moon (airless) — fully propulsive', async ({ page }) => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MOON', crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
 
@@ -764,7 +736,7 @@ test.describe('Landing on airless and atmospheric bodies', () => {
     } catch { /* no overlay */ }
   });
 
-  test('(2) landing on Mars (thin atmosphere)', async () => {
+  test('(2) landing on Mars (thin atmosphere)', async ({ page }) => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MARS', crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MARS' });
 
@@ -788,7 +760,7 @@ test.describe('Landing on airless and atmospheric bodies', () => {
     } catch { /* no overlay */ }
   });
 
-  test('(3) landing on Mercury (airless)', async () => {
+  test('(3) landing on Mercury (airless)', async ({ page }) => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MERCURY', crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MERCURY' });
 
@@ -812,7 +784,7 @@ test.describe('Landing on airless and atmospheric bodies', () => {
     } catch { /* no overlay */ }
   });
 
-  test('(4) Sun is not landable', async () => {
+  test('(4) Sun is not landable', async ({ page }) => {
     const landable: boolean = await page.evaluate((): boolean => {
       // Check via data module if exposed, or via game logic.
       if (typeof window.__isLandable === 'function') {
@@ -830,19 +802,12 @@ test.describe('Landing on airless and atmospheric bodies', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Body-specific biomes and science opportunities', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) Moon has distinct biomes with science multipliers', async () => {
+  test('(1) Moon has distinct biomes with science multipliers', async ({ page }) => {
     test.setTimeout(60_000);
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MOON' });
 
@@ -882,7 +847,7 @@ test.describe('Body-specific biomes and science opportunities', () => {
     } catch { /* no overlay */ }
   });
 
-  test('(2) Mars has atmospheric biomes', async () => {
+  test('(2) Mars has atmospheric biomes', async ({ page }) => {
     test.setTimeout(90_000);
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MARS' });
     await stageAndLaunch(page);
@@ -897,7 +862,7 @@ test.describe('Body-specific biomes and science opportunities', () => {
     } catch { /* no overlay */ }
   });
 
-  test('(3) Sun biomes include danger zones', async () => {
+  test('(3) Sun biomes include danger zones', async ({ page }) => {
     const sunBiomes = await page.evaluate((): SunBiomeInfo[] | null => {
       const bodies = window.__celestialBodies;
       if (bodies && bodies.SUN) {
@@ -929,19 +894,12 @@ test.describe('Body-specific biomes and science opportunities', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Surface operations — flag planting', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) can plant flag on Moon (crewed, landed)', async () => {
+  test('(1) can plant flag on Moon (crewed, landed)', async ({ page }) => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MOON', crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
 
@@ -986,7 +944,7 @@ test.describe('Surface operations — flag planting', () => {
     }
   });
 
-  test('(2) cannot plant second flag on same body', async () => {
+  test('(2) cannot plant second flag on same body', async ({ page }) => {
     const result = await page.evaluate(async (): Promise<SurfaceActionResult | null> => {
       let r: SurfaceActionResult | null = null;
       if (typeof window.__plantFlag === 'function') {
@@ -1004,7 +962,7 @@ test.describe('Surface operations — flag planting', () => {
     }
   });
 
-  test('(3) uncrewed probe cannot plant flag', async () => {
+  test('(3) uncrewed probe cannot plant flag', async ({ page }) => {
     await returnToAgency(page);
     try {
       await page.locator('#return-results-dismiss-btn').click({ timeout: 3_000 });
@@ -1042,19 +1000,12 @@ test.describe('Surface operations — flag planting', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Surface operations — sample collection and return', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) can collect surface sample on Moon (crewed, landed)', async () => {
+  test('(1) can collect surface sample on Moon (crewed, landed)', async ({ page }) => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MOON', crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
 
@@ -1102,7 +1053,7 @@ test.describe('Surface operations — sample collection and return', () => {
     } catch { /* no overlay */ }
   });
 
-  test('(2) sample return on Earth landing awards science', async () => {
+  test('(2) sample return on Earth landing awards science', async ({ page }) => {
     const gsBefore = (await getGameState(page))!;
     const scienceBefore: number = gsBefore.sciencePoints as number;
 
@@ -1148,7 +1099,7 @@ test.describe('Surface operations — sample collection and return', () => {
     }
   });
 
-  test('(3) sample return on non-Earth body does NOT award science', async () => {
+  test('(3) sample return on non-Earth body does NOT award science', async ({ page }) => {
     // Add another uncollected sample.
     await page.evaluate(async () => {
       const gs = window.__gameState;
@@ -1186,19 +1137,12 @@ test.describe('Surface operations — sample collection and return', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Surface operations — instruments and beacons', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) can deploy surface instrument (science module present)', async () => {
+  test('(1) can deploy surface instrument (science module present)', async ({ page }) => {
     await startTestFlight(page, [
       'cmd-mk1', 'science-module-mk1', 'tank-large', 'engine-reliant', 'landing-legs-small',
     ], { bodyId: 'MOON', crewIds: ['crew-1'] });
@@ -1234,7 +1178,7 @@ test.describe('Surface operations — instruments and beacons', () => {
     }
   });
 
-  test('(2) deployed instrument generates passive science per period', async () => {
+  test('(2) deployed instrument generates passive science per period', async ({ page }) => {
     await returnToAgency(page);
     try {
       await page.locator('#return-results-dismiss-btn').click({ timeout: 3_000 });
@@ -1281,7 +1225,7 @@ test.describe('Surface operations — instruments and beacons', () => {
     }
   });
 
-  test('(3) can deploy beacon on any body (no crew required)', async () => {
+  test('(3) can deploy beacon on any body (no crew required)', async ({ page }) => {
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MARS' });
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MARS' });
 
@@ -1318,17 +1262,11 @@ test.describe('Surface operations — instruments and beacons', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Surface item visibility based on GPS coverage', () => {
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) Earth surface items are always visible (direct line of sight)', async () => {
+  test('(1) Earth surface items are always visible (direct line of sight)', async ({ page }) => {
     const envelope: SaveEnvelope = phase6Fixture({
       surfaceItems: [
         { id: 'test-flag-earth', type: 'FLAG', bodyId: 'EARTH', posX: 0, deployedPeriod: 1, label: 'Earth flag' },
@@ -1346,7 +1284,7 @@ test.describe('Surface item visibility based on GPS coverage', () => {
     expect(visible).toBe(true);
   });
 
-  test('(2) Moon items NOT visible without GPS satellite', async () => {
+  test('(2) Moon items NOT visible without GPS satellite', async ({ page }) => {
     const envelope: SaveEnvelope = phase6Fixture({
       surfaceItems: [
         { id: 'test-flag-moon', type: 'FLAG', bodyId: 'MOON', posX: 0, deployedPeriod: 1, label: 'Moon flag' },
@@ -1367,7 +1305,7 @@ test.describe('Surface item visibility based on GPS coverage', () => {
     }
   });
 
-  test('(3) Moon items visible WITH GPS satellite in orbit', async () => {
+  test('(3) Moon items visible WITH GPS satellite in orbit', async ({ page }) => {
     const envelope: SaveEnvelope = phase6Fixture({
       surfaceItems: [
         { id: 'test-flag-moon', type: 'FLAG', bodyId: 'MOON', posX: 0, deployedPeriod: 1, label: 'Moon flag' },
@@ -1398,18 +1336,11 @@ test.describe('Surface item visibility based on GPS coverage', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Prestige milestones trigger at correct events', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) FIRST_ORBIT triggers with orbital evidence', async () => {
+  test('(1) FIRST_ORBIT triggers with orbital evidence', async ({ page }) => {
     const envelope: SaveEnvelope = phase6Fixture({
       achievements: [],
       orbitalObjects: [{ id: 'obj-1', bodyId: 'EARTH', type: 'DEBRIS' }],
@@ -1436,7 +1367,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
     }
   });
 
-  test('(2) FIRST_SATELLITE triggers with satellite deployed', async () => {
+  test('(2) FIRST_SATELLITE triggers with satellite deployed', async ({ page }) => {
     const envelope: SaveEnvelope = phase6Fixture({
       achievements: [],
       satelliteNetwork: {
@@ -1467,7 +1398,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
     }
   });
 
-  test('(3) FIRST_CONSTELLATION triggers with 3+ same-type satellites', async () => {
+  test('(3) FIRST_CONSTELLATION triggers with 3+ same-type satellites', async ({ page }) => {
     const envelope: SaveEnvelope = phase6Fixture({
       achievements: [],
       satelliteNetwork: {
@@ -1500,7 +1431,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
     }
   });
 
-  test('(4) FIRST_LUNAR_LANDING triggers with Moon surface item', async () => {
+  test('(4) FIRST_LUNAR_LANDING triggers with Moon surface item', async ({ page }) => {
     const envelope: SaveEnvelope = phase6Fixture({
       achievements: [],
       surfaceItems: [
@@ -1529,7 +1460,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
     }
   });
 
-  test('(5) FIRST_LUNAR_RETURN triggers with Moon sample returned', async () => {
+  test('(5) FIRST_LUNAR_RETURN triggers with Moon sample returned', async ({ page }) => {
     const envelope: SaveEnvelope = phase6Fixture({
       achievements: [],
       surfaceItems: [
@@ -1559,7 +1490,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
     }
   });
 
-  test('(6) FIRST_MARS_LANDING triggers with Mars surface item', async () => {
+  test('(6) FIRST_MARS_LANDING triggers with Mars surface item', async ({ page }) => {
     const envelope: SaveEnvelope = phase6Fixture({
       achievements: [],
       surfaceItems: [
@@ -1588,7 +1519,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
     }
   });
 
-  test('(7) FIRST_SOLAR_SCIENCE triggers with Sun biome science log', async () => {
+  test('(7) FIRST_SOLAR_SCIENCE triggers with Sun biome science log', async ({ page }) => {
     const envelope: SaveEnvelope = phase6Fixture({
       achievements: [],
       scienceLog: [
@@ -1617,7 +1548,7 @@ test.describe('Prestige milestones trigger at correct events', () => {
     }
   });
 
-  test('(8) achievements are not re-awarded once earned', async () => {
+  test('(8) achievements are not re-awarded once earned', async ({ page }) => {
     const envelope: SaveEnvelope = phase6Fixture({
       achievements: [
         { id: 'FIRST_ORBIT', earnedPeriod: 5 },
@@ -1659,19 +1590,12 @@ test.describe('Prestige milestones trigger at correct events', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Phase 6 new parts function correctly', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) Deep Space Engine — exists in part catalog with correct stats', async () => {
+  test('(1) Deep Space Engine — exists in part catalog with correct stats', async ({ page }) => {
     const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
         return window.__getPartById('engine-deep-space') as PartInfo | null;
@@ -1691,7 +1615,7 @@ test.describe('Phase 6 new parts function correctly', () => {
     }
   });
 
-  test('(2) Deep Space Engine — can be used in flight on low-gravity body', async () => {
+  test('(2) Deep Space Engine — can be used in flight on low-gravity body', async ({ page }) => {
     // The Deep Space Engine has only 5 kN sea-level thrust — insufficient to
     // lift off from Earth. Test on the Moon (1.62 m/s²) where it can hover/climb.
     await startTestFlight(page, ['probe-core-mk1', 'tank-small', 'engine-deep-space'], { bodyId: 'MOON' });
@@ -1713,7 +1637,7 @@ test.describe('Phase 6 new parts function correctly', () => {
     } catch { /* no overlay */ }
   });
 
-  test('(3) Extended Mission Module — exists with correct properties', async () => {
+  test('(3) Extended Mission Module — exists with correct properties', async ({ page }) => {
     const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
         return window.__getPartById('mission-module-extended') as PartInfo | null;
@@ -1731,7 +1655,7 @@ test.describe('Phase 6 new parts function correctly', () => {
     }
   });
 
-  test('(4) Sample Return Container — exists with correct properties', async () => {
+  test('(4) Sample Return Container — exists with correct properties', async ({ page }) => {
     const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
         return window.__getPartById('sample-return-container') as PartInfo | null;
@@ -1749,7 +1673,7 @@ test.describe('Phase 6 new parts function correctly', () => {
     }
   });
 
-  test('(5) Surface Instrument Package — exists with correct properties', async () => {
+  test('(5) Surface Instrument Package — exists with correct properties', async ({ page }) => {
     const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
         return window.__getPartById('surface-instrument-package') as PartInfo | null;
@@ -1768,7 +1692,7 @@ test.describe('Phase 6 new parts function correctly', () => {
     }
   });
 
-  test('(6) Relay Antenna — exists with correct properties', async () => {
+  test('(6) Relay Antenna — exists with correct properties', async ({ page }) => {
     const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
         return window.__getPartById('relay-antenna') as PartInfo | null;
@@ -1787,7 +1711,7 @@ test.describe('Phase 6 new parts function correctly', () => {
     }
   });
 
-  test('(7) Heat Shield Heavy — exists with interplanetary-rated tolerance', async () => {
+  test('(7) Heat Shield Heavy — exists with interplanetary-rated tolerance', async ({ page }) => {
     const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
         return window.__getPartById('heat-shield-heavy') as PartInfo | null;
@@ -1804,7 +1728,7 @@ test.describe('Phase 6 new parts function correctly', () => {
     }
   });
 
-  test('(8) Solar Heat Shield — exists with solar heat resistance', async () => {
+  test('(8) Solar Heat Shield — exists with solar heat resistance', async ({ page }) => {
     const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
         return window.__getPartById('heat-shield-solar') as PartInfo | null;
@@ -1822,7 +1746,7 @@ test.describe('Phase 6 new parts function correctly', () => {
     }
   });
 
-  test('(9) Heat Shield Mk1 — basic tier with correct tolerance', async () => {
+  test('(9) Heat Shield Mk1 — basic tier with correct tolerance', async ({ page }) => {
     const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
         return window.__getPartById('heat-shield-mk1') as PartInfo | null;
@@ -1839,7 +1763,7 @@ test.describe('Phase 6 new parts function correctly', () => {
     }
   });
 
-  test('(10) Heat Shield Mk2 — standard tier for crewed capsules', async () => {
+  test('(10) Heat Shield Mk2 — standard tier for crewed capsules', async ({ page }) => {
     const part = await page.evaluate((): PartInfo | null => {
       if (typeof window.__getPartById === 'function') {
         return window.__getPartById('heat-shield-mk2') as PartInfo | null;
@@ -1856,7 +1780,7 @@ test.describe('Phase 6 new parts function correctly', () => {
     }
   });
 
-  test('(11) heat shield tiers ordered by increasing tolerance', async () => {
+  test('(11) heat shield tiers ordered by increasing tolerance', async ({ page }) => {
     const shields = await page.evaluate((): ShieldTierInfo[] | null => {
       if (typeof window.__getPartById !== 'function') return null;
       const ids = ['heat-shield-mk1', 'heat-shield-mk2', 'heat-shield-heavy', 'heat-shield-solar'];
@@ -1879,19 +1803,12 @@ test.describe('Phase 6 new parts function correctly', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Map view controls during transfer', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) map view can be toggled during transfer', async () => {
+  test('(1) map view can be toggled during transfer', async ({ page }) => {
     await startTestFlight(page, DEEP_SPACE_SHIP, { bodyId: 'EARTH', crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
     await waitForOrbit(page);
@@ -1936,19 +1853,12 @@ test.describe('Map view controls during transfer', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Integration — full lunar mission flow', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) launch from Earth, teleport to Moon orbit', async () => {
+  test('(1) launch from Earth, teleport to Moon orbit', async ({ page }) => {
     await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MOON', crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: MOON_ORBIT_ALT, velX: MOON_ORBIT_VEL, bodyId: 'MOON' });
     await waitForOrbit(page);
@@ -1958,7 +1868,7 @@ test.describe('Integration — full lunar mission flow', () => {
     expect(fs.bodyId).toBe('MOON');
   });
 
-  test('(2) land on Moon surface', async () => {
+  test('(2) land on Moon surface', async ({ page }) => {
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
 
     const ps = (await getPhysicsSnapshot(page))!;
@@ -1966,7 +1876,7 @@ test.describe('Integration — full lunar mission flow', () => {
     expect(ps.crashed).toBe(false);
   });
 
-  test('(3) perform all surface operations', async () => {
+  test('(3) perform all surface operations', async ({ page }) => {
     // Plant flag.
     const flagResult = await page.evaluate(async (): Promise<SurfaceActionResult> => {
       let r: SurfaceActionResult = { success: true };
@@ -1998,13 +1908,13 @@ test.describe('Integration — full lunar mission flow', () => {
     expect(beaconResult.success).toBe(true);
   });
 
-  test('(4) verify surface items created', async () => {
+  test('(4) verify surface items created', async ({ page }) => {
     const gs = (await getGameState(page))!;
     const moonItems = (gs.surfaceItems as unknown[] ?? []).filter((i: unknown) => (i as Record<string, unknown>).bodyId === 'MOON');
     expect(moonItems.length).toBeGreaterThanOrEqual(1);
   });
 
-  test('(5) return to agency completes the mission', async () => {
+  test('(5) return to agency completes the mission', async ({ page }) => {
     await returnToAgency(page);
     try {
       await page.locator('#return-results-dismiss-btn').click({ timeout: 3_000 });

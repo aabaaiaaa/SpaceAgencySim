@@ -172,26 +172,19 @@ async function completeFlightCycle(page: Page, parts: string[] = BASIC_ROCKET): 
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Construction menu — building a facility', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     // Non-tutorial, starter facilities only, enough money to build
     const envelope = freshStartFixture({ money: 2_000_000 });
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) crew admin not built initially', async () => {
+  test('(1) crew admin not built initially', async ({ page }) => {
     const gs = await getGameState(page) as GameState;
     expect(gs.hubs[0].facilities[FacilityId.CREW_ADMIN]).toBeFalsy();
   });
 
-  test('(2) can build crew admin from construction menu', async () => {
+  test('(2) can build crew admin from construction menu', async ({ page }) => {
     // Open construction panel via hamburger menu
     await openConstructionPanel(page);
 
@@ -221,12 +214,7 @@ test.describe('Construction menu — building a facility', () => {
 });
 
 test.describe('Construction menu — tutorial mode lock', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     // Tutorial mode: construction should be locked
     const envelope = buildSaveEnvelope({
@@ -239,9 +227,7 @@ test.describe('Construction menu — tutorial mode lock', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) construction menu shows locked state in tutorial mode', async () => {
+  test('(1) construction menu shows locked state in tutorial mode', async ({ page }) => {
     await openConstructionPanel(page);
 
     // Non-starter facilities should show locked or have disabled build buttons
@@ -266,12 +252,7 @@ test.describe('Construction menu — tutorial mode lock', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Contract generation after flight return', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     // Early game with some completed missions (contracts require progression)
     const envelope = earlyGameFixture({
@@ -280,14 +261,12 @@ test.describe('Contract generation after flight return', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) contracts board starts empty', async () => {
+  test('(1) contracts board starts empty', async ({ page }) => {
     const gs = await getGameState(page) as GameState;
     expect(gs.contracts.board.length).toBe(0);
   });
 
-  test('(2) new contracts appear on board after flight return', async () => {
+  test('(2) new contracts appear on board after flight return', async ({ page }) => {
     await completeFlightCycle(page);
 
     const gs = await getGameState(page) as GameState;
@@ -296,7 +275,7 @@ test.describe('Contract generation after flight return', () => {
     expect(gs.contracts.board.length).toBeLessThanOrEqual(3);
   });
 
-  test('(3) board fills up across multiple flights', async () => {
+  test('(3) board fills up across multiple flights', async ({ page }) => {
     // Do another flight to generate more contracts
     await completeFlightCycle(page);
 
@@ -308,12 +287,7 @@ test.describe('Contract generation after flight return', () => {
 });
 
 test.describe('Contract acceptance and cancellation', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const testContract = buildContract({
@@ -343,16 +317,14 @@ test.describe('Contract acceptance and cancellation', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) contract is on board initially', async () => {
+  test('(1) contract is on board initially', async ({ page }) => {
     const gs = await getGameState(page) as GameState;
     expect(gs.contracts.board.length).toBe(1);
     expect(gs.contracts.board[0].id).toBe('contract-accept-test');
     expect(gs.contracts.active.length).toBe(0);
   });
 
-  test('(2) accepting a contract moves it from board to active', async () => {
+  test('(2) accepting a contract moves it from board to active', async ({ page }) => {
     // Accept via state manipulation (simulates the UI accept action)
     await page.evaluate(() => {
       const gs = window.__gameState;
@@ -376,7 +348,7 @@ test.describe('Contract acceptance and cancellation', () => {
     expect(gs.contracts.active[0].acceptedPeriod).toBe(gs.currentPeriod);
   });
 
-  test('(3) cancelling an active contract applies penalty and rep hit', async () => {
+  test('(3) cancelling an active contract applies penalty and rep hit', async ({ page }) => {
     const gsBefore = await getGameState(page) as GameState;
     const moneyBefore = gsBefore.money as number;
     const repBefore = gsBefore.reputation as number;
@@ -404,12 +376,7 @@ test.describe('Contract acceptance and cancellation', () => {
 });
 
 test.describe('Contract board expiry after N flights', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     // Create a contract that expires at period 5 (boardExpiryPeriod = 5)
@@ -436,15 +403,13 @@ test.describe('Contract board expiry after N flights', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) board contract exists before expiry period', async () => {
+  test('(1) board contract exists before expiry period', async ({ page }) => {
     const gs = await getGameState(page) as GameState;
     expect(gs.contracts.board.length).toBe(1);
     expect(gs.currentPeriod).toBe(4);
   });
 
-  test('(2) board contract expires after flight advances period past expiry', async () => {
+  test('(2) board contract expires after flight advances period past expiry', async ({ page }) => {
     // Complete a flight — period advances from 4 -> 5, then expiry check
     // at period 5 removes contracts with boardExpiryPeriod < 5
     // Actually: expireBoardContracts checks currentPeriod > boardExpiryPeriod
@@ -473,12 +438,7 @@ test.describe('Contract board expiry after N flights', () => {
 });
 
 test.describe('Active contract deadline expiry', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     // Active contract with deadline at period 6
@@ -507,15 +467,13 @@ test.describe('Active contract deadline expiry', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) active contract with deadline exists', async () => {
+  test('(1) active contract with deadline exists', async ({ page }) => {
     const gs = await getGameState(page) as GameState;
     expect(gs.contracts.active.length).toBe(1);
     expect(gs.contracts.active[0].deadlinePeriod).toBe(6);
   });
 
-  test('(2) active contract expires and moves to failed when period passes deadline', async () => {
+  test('(2) active contract expires and moves to failed when period passes deadline', async ({ page }) => {
     const gsBefore = await getGameState(page) as GameState;
     const repBefore = gsBefore.reputation as number;
 
@@ -545,12 +503,7 @@ test.describe('Active contract deadline expiry', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Contract objectives complete in-flight', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const altitudeContract = buildContract({
@@ -572,9 +525,7 @@ test.describe('Contract objectives complete in-flight', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) REACH_ALTITUDE objective completes when altitude is reached', async () => {
+  test('(1) REACH_ALTITUDE objective completes when altitude is reached', async ({ page }) => {
     await startTestFlight(page, BASIC_ROCKET);
 
     // Stage and throttle up
@@ -593,12 +544,7 @@ test.describe('Contract objectives complete in-flight', () => {
 });
 
 test.describe('Contract REACH_SPEED objective', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const speedContract = buildContract({
@@ -620,9 +566,7 @@ test.describe('Contract REACH_SPEED objective', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) REACH_SPEED objective completes when speed is reached', async () => {
+  test('(1) REACH_SPEED objective completes when speed is reached', async ({ page }) => {
     await startTestFlight(page, BASIC_ROCKET);
     await pressStage(page);
     await pressThrottleUp(page);
@@ -638,12 +582,7 @@ test.describe('Contract REACH_SPEED objective', () => {
 });
 
 test.describe('Contract BUDGET_LIMIT and MAX_PARTS constraints', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const constraintContract = buildContract({
@@ -670,9 +609,7 @@ test.describe('Contract BUDGET_LIMIT and MAX_PARTS constraints', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) BUDGET_LIMIT and MAX_PARTS auto-complete for a small rocket', async () => {
+  test('(1) BUDGET_LIMIT and MAX_PARTS auto-complete for a small rocket', async ({ page }) => {
     // 3-part basic rocket will be well under both limits
     await startTestFlight(page, BASIC_ROCKET);
 
@@ -709,12 +646,7 @@ test.describe('Contract BUDGET_LIMIT and MAX_PARTS constraints', () => {
 });
 
 test.describe('Contract over-performance bonus', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const bonusContract = buildContract({
@@ -744,9 +676,7 @@ test.describe('Contract over-performance bonus', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) bonus objectives are tracked alongside main objectives', async () => {
+  test('(1) bonus objectives are tracked alongside main objectives', async ({ page }) => {
     await startTestFlight(page, BASIC_ROCKET);
     await pressStage(page);
     await pressThrottleUp(page);
@@ -774,7 +704,7 @@ test.describe('Contract over-performance bonus', () => {
     expect(contract!.bonusObjectives![0].completed).toBe(true);
   });
 
-  test('(2) completing bonus objectives awards bonus reward on flight return', async () => {
+  test('(2) completing bonus objectives awards bonus reward on flight return', async ({ page }) => {
     const gsBefore = await getGameState(page) as GameState;
     const _moneyBefore = gsBefore.money as number;
 
@@ -793,12 +723,7 @@ test.describe('Contract over-performance bonus', () => {
 });
 
 test.describe('Multi-part chain contracts', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     // Create part 1 of a 3-part chain
@@ -826,9 +751,7 @@ test.describe('Multi-part chain contracts', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) completing chain part 1 generates part 2 on the board', async () => {
+  test('(1) completing chain part 1 generates part 2 on the board', async ({ page }) => {
     // Complete a flight so processContractCompletions runs
     await startTestFlight(page, BASIC_ROCKET);
     await returnToAgency(page);
@@ -854,12 +777,7 @@ test.describe('Multi-part chain contracts', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Operating costs charged per period', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     // 2 active crew ($5k each = $10k), 3 starter facilities ($10k each = $30k)
@@ -881,9 +799,7 @@ test.describe('Operating costs charged per period', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) operating costs deducted after flight return', async () => {
+  test('(1) operating costs deducted after flight return', async ({ page }) => {
     const gsBefore = await getGameState(page) as GameState;
     const moneyBefore = gsBefore.money as number;
 
@@ -898,7 +814,7 @@ test.describe('Operating costs charged per period', () => {
     expect(gsAfter.money).toBeLessThanOrEqual(moneyBefore - expectedCosts);
   });
 
-  test('(2) operating costs scale with more facilities', async () => {
+  test('(2) operating costs scale with more facilities', async ({ page }) => {
     // Build crew admin (adds another $10k upkeep)
     await page.evaluate(() => {
       const gs = window.__gameState as
@@ -920,12 +836,7 @@ test.describe('Operating costs charged per period', () => {
 });
 
 test.describe('Bankruptcy trigger', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     // Very low money, maxed out loan — can't afford cheapest rocket
@@ -942,9 +853,7 @@ test.describe('Bankruptcy trigger', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) bankruptcy is detected when purchasing power < minimum rocket cost', async () => {
+  test('(1) bankruptcy is detected when purchasing power < minimum rocket cost', async ({ page }) => {
     // money=0, loan maxed at 10M -> no borrowing capacity
     // Cannot afford minimum rocket
     const isBankrupt = await page.evaluate(() => {
@@ -964,13 +873,9 @@ test.describe('Bankruptcy trigger', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Crew skill XP gains from flight events', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
   let skillsBefore: { piloting: number; engineering: number; science: number };
 
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const envelope = buildSaveEnvelope({
@@ -993,9 +898,7 @@ test.describe('Crew skill XP gains from flight events', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) crew starts with zero skills', async () => {
+  test('(1) crew starts with zero skills', async ({ page }) => {
     const gs = await getGameState(page) as GameState;
     const crew = (gs.crew as CrewSnapshot[]).find(
       (c: CrewSnapshot) => c.id === 'crew-xp-1',
@@ -1006,7 +909,7 @@ test.describe('Crew skill XP gains from flight events', () => {
     skillsBefore = { ...crew!.skills };
   });
 
-  test('(2) crew gains piloting XP after a successful crewed flight with landing', async () => {
+  test('(2) crew gains piloting XP after a successful crewed flight with landing', async ({ page }) => {
     // Start a crewed flight with the test pilot
     await startTestFlight(page, CREWED_ROCKET, {
       crewIds: ['crew-xp-1'],
@@ -1034,7 +937,7 @@ test.describe('Crew skill XP gains from flight events', () => {
     expect(crew!.skills.piloting).toBeGreaterThan(skillsBefore.piloting);
   });
 
-  test('(3) engineering XP gained from staging events and part recovery', async () => {
+  test('(3) engineering XP gained from staging events and part recovery', async ({ page }) => {
     const gs = await getGameState(page) as GameState;
     const crew = (gs.crew as CrewSnapshot[]).find(
       (c: CrewSnapshot) => c.id === 'crew-xp-1',
@@ -1045,12 +948,7 @@ test.describe('Crew skill XP gains from flight events', () => {
 });
 
 test.describe('Crew skill effects — engineering increases recovery value', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     // Two flights: one with low-skill crew, one with high-skill crew
@@ -1082,9 +980,7 @@ test.describe('Crew skill effects — engineering increases recovery value', () 
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) high engineering skill crew produces higher recovery value', async () => {
+  test('(1) high engineering skill crew produces higher recovery value', async ({ page }) => {
     // Recovery fraction: 0.6 + (engSkill/100) * 0.2
     // Low eng (0): 60% recovery
     // High eng (100): 80% recovery
@@ -1107,12 +1003,7 @@ test.describe('Crew skill effects — engineering increases recovery value', () 
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Crew injury from hard landing', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const envelope = buildSaveEnvelope({
@@ -1135,9 +1026,7 @@ test.describe('Crew injury from hard landing', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) crew is not injured initially', async () => {
+  test('(1) crew is not injured initially', async ({ page }) => {
     const gs = await getGameState(page) as GameState;
     const crew = (gs.crew as CrewSnapshot[]).find(
       (c: CrewSnapshot) => c.id === 'crew-injury-1',
@@ -1146,7 +1035,7 @@ test.describe('Crew injury from hard landing', () => {
     expect(crew!.injuryEnds == null).toBe(true);
   });
 
-  test('(2) hard landing injury applies when landing speed is 5-10 m/s', async () => {
+  test('(2) hard landing injury applies when landing speed is 5-10 m/s', async ({ page }) => {
     // Simulate the hard landing injury via state manipulation
     // (direct physics manipulation of a landing at 7 m/s is fragile in E2E)
     await page.evaluate(() => {
@@ -1170,12 +1059,7 @@ test.describe('Crew injury from hard landing', () => {
 });
 
 test.describe('Crew ejection injury', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const envelope = buildSaveEnvelope({
@@ -1198,9 +1082,7 @@ test.describe('Crew ejection injury', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) ejected crew get 1-period injury', async () => {
+  test('(1) ejected crew get 1-period injury', async ({ page }) => {
     // Test the ejection injury mechanic via state manipulation rather than
     // simulating a crash (which triggers post-flight flows that are complex to handle).
     // The processFlightInjuries function sets injuryEnds = currentPeriod + EJECTION_INJURY_PERIODS(1).
@@ -1232,12 +1114,7 @@ test.describe('Crew ejection injury', () => {
 });
 
 test.describe('Injury blocks flight assignment', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const envelope = buildSaveEnvelope({
@@ -1260,9 +1137,7 @@ test.describe('Injury blocks flight assignment', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) injured crew cannot be assigned to flights', async () => {
+  test('(1) injured crew cannot be assigned to flights', async ({ page }) => {
     // Set injury via state manipulation
     await page.evaluate(() => {
       const gs = window.__gameState as
@@ -1295,12 +1170,7 @@ test.describe('Injury blocks flight assignment', () => {
 });
 
 test.describe('Medical care halves recovery time', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const envelope = buildSaveEnvelope({
@@ -1323,9 +1193,7 @@ test.describe('Medical care halves recovery time', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) medical care halves remaining recovery periods', async () => {
+  test('(1) medical care halves remaining recovery periods', async ({ page }) => {
     // Set injury: 4 periods remaining (injuryEnds = 14)
     await page.evaluate(() => {
       const gs = window.__gameState as
@@ -1377,9 +1245,6 @@ test.describe('Medical care halves recovery time', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Design library save/load/duplicate', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
   const testDesign: DesignSnapshot = {
     id: 'design-test-1',
     name: 'Test Rocket Alpha',
@@ -1396,9 +1261,7 @@ test.describe('Design library save/load/duplicate', () => {
     savePrivate: true,
   };
 
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const envelope = freshStartFixture({
@@ -1407,16 +1270,14 @@ test.describe('Design library save/load/duplicate', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) saved design exists in game state', async () => {
+  test('(1) saved design exists in game state', async ({ page }) => {
     const gs = await getGameState(page) as GameState;
     expect(gs.savedDesigns.length).toBe(1);
     expect(gs.savedDesigns[0].name).toBe('Test Rocket Alpha');
     expect(gs.savedDesigns[0].id).toBe('design-test-1');
   });
 
-  test('(2) duplicate design creates copy with new ID and name suffix', async () => {
+  test('(2) duplicate design creates copy with new ID and name suffix', async ({ page }) => {
     await page.evaluate(() => {
       const gs = window.__gameState;
       if (!gs) return;
@@ -1445,7 +1306,7 @@ test.describe('Design library save/load/duplicate', () => {
     expect(copy!.parts.length).toBe(3);
   });
 
-  test('(3) delete design removes it from library', async () => {
+  test('(3) delete design removes it from library', async ({ page }) => {
     await page.evaluate(() => {
       const gs = window.__gameState as
         { savedDesigns: { id: string }[] } | undefined;
@@ -1460,21 +1321,14 @@ test.describe('Design library save/load/duplicate', () => {
 });
 
 test.describe('Design library cross-save sharing', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const envelope = freshStartFixture();
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) shared designs stored in IndexedDB are accessible', async () => {
+  test('(1) shared designs stored in IndexedDB are accessible', async ({ page }) => {
     // Save a shared design to IndexedDB
     const sharedDesign = {
       id: 'design-shared-1',
@@ -1502,7 +1356,7 @@ test.describe('Design library cross-save sharing', () => {
     expect((sharedLib[0] as Record<string, unknown>).id).toBe('design-shared-1');
   });
 
-  test('(2) shared designs merge with save-private designs', async () => {
+  test('(2) shared designs merge with save-private designs', async ({ page }) => {
     // Add a private design to the game state
     await page.evaluate(() => {
       const gs = window.__gameState;
@@ -1543,12 +1397,7 @@ test.describe('Design library cross-save sharing', () => {
 });
 
 test.describe('Design library grouping and filtering', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const designs: DesignSnapshot[] = [
@@ -1607,9 +1456,7 @@ test.describe('Design library grouping and filtering', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) designs can be classified into groups', async () => {
+  test('(1) designs can be classified into groups', async ({ page }) => {
     const gs = await getGameState(page) as GameState;
     expect(gs.savedDesigns.length).toBe(3);
 
@@ -1643,12 +1490,7 @@ test.describe('Design library grouping and filtering', () => {
 });
 
 test.describe('Design library compatibility — locked parts', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     // Design uses engine-poodle which requires tech tree unlock
@@ -1675,9 +1517,7 @@ test.describe('Design library compatibility — locked parts', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) design with locked parts shows compatibility issue', async () => {
+  test('(1) design with locked parts shows compatibility issue', async ({ page }) => {
     const gs = await getGameState(page) as GameState;
     const design = gs.savedDesigns[0] as DesignSnapshot;
     expect(design).toBeTruthy();
@@ -1696,7 +1536,7 @@ test.describe('Design library compatibility — locked parts', () => {
     expect(gs.parts).not.toContain('engine-poodle');
   });
 
-  test('(2) validation fails for design with locked parts', async () => {
+  test('(2) validation fails for design with locked parts', async ({ page }) => {
     // Check via the checkDesignCompatibility logic
     const result = await page.evaluate(() => {
       const gs = window.__gameState as
@@ -1735,12 +1575,7 @@ test.describe('Design library compatibility — locked parts', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Full contract lifecycle — accept -> fly -> complete -> reward', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const lifecycleContract = buildContract({
@@ -1771,15 +1606,13 @@ test.describe('Full contract lifecycle — accept -> fly -> complete -> reward',
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) active contract starts with incomplete objectives', async () => {
+  test('(1) active contract starts with incomplete objectives', async ({ page }) => {
     const gs = await getGameState(page) as GameState;
     expect(gs.contracts.active.length).toBe(1);
     expect(gs.contracts.active[0].objectives[0].completed).toBe(false);
   });
 
-  test('(2) objective completes during flight', async () => {
+  test('(2) objective completes during flight', async ({ page }) => {
     await startTestFlight(page, BASIC_ROCKET);
     await pressStage(page);
     await pressThrottleUp(page);
@@ -1793,7 +1626,7 @@ test.describe('Full contract lifecycle — accept -> fly -> complete -> reward',
     expect(contract!.objectives[0].completed).toBe(true);
   });
 
-  test('(3) contract completes on flight return, awarding cash and rep', async () => {
+  test('(3) contract completes on flight return, awarding cash and rep', async ({ page }) => {
     const gsBefore = await getGameState(page) as GameState;
     const _moneyBefore = gsBefore.money as number;
     const repBefore = gsBefore.reputation as number;
@@ -1819,12 +1652,7 @@ test.describe('Full contract lifecycle — accept -> fly -> complete -> reward',
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Contract RESTRICT_PART constraint objective', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const restrictContract = buildContract({
@@ -1845,9 +1673,7 @@ test.describe('Contract RESTRICT_PART constraint objective', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) RESTRICT_PART completes when forbidden part not used', async () => {
+  test('(1) RESTRICT_PART completes when forbidden part not used', async ({ page }) => {
     // Launch a probe rocket (no command module)
     await startTestFlight(page, BASIC_ROCKET);
 
@@ -1878,12 +1704,7 @@ test.describe('Contract RESTRICT_PART constraint objective', () => {
 });
 
 test.describe('Contract MINIMUM_CREW constraint objective', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const crewContract = buildContract({
@@ -1913,9 +1734,7 @@ test.describe('Contract MINIMUM_CREW constraint objective', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) MINIMUM_CREW completes when enough crew are on flight', async () => {
+  test('(1) MINIMUM_CREW completes when enough crew are on flight', async ({ page }) => {
     await startTestFlight(page, CREWED_ROCKET, {
       crewIds: ['crew-mincrew-1'],
     });
@@ -1950,12 +1769,7 @@ test.describe('Contract MINIMUM_CREW constraint objective', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Injury recovery clears after period elapses', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const envelope = buildSaveEnvelope({
@@ -1981,9 +1795,7 @@ test.describe('Injury recovery clears after period elapses', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) crew is injured at start (period 10, injury ends at 12)', async () => {
+  test('(1) crew is injured at start (period 10, injury ends at 12)', async ({ page }) => {
     const gs = await getGameState(page) as GameState;
     const crew = (gs.crew as CrewSnapshot[]).find(
       (c: CrewSnapshot) => c.id === 'crew-recover-1',
@@ -1992,7 +1804,7 @@ test.describe('Injury recovery clears after period elapses', () => {
     expect(gs.currentPeriod).toBe(10);
   });
 
-  test('(2) crew still injured after first flight (period 11)', async () => {
+  test('(2) crew still injured after first flight (period 11)', async ({ page }) => {
     await completeFlightCycle(page);
 
     const gs = await getGameState(page) as GameState;
@@ -2004,7 +1816,7 @@ test.describe('Injury recovery clears after period elapses', () => {
     expect(crew!.injuryEnds).toBe(12);
   });
 
-  test('(3) crew recovered after second flight (period 12)', async () => {
+  test('(3) crew recovered after second flight (period 12)', async ({ page }) => {
     await completeFlightCycle(page);
 
     const gs = await getGameState(page) as GameState;

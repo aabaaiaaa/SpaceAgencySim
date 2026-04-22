@@ -142,20 +142,13 @@ async function dismissReturnResults(page: Page): Promise<void> {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Malfunction toggle and biome-transition triggering', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) malfunctions default to off in test flights', async () => {
+  test('(1) malfunctions default to off in test flights', async ({ page }) => {
     test.setTimeout(120_000);
     await startTestFlight(page, ENGINE_ROCKET, { malfunctionMode: 'off' });
     const mode = await getMalfunctionMode(page);
@@ -182,7 +175,7 @@ test.describe('Malfunction toggle and biome-transition triggering', () => {
     await dismissReturnResults(page);
   });
 
-  test('(2) forced mode triggers malfunctions on biome transition', async () => {
+  test('(2) forced mode triggers malfunctions on biome transition', async ({ page }) => {
     test.setTimeout(120_000);
     await startTestFlight(page, ENGINE_ROCKET, { malfunctionMode: 'forced' });
 
@@ -219,20 +212,13 @@ test.describe('Malfunction toggle and biome-transition triggering', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Engine flameout malfunction', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) engine flameout removes engine from firing set', async () => {
+  test('(1) engine flameout removes engine from firing set', async ({ page }) => {
     await startTestFlight(page, ENGINE_ROCKET, { malfunctionMode: 'off' });
     await pressStage(page);
     await pressThrottleUp(page);
@@ -276,20 +262,13 @@ test.describe('Engine flameout malfunction', () => {
 });
 
 test.describe('Engine reduced thrust malfunction', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) engine reduced thrust malfunction is recorded', async () => {
+  test('(1) engine reduced thrust malfunction is recorded', async ({ page }) => {
     await startTestFlight(page, ENGINE_ROCKET, { malfunctionMode: 'off' });
     await pressStage(page);
     await pressThrottleUp(page);
@@ -319,20 +298,13 @@ test.describe('Engine reduced thrust malfunction', () => {
 });
 
 test.describe('Fuel tank leak malfunction', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) fuel leak drains fuel over time', async () => {
+  test('(1) fuel leak drains fuel over time', async ({ page }) => {
     await startTestFlight(page, ENGINE_ROCKET, { malfunctionMode: 'off' });
 
     // Inject fuel leak on the fuel tank and record fuel before/after
@@ -388,20 +360,13 @@ test.describe('Fuel tank leak malfunction', () => {
 });
 
 test.describe('Stuck decoupler malfunction', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) stuck decoupler malfunction is recorded and recoverable', async () => {
+  test('(1) stuck decoupler malfunction is recorded and recoverable', async ({ page }) => {
     await startTestFlight(page, DECOUPLER_ROCKET, { malfunctionMode: 'off' });
 
     const result = await page.evaluate(async () => {
@@ -428,20 +393,13 @@ test.describe('Stuck decoupler malfunction', () => {
 });
 
 test.describe('Partial parachute malfunction', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) partial parachute malfunction is recorded (no recovery)', async () => {
+  test('(1) partial parachute malfunction is recorded (no recovery)', async ({ page }) => {
     await startTestFlight(page, CHUTE_ROCKET, { malfunctionMode: 'off' });
 
     const result = await page.evaluate(async () => {
@@ -466,20 +424,13 @@ test.describe('Partial parachute malfunction', () => {
 });
 
 test.describe('SRB early burnout malfunction', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) SRB early burnout exhausts fuel and removes from firing set', async () => {
+  test('(1) SRB early burnout exhausts fuel and removes from firing set', async ({ page }) => {
     await startTestFlight(page, SRB_ROCKET, { malfunctionMode: 'off' });
     await pressStage(page); // stage SRB
 
@@ -523,20 +474,13 @@ test.describe('SRB early burnout malfunction', () => {
 });
 
 test.describe('Science instrument failure malfunction', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) science instrument failure is recorded', async () => {
+  test('(1) science instrument failure is recorded', async ({ page }) => {
     await startTestFlight(page, SCIENCE_ROCKET, {
       malfunctionMode: 'off',
       instruments: { 'science-module-mk1': ['thermometer-mk1'] },
@@ -564,20 +508,13 @@ test.describe('Science instrument failure malfunction', () => {
 });
 
 test.describe('Stuck landing legs malfunction', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) stuck landing legs malfunction is recorded', async () => {
+  test('(1) stuck landing legs malfunction is recorded', async ({ page }) => {
     await startTestFlight(page, LEGS_ROCKET, { malfunctionMode: 'off' });
 
     const result = await page.evaluate(async () => {
@@ -606,20 +543,13 @@ test.describe('Stuck landing legs malfunction', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Malfunction recovery via context menu', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) stuck decoupler recovery always succeeds (100% rate)', async () => {
+  test('(1) stuck decoupler recovery always succeeds (100% rate)', async ({ page }) => {
     await startTestFlight(page, DECOUPLER_ROCKET, { malfunctionMode: 'off' });
 
     // Inject stuck decoupler then attempt recovery via game API
@@ -656,7 +586,7 @@ test.describe('Malfunction recovery via context menu', () => {
     await dismissReturnResults(page);
   });
 
-  test('(2) engine flameout recovery succeeds when forced mode is normal', async () => {
+  test('(2) engine flameout recovery succeeds when forced mode is normal', async ({ page }) => {
     await startTestFlight(page, ENGINE_ROCKET, { malfunctionMode: 'off' });
     await pressStage(page);
 
@@ -700,20 +630,13 @@ test.describe('Malfunction recovery via context menu', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Reliability display in VAB', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = midGameFixture({ money: 5_000_000 });
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) clicking a part card in VAB shows reliability stat', async () => {
+  test('(1) clicking a part card in VAB shows reliability stat', async ({ page }) => {
     await navigateToVab(page);
 
     // Click on an engine part card to select it and see detail panel
@@ -741,12 +664,7 @@ test.describe('Reliability display in VAB', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Crew engineering skill reduces malfunction chance', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     // Create a save with a high-engineering crew member
@@ -763,9 +681,7 @@ test.describe('Crew engineering skill reduces malfunction chance', () => {
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) engineering skill provides malfunction reduction in crewed flight', async () => {
+  test('(1) engineering skill provides malfunction reduction in crewed flight', async ({ page }) => {
     // Start a crewed flight with the engineer
     await startTestFlight(page,
       ['cmd-mk1', 'tank-small', 'engine-spark', 'parachute-mk1'],
@@ -803,12 +719,7 @@ test.describe('Crew engineering skill reduces malfunction chance', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Part inventory and wear tracking', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const envelope = midGameFixture({ money: 5_000_000 });
@@ -825,9 +736,7 @@ test.describe('Part inventory and wear tracking', () => {
     });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) part inventory is loaded with wear values', async () => {
+  test('(1) part inventory is loaded with wear values', async ({ page }) => {
     const gs = await getGameState(page) as GameStateSnapshot;
     expect(gs.partInventory).toBeDefined();
     expect(gs.partInventory.length).toBe(3);
@@ -838,7 +747,7 @@ test.describe('Part inventory and wear tracking', () => {
     expect(engine1!.flights).toBe(1);
   });
 
-  test('(2) wear affects effective reliability', async () => {
+  test('(2) wear affects effective reliability', async ({ page }) => {
     // Effective reliability = base × (1 - wear/100 × 0.5)
     // For engine-spark with reliability ~0.92 and wear 45:
     // effectiveRel = 0.92 × (1 - 0.45 × 0.5) = 0.92 × 0.775 = 0.713
@@ -850,7 +759,7 @@ test.describe('Part inventory and wear tracking', () => {
     // The effective reliability will be lower than base (verified via VAB display below)
   });
 
-  test('(3) parts accumulate wear from flights', async () => {
+  test('(3) parts accumulate wear from flights', async ({ page }) => {
     // Complete a flight to generate recovered parts with wear
     await startTestFlight(page, BASIC_ROCKET, { malfunctionMode: 'off' });
     await returnToAgency(page);
@@ -870,12 +779,7 @@ test.describe('Part inventory and wear tracking', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('VAB inventory tab — refurbish and scrap', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const envelope = midGameFixture({ money: 5_000_000 });
@@ -892,9 +796,7 @@ test.describe('VAB inventory tab — refurbish and scrap', () => {
     });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) inventory button opens inventory panel in VAB', async () => {
+  test('(1) inventory button opens inventory panel in VAB', async ({ page }) => {
     await navigateToVab(page);
 
     // Click inventory button
@@ -902,7 +804,7 @@ test.describe('VAB inventory tab — refurbish and scrap', () => {
     await expect(page.locator('#vab-inventory-panel')).toBeVisible({ timeout: 5_000 });
   });
 
-  test('(2) inventory items display wear and effective reliability', async () => {
+  test('(2) inventory items display wear and effective reliability', async ({ page }) => {
     // Check that inventory items are rendered with wear info
     const items = page.locator('.vab-inv-item');
     const count = await items.count();
@@ -917,7 +819,7 @@ test.describe('VAB inventory tab — refurbish and scrap', () => {
     expect(relText).toMatch(/Rel:\s*\d+%/);
   });
 
-  test('(3) refurbish button resets wear to 10% and deducts cost', async () => {
+  test('(3) refurbish button resets wear to 10% and deducts cost', async ({ page }) => {
     const gsBefore = await getGameState(page) as GameStateSnapshot;
     const moneyBefore = gsBefore.money;
 
@@ -944,7 +846,7 @@ test.describe('VAB inventory tab — refurbish and scrap', () => {
     expect(refurbishedParts.length).toBeGreaterThanOrEqual(1);
   });
 
-  test('(4) scrap button removes part and adds money', async () => {
+  test('(4) scrap button removes part and adds money', async ({ page }) => {
     const gsBefore = await getGameState(page) as GameStateSnapshot;
     const moneyBefore = gsBefore.money;
     const invCountBefore = gsBefore.partInventory.length;
@@ -973,25 +875,18 @@ test.describe('VAB inventory tab — refurbish and scrap', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Weather display on hub', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = freshStartFixture();
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) weather panel is visible on hub', async () => {
+  test('(1) weather panel is visible on hub', async ({ page }) => {
     // Weather panel should be rendered on the hub
     await expect(page.locator('#weather-panel')).toBeVisible({ timeout: 5_000 });
   });
 
-  test('(2) weather description is displayed', async () => {
+  test('(2) weather description is displayed', async ({ page }) => {
     const desc = page.locator('#weather-panel .weather-description');
     await expect(desc).toBeVisible({ timeout: 5_000 });
     const text = await desc.textContent();
@@ -999,7 +894,7 @@ test.describe('Weather display on hub', () => {
     expect(text!.length).toBeGreaterThan(0);
   });
 
-  test('(3) weather stats show wind, ISP effect, visibility', async () => {
+  test('(3) weather stats show wind, ISP effect, visibility', async ({ page }) => {
     // Check weather rows exist
     const rows = page.locator('#weather-panel .weather-row');
     const count = await rows.count();
@@ -1013,7 +908,7 @@ test.describe('Weather display on hub', () => {
     expect(allText).toContain('Visibility');
   });
 
-  test('(4) weather state exists in game state', async () => {
+  test('(4) weather state exists in game state', async ({ page }) => {
     const gs = await getGameState(page) as GameStateSnapshot;
     expect(gs.weather).toBeDefined();
     expect(gs.weather.current).toBeDefined();
@@ -1029,12 +924,7 @@ test.describe('Weather display on hub', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Wind force during flight and ISP modifier', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     // Set up weather with known wind conditions
@@ -1060,9 +950,7 @@ test.describe('Wind force during flight and ISP modifier', () => {
     });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) wind force is applied during low-altitude flight', async () => {
+  test('(1) wind force is applied during low-altitude flight', async ({ page }) => {
     await startTestFlight(page, ENGINE_ROCKET, { malfunctionMode: 'off' });
     await pressStage(page);
     await pressThrottleUp(page);
@@ -1088,7 +976,7 @@ test.describe('Wind force during flight and ISP modifier', () => {
     await dismissReturnResults(page);
   });
 
-  test('(2) ISP temperature modifier is within valid range', async () => {
+  test('(2) ISP temperature modifier is within valid range', async ({ page }) => {
     // Weather temperature (ISP modifier) should be in range 0.95-1.05
     const gs = await getGameState(page) as GameStateSnapshot;
     const temp = gs.weather.current.temperature;
@@ -1102,25 +990,18 @@ test.describe('Wind force during flight and ISP modifier', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Day skipping with escalating fees', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = freshStartFixture({ money: 2_000_000 });
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) skip count starts at 0', async () => {
+  test('(1) skip count starts at 0', async ({ page }) => {
     const gs = await getGameState(page) as GameStateSnapshot;
     expect(gs.weather.skipCount).toBe(0);
   });
 
-  test('(2) skipping weather costs base fee and increments skip count', async () => {
+  test('(2) skipping weather costs base fee and increments skip count', async ({ page }) => {
     const gsBefore = await getGameState(page) as GameStateSnapshot;
     const moneyBefore = gsBefore.money;
 
@@ -1139,7 +1020,7 @@ test.describe('Day skipping with escalating fees', () => {
     expect(gsAfter.money).toBe(moneyBefore - 25_000);
   });
 
-  test('(3) consecutive skips escalate in cost', async () => {
+  test('(3) consecutive skips escalate in cost', async ({ page }) => {
     // Skip cost formula: BASE × ESCALATION^skipCount
     // Skip 1: $25,000 × 1.5^0 = $25,000
     // Skip 2: $25,000 × 1.5^1 = $37,500
@@ -1162,20 +1043,13 @@ test.describe('Day skipping with escalating fees', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Extreme weather warning', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = freshStartFixture();
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) extreme weather shows warning on hub panel', async () => {
+  test('(1) extreme weather shows warning on hub panel', async ({ page }) => {
     // Inject extreme weather AFTER hub has loaded (overwriting whatever was generated)
     await page.evaluate(() => {
       const gs = window.__gameState;
@@ -1297,36 +1171,29 @@ test.describe('Extreme weather warning', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Reputation score changes from events', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
     const envelope = freshStartFixture({ reputation: 50 });
     await seedAndLoadSave(page, envelope);
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) reputation badge is visible on hub', async () => {
+  test('(1) reputation badge is visible on hub', async ({ page }) => {
     await expect(page.locator('#hub-reputation-badge')).toBeVisible({ timeout: 5_000 });
   });
 
-  test('(2) reputation value matches game state', async () => {
+  test('(2) reputation value matches game state', async ({ page }) => {
     const gs = await getGameState(page) as GameStateSnapshot;
     const repValue = await page.locator('.hub-rep-value').textContent();
     expect(repValue!.trim()).toBe(`${Math.round(gs.reputation)}`);
   });
 
-  test('(3) reputation tier label is shown (Good at rep 50)', async () => {
+  test('(3) reputation tier label is shown (Good at rep 50)', async ({ page }) => {
     const tierText = await page.locator('.hub-rep-tier').textContent();
     // Reputation 50 falls in "Good" tier (41-60)
     expect(tierText).toBe('Good');
   });
 
-  test('(4) reputation increases with safe crew return', async () => {
+  test('(4) reputation increases with safe crew return', async ({ page }) => {
     // Directly adjust reputation via game state to simulate safe crew return
     // +1 per crew member safely returned
     await page.evaluate(() => {
@@ -1338,7 +1205,7 @@ test.describe('Reputation score changes from events', () => {
     expect(gs.reputation).toBe(53);
   });
 
-  test('(5) reputation decreases with crew death', async () => {
+  test('(5) reputation decreases with crew death', async ({ page }) => {
     // -10 per crew death
     await page.evaluate(() => {
       const gs = window.__gameState;
@@ -1349,7 +1216,7 @@ test.describe('Reputation score changes from events', () => {
     expect(gs.reputation).toBe(43);
   });
 
-  test('(6) reputation decreases with mission failure', async () => {
+  test('(6) reputation decreases with mission failure', async ({ page }) => {
     // -3 per mission failure
     await page.evaluate(() => {
       const gs = window.__gameState;
@@ -1360,7 +1227,7 @@ test.describe('Reputation score changes from events', () => {
     expect(gs.reputation).toBe(40);
   });
 
-  test('(7) reputation decreases with rocket destruction', async () => {
+  test('(7) reputation decreases with rocket destruction', async ({ page }) => {
     // -2 per rocket destruction
     await page.evaluate(() => {
       const gs = window.__gameState;
@@ -1371,7 +1238,7 @@ test.describe('Reputation score changes from events', () => {
     expect(gs.reputation).toBe(38);
   });
 
-  test('(8) reputation increases with milestone', async () => {
+  test('(8) reputation increases with milestone', async ({ page }) => {
     // +10 per milestone
     await page.evaluate(() => {
       const gs = window.__gameState;
@@ -1382,7 +1249,7 @@ test.describe('Reputation score changes from events', () => {
     expect(gs.reputation).toBe(48);
   });
 
-  test('(9) reputation clamped to 0-100 range', async () => {
+  test('(9) reputation clamped to 0-100 range', async ({ page }) => {
     await page.evaluate(() => {
       const gs = window.__gameState;
       gs.reputation = 150; // Over max
@@ -1408,18 +1275,11 @@ test.describe('Reputation score changes from events', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Reputation tier effects', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) Basic tier (0-20): +50% crew cost, 0% facility discount', async () => {
+  test('(1) Basic tier (0-20): +50% crew cost, 0% facility discount', async ({ page }) => {
     const envelope = freshStartFixture({ reputation: 10 });
     await seedAndLoadSave(page, envelope);
 
@@ -1440,7 +1300,7 @@ test.describe('Reputation tier effects', () => {
     expect(tier!.facilityDiscount).toBe(0.00);
   });
 
-  test('(2) Standard tier (21-40): +25% crew cost, 0% facility discount', async () => {
+  test('(2) Standard tier (21-40): +25% crew cost, 0% facility discount', async ({ page }) => {
     await page.evaluate(() => { window.__gameState.reputation = 30; });
     const tier = await page.evaluate(() => {
       const TIERS: { min: number; max: number; label: string; crewCostModifier: number; facilityDiscount: number }[] = [
@@ -1459,7 +1319,7 @@ test.describe('Reputation tier effects', () => {
     expect(tier!.facilityDiscount).toBe(0.00);
   });
 
-  test('(3) Good tier (41-60): normal crew cost, 5% facility discount', async () => {
+  test('(3) Good tier (41-60): normal crew cost, 5% facility discount', async ({ page }) => {
     await page.evaluate(() => { window.__gameState.reputation = 50; });
     const tier = await page.evaluate(() => {
       const TIERS: { min: number; max: number; label: string; crewCostModifier: number; facilityDiscount: number }[] = [
@@ -1478,7 +1338,7 @@ test.describe('Reputation tier effects', () => {
     expect(tier!.facilityDiscount).toBe(0.05);
   });
 
-  test('(4) Premium tier (61-80): -10% crew cost, 10% facility discount', async () => {
+  test('(4) Premium tier (61-80): -10% crew cost, 10% facility discount', async ({ page }) => {
     await page.evaluate(() => { window.__gameState.reputation = 70; });
     const tier = await page.evaluate(() => {
       const TIERS: { min: number; max: number; label: string; crewCostModifier: number; facilityDiscount: number }[] = [
@@ -1497,7 +1357,7 @@ test.describe('Reputation tier effects', () => {
     expect(tier!.facilityDiscount).toBe(0.10);
   });
 
-  test('(5) Elite tier (81-100): -25% crew cost, 15% facility discount', async () => {
+  test('(5) Elite tier (81-100): -25% crew cost, 15% facility discount', async ({ page }) => {
     await page.evaluate(() => { window.__gameState.reputation = 90; });
     const tier = await page.evaluate(() => {
       const TIERS: { min: number; max: number; label: string; crewCostModifier: number; facilityDiscount: number }[] = [
@@ -1516,7 +1376,7 @@ test.describe('Reputation tier effects', () => {
     expect(tier!.facilityDiscount).toBe(0.15);
   });
 
-  test('(6) hub badge updates to reflect current tier', async () => {
+  test('(6) hub badge updates to reflect current tier', async ({ page }) => {
     // Reputation is 90 (Elite) from previous test
     // Navigate away and back to trigger re-render
     await page.click('[data-building-id="vab"]');
@@ -1542,12 +1402,7 @@ test.describe('Reputation tier effects', () => {
 // ═══════════════════════════════════════════════════════════════════════════
 
 test.describe('Building with recovered vs new parts', () => {
-  test.describe.configure({ mode: 'serial' });
-  let page: Page;
-
-  test.beforeAll(async ({ browser }) => {
-    test.setTimeout(60_000);
-    page = await browser.newPage();
+  test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const envelope = midGameFixture({ money: 5_000_000 });
@@ -1563,9 +1418,7 @@ test.describe('Building with recovered vs new parts', () => {
     });
   });
 
-  test.afterAll(async () => { await page.close(); });
-
-  test('(1) inventory parts are available alongside new parts in VAB', async () => {
+  test('(1) inventory parts are available alongside new parts in VAB', async ({ page }) => {
     // Verify inventory was injected
     const gsBefore = await getGameState(page) as GameStateSnapshot;
     expect(gsBefore.partInventory).toBeDefined();
@@ -1582,7 +1435,7 @@ test.describe('Building with recovered vs new parts', () => {
     await expect(engineCard).toBeVisible({ timeout: 5_000 });
   });
 
-  test('(2) part detail shows inventory info when available', async () => {
+  test('(2) part detail shows inventory info when available', async ({ page }) => {
     // Click on engine-spark to see its details
     const engineCard = page.locator('.vab-part-card[data-part-id="engine-spark"]');
     await engineCard.click();
