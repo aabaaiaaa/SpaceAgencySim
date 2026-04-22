@@ -156,7 +156,7 @@ test.describe('Thermal system', () => {
   });
 
   test('(1) heat accumulates during high-speed atmospheric flight', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, BASIC_PROBE);
 
@@ -187,7 +187,7 @@ test.describe('Thermal system', () => {
   });
 
   test('(2) heat dissipates when slowing below threshold', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, BASIC_PROBE);
 
@@ -241,7 +241,7 @@ test.describe('Thermal system', () => {
   });
 
   test('(3) parts are destroyed when thermal tolerance is exceeded', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, BASIC_PROBE);
 
@@ -327,7 +327,7 @@ test.describe('Thermal system', () => {
   });
 
   test('(5) orientation matters — ascending heat distribution differs from descending', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'tank-small', 'engine-spark', 'heat-shield-mk2']);
 
@@ -397,7 +397,7 @@ test.describe('Thermal system', () => {
   });
 
   test('(7) airless bodies produce no atmospheric heating', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, BASIC_PROBE, { bodyId: 'MOON' });
 
@@ -531,7 +531,7 @@ test.describe('Tech tree parts', () => {
   });
 
   test('(2) ion engine has very low thrust but is present', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'tank-small', 'engine-ion']);
 
@@ -546,7 +546,7 @@ test.describe('Tech tree parts', () => {
   });
 
   test('(3) deep space engine is placeable and functional', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'tank-large', 'engine-deep-space']);
 
@@ -579,7 +579,7 @@ test.describe('Tech tree parts', () => {
   });
 
   test('(4) large fuel tank has correct capacity', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'tank-large', 'engine-reliant']);
 
@@ -603,7 +603,7 @@ test.describe('Tech tree parts', () => {
   });
 
   test('(5) parachute deploys and slows descent', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'parachute-mk1', 'tank-small', 'engine-spark']);
 
@@ -637,7 +637,7 @@ test.describe('Tech tree parts', () => {
   });
 
   test('(6) drogue chute deploys at high altitude', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'parachute-drogue', 'parachute-mk1', 'tank-small', 'engine-spark']);
 
@@ -652,7 +652,7 @@ test.describe('Tech tree parts', () => {
   });
 
   test('(7) heat shields are placeable and have high tolerance', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'heat-shield-mk2', 'tank-small', 'engine-spark']);
 
@@ -667,7 +667,7 @@ test.describe('Tech tree parts', () => {
   });
 
   test('(8) powered landing guidance auto-lands consuming fuel', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'landing-legs-powered', 'tank-small', 'engine-spark']);
 
@@ -701,7 +701,7 @@ test.describe('Tech tree parts', () => {
   });
 
   test('(9) reusable booster module creates inventory parts on stage separation', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, [
       'probe-core-mk1', 'tank-small', 'engine-spark',
@@ -720,7 +720,7 @@ test.describe('Tech tree parts', () => {
   });
 
   test('(10) Science Lab generates additional science from collected data', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'science-lab', 'tank-small', 'engine-spark']);
 
@@ -737,7 +737,7 @@ test.describe('Tech tree parts', () => {
   });
 
   test('(11) deep space instruments work when present in assembly', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, ['probe-core-mk1', 'instrument-telescope', 'tank-small', 'engine-spark']);
 
@@ -921,7 +921,7 @@ test.describe('Satellite components', () => {
   });
 
   test('(10) science telescope generates orbital science', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, [
       'probe-core-mk1', 'instrument-telescope',
@@ -942,7 +942,7 @@ test.describe('Satellite components', () => {
   });
 
   test('(11) power draw from active components is tracked', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(90_000);
     await seedAndLoadSave(page, asSave(fullFixture()));
     await startTestFlight(page, [
       'probe-core-mk1',

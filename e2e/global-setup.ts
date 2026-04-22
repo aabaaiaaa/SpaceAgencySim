@@ -1,6 +1,6 @@
 import { chromium, type FullConfig } from '@playwright/test';
 import { freshStartFixture } from './fixtures.js';
-import { seedAndLoadSave } from './helpers.js';
+import { seedAndLoadSave, teleportCraft, waitForOrbit } from './helpers.js';
 
 /**
  * Warm up the Vite dev server before the first spec runs.
@@ -12,10 +12,12 @@ import { seedAndLoadSave } from './helpers.js';
  * milliseconds.
  *
  * By running through the same flow tests do (seed save, load into hub,
- * start a flight), we force Vite to compile every module tests will later
- * touch — including the physics worker (loaded as a separate Vite entry
- * via `new Worker(new URL(...))`) and the PixiJS flight renderer. All
- * tests thereafter see a warm Vite cache and run with consistent timings.
+ * start a flight, teleport to orbit), we force Vite to compile every
+ * module tests will later touch — including the physics worker (loaded as
+ * a separate Vite entry via `new Worker(new URL(...))`), the PixiJS
+ * flight renderer, and the orbital-mechanics code path that most flight
+ * tests exercise. All tests thereafter see a warm Vite cache and run with
+ * consistent timings.
  *
  * `window.__e2eStartFlight` is only exposed after the main-menu callback
  * fires, so we can't trigger a flight from a bare page.goto; we have to
@@ -55,6 +57,15 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
       undefined,
       { timeout: 10_000 },
     );
+
+    // Teleport to a circular orbit and wait for ORBIT phase to warm the
+    // orbit-detection / orbital-elements / docking-state module paths.
+    // Most failing specs (orbital-operations, destinations,
+    // reliability-risk, agency-depth, facilities-infrastructure) exercise
+    // this code on their first test and used to pay the compile cost
+    // there; warming it here amortises that cost across the whole run.
+    await teleportCraft(page, { posY: 100_000, velX: 7848, bodyId: 'EARTH' });
+    await waitForOrbit(page, 15_000).catch(() => { /* best-effort warmup */ });
   } catch (err) {
     // Warm-up is a best-effort optimisation. If it fails (e.g. because
     // the app changed in a way the helper doesn't understand), don't

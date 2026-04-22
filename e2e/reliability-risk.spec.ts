@@ -1212,9 +1212,10 @@ test.describe('Reputation score changes from events', () => {
   });
 
   test('(5) reputation decreases with crew death', async ({ page }) => {
-    // -10 per crew death
+    // -10 per crew death. Start from 53 (as if test (4) had run) for independent test.
     await page.evaluate(() => {
       const gs = window.__gameState;
+      gs.reputation = 53;
       gs.reputation = Math.max(0, gs.reputation - 10); // 1 crew death
     });
 
@@ -1223,9 +1224,10 @@ test.describe('Reputation score changes from events', () => {
   });
 
   test('(6) reputation decreases with mission failure', async ({ page }) => {
-    // -3 per mission failure
+    // -3 per mission failure. Start from 43 (cumulative from earlier events).
     await page.evaluate(() => {
       const gs = window.__gameState;
+      gs.reputation = 43;
       gs.reputation = Math.max(0, gs.reputation - 3);
     });
 
@@ -1234,9 +1236,10 @@ test.describe('Reputation score changes from events', () => {
   });
 
   test('(7) reputation decreases with rocket destruction', async ({ page }) => {
-    // -2 per rocket destruction
+    // -2 per rocket destruction. Start from 40 (cumulative from earlier events).
     await page.evaluate(() => {
       const gs = window.__gameState;
+      gs.reputation = 40;
       gs.reputation = Math.max(0, gs.reputation - 2);
     });
 
@@ -1245,9 +1248,10 @@ test.describe('Reputation score changes from events', () => {
   });
 
   test('(8) reputation increases with milestone', async ({ page }) => {
-    // +10 per milestone
+    // +10 per milestone. Start from 38 (cumulative from earlier events).
     await page.evaluate(() => {
       const gs = window.__gameState;
+      gs.reputation = 38;
       gs.reputation = Math.min(100, gs.reputation + 10);
     });
 
@@ -1283,11 +1287,14 @@ test.describe('Reputation score changes from events', () => {
 test.describe('Reputation tier effects', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
+    // Load a save once per test so subsequent tests can rely on the game
+    // state being initialised (was previously only loaded in test (1)).
+    const envelope = freshStartFixture({ reputation: 50 });
+    await seedAndLoadSave(page, envelope);
   });
 
   test('(1) Basic tier (0-20): +50% crew cost, 0% facility discount', async ({ page }) => {
-    const envelope = freshStartFixture({ reputation: 10 });
-    await seedAndLoadSave(page, envelope);
+    await page.evaluate(() => { window.__gameState.reputation = 10; });
 
     const tier = await page.evaluate(() => {
       const TIERS: { min: number; max: number; label: string; crewCostModifier: number; facilityDiscount: number }[] = [
@@ -1383,8 +1390,8 @@ test.describe('Reputation tier effects', () => {
   });
 
   test('(6) hub badge updates to reflect current tier', async ({ page }) => {
-    // Reputation is 90 (Elite) from previous test
-    // Navigate away and back to trigger re-render
+    // Set reputation to 90 (Elite tier) and force a re-render by navigating away and back.
+    await page.evaluate(() => { window.__gameState.reputation = 90; });
     await page.click('[data-building-id="vab"]');
     await page.waitForSelector('#vab-btn-launch', { state: 'visible', timeout: 5_000 });
     await page.click('#vab-back-btn');
@@ -1422,23 +1429,21 @@ test.describe('Building with recovered vs new parts', () => {
         { id: 'inv-tank-1', partId: 'tank-small', wear: 10, flights: 1 },
       ];
     });
+
+    // Both tests in this describe need VAB open with the engine-spark card visible.
+    await navigateToVab(page);
+    await expect(page.locator('.vab-part-card[data-part-id="engine-spark"]')).toBeVisible({ timeout: 5_000 });
   });
 
   test('(1) inventory parts are available alongside new parts in VAB', async ({ page }) => {
     // Verify inventory was injected
-    const gsBefore = await getGameState(page) as GameStateSnapshot;
-    expect(gsBefore.partInventory).toBeDefined();
-    expect(gsBefore.partInventory.length).toBeGreaterThanOrEqual(2);
-
-    await navigateToVab(page);
-
-    // Both new parts (from catalog) and inventory parts should be available
     const gs = await getGameState(page) as GameStateSnapshot;
+    expect(gs.partInventory).toBeDefined();
     expect(gs.partInventory.length).toBeGreaterThanOrEqual(2);
 
     // The VAB parts panel should show catalog parts
     const engineCard = page.locator('.vab-part-card[data-part-id="engine-spark"]');
-    await expect(engineCard).toBeVisible({ timeout: 5_000 });
+    await expect(engineCard).toBeVisible();
   });
 
   test('(2) part detail shows inventory info when available', async ({ page }) => {

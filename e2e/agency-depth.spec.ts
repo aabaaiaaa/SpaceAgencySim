@@ -349,6 +349,18 @@ test.describe('Contract acceptance and cancellation', () => {
   });
 
   test('(3) cancelling an active contract applies penalty and rep hit', async ({ page }) => {
+    // Accept the contract first (previously relied on test (2)'s side effect).
+    await page.evaluate(() => {
+      const gs = window.__gameState;
+      if (!gs) return;
+      const contract = gs.contracts.board.find(c => c.id === 'contract-accept-test');
+      if (contract) {
+        gs.contracts.board = gs.contracts.board.filter(c => c.id !== 'contract-accept-test');
+        contract.acceptedPeriod = gs.currentPeriod;
+        gs.contracts.active.push(contract);
+      }
+    });
+
     const gsBefore = await getGameState(page) as GameState;
     const moneyBefore = gsBefore.money as number;
     const repBefore = gsBefore.reputation as number;
@@ -647,6 +659,7 @@ test.describe('Contract BUDGET_LIMIT and MAX_PARTS constraints', () => {
 
 test.describe('Contract over-performance bonus', () => {
   test.beforeEach(async ({ page }) => {
+    test.setTimeout(120_000);
     await page.setViewportSize({ width: VP_W, height: VP_H });
 
     const bonusContract = buildContract({
@@ -674,24 +687,23 @@ test.describe('Contract over-performance bonus', () => {
 
     const envelope = contractTestFixture(bonusContract, { money: 500_000 });
     await seedAndLoadSave(page, envelope);
-  });
 
-  test('(1) bonus objectives are tracked alongside main objectives', async ({ page }) => {
+    // Both tests in this describe need the flight to have reached 100 m (the
+    // bonus objective altitude), completing both the main and bonus
+    // objectives in the flight state. Run this once per test.
     await startTestFlight(page, BASIC_ROCKET);
     await pressStage(page);
     await pressThrottleUp(page);
-
-    // Wait for both main and bonus altitude to be reached
     await waitForAltitude(page, 100, 15_000);
-
-    // Wait for contract objective to be evaluated
     await page.waitForFunction(() => {
       const gs = window.__gameState as
         { contracts?: { active?: { id: string; objectives?: { completed?: boolean }[] }[] } } | undefined;
       const contract = gs?.contracts?.active?.find(c => c.id === 'contract-bonus');
       return contract?.objectives?.[0]?.completed === true;
     }, undefined, { timeout: 5_000 });
+  });
 
+  test('(1) bonus objectives are tracked alongside main objectives', async ({ page }) => {
     const gs = await getGameState(page) as GameState;
     const contract = (gs.contracts.active as ContractSnapshot[]).find(
       (c: ContractSnapshot) => c.id === 'contract-bonus',
@@ -705,9 +717,6 @@ test.describe('Contract over-performance bonus', () => {
   });
 
   test('(2) completing bonus objectives awards bonus reward on flight return', async ({ page }) => {
-    const gsBefore = await getGameState(page) as GameState;
-    const _moneyBefore = gsBefore.money as number;
-
     await returnToAgency(page);
     await dismissReturnResults(page);
 
@@ -717,8 +726,6 @@ test.describe('Contract over-performance bonus', () => {
     expect((gsAfter.contracts.completed as ContractSnapshot[]).some(
       (c: ContractSnapshot) => c.id === 'contract-bonus',
     )).toBe(true);
-    // Money should have increased from the contract reward
-    // The exact amount depends on operating costs, but the contract should be completed
   });
 });
 
@@ -938,6 +945,16 @@ test.describe('Crew skill XP gains from flight events', () => {
   });
 
   test('(3) engineering XP gained from staging events and part recovery', async ({ page }) => {
+    test.setTimeout(120_000);
+    // Run a crewed flight that stages and recovers parts so engineering XP accrues.
+    await startTestFlight(page, CREWED_ROCKET, { crewIds: ['crew-xp-1'] });
+    await pressStage(page);
+    await pressThrottleUp(page);
+    await waitForAltitude(page, 200, 10_000);
+    await pressThrottleCut(page);
+    await returnToAgency(page);
+    await dismissReturnResults(page);
+
     const gs = await getGameState(page) as GameState;
     const crew = (gs.crew as CrewSnapshot[]).find(
       (c: CrewSnapshot) => c.id === 'crew-xp-1',
@@ -1357,6 +1374,23 @@ test.describe('Design library cross-save sharing', () => {
   });
 
   test('(2) shared designs merge with save-private designs', async ({ page }) => {
+    // Seed a shared design (previously relied on test (1)'s side effect).
+    const sharedDesign = {
+      id: 'design-shared-1',
+      name: 'Shared Rocket',
+      parts: [
+        { partId: 'probe-core-mk1', position: { x: 0, y: 0 } },
+        { partId: 'tank-small', position: { x: 0, y: -1 } },
+        { partId: 'engine-spark', position: { x: 0, y: -2 } },
+      ],
+      staging: { stages: [[0, 1, 2]], unstaged: [] },
+      totalMass: 500,
+      totalThrust: 20,
+      createdDate: new Date().toISOString(),
+      updatedDate: new Date().toISOString(),
+    };
+    await seedIdb(page, 'spaceAgencyDesignLibrary', JSON.stringify([sharedDesign]));
+
     // Add a private design to the game state
     await page.evaluate(() => {
       const gs = window.__gameState;
@@ -1627,8 +1661,14 @@ test.describe('Full contract lifecycle — accept -> fly -> complete -> reward',
   });
 
   test('(3) contract completes on flight return, awarding cash and rep', async ({ page }) => {
+    test.setTimeout(120_000);
+    // Fly to complete the objective (previously relied on test (2)'s flight).
+    await startTestFlight(page, BASIC_ROCKET);
+    await pressStage(page);
+    await pressThrottleUp(page);
+    await waitForContractObjectiveComplete(page, 'contract-lifecycle', 'obj-lc-1', 30_000);
+
     const gsBefore = await getGameState(page) as GameState;
-    const _moneyBefore = gsBefore.money as number;
     const repBefore = gsBefore.reputation as number;
 
     await returnToAgency(page);
@@ -1817,6 +1857,9 @@ test.describe('Injury recovery clears after period elapses', () => {
   });
 
   test('(3) crew recovered after second flight (period 12)', async ({ page }) => {
+    test.setTimeout(120_000);
+    // Run two flight cycles: 10 → 11 → 12. Previously relied on test (2)'s cycle.
+    await completeFlightCycle(page);
     await completeFlightCycle(page);
 
     const gs = await getGameState(page) as GameState;

@@ -243,7 +243,7 @@ test.describe('Horizon curvature rendering', () => {
   }
 
   test('(1) no curvature at low altitude (below 5000 m)', async ({ browser }) => {
-    test.setTimeout(30_000);
+    test.setTimeout(60_000);
     const page: Page = await setupCurvatureFlight(browser);
 
     // Set full throttle then stage.
@@ -265,7 +265,7 @@ test.describe('Horizon curvature rendering', () => {
   });
 
   test('(2) curvature begins at 5000+ m altitude', async ({ browser }) => {
-    test.setTimeout(30_000);
+    test.setTimeout(60_000);
     const page: Page = await setupCurvatureFlight(browser);
 
     // Teleport to 5500m altitude.
@@ -282,7 +282,7 @@ test.describe('Horizon curvature rendering', () => {
   });
 
   test('(3) curvature increases with altitude', async ({ browser }) => {
-    test.setTimeout(30_000);
+    test.setTimeout(60_000);
     const page: Page = await setupCurvatureFlight(browser);
 
     // Teleport to 20000m altitude in ORBIT phase to prevent gravity drift.

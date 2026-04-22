@@ -576,16 +576,17 @@ test.describe('Sun destruction altitude and escalating heat damage', () => {
 
 test.describe('Transfer gameplay mechanics', () => {
   test.beforeEach(async ({ page }) => {
+    test.setTimeout(120_000);
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
+    // Set up an Earth → Moon transfer for every test in this block.
+    await startTestFlight(page, DEEP_SPACE_SHIP, { bodyId: 'EARTH', crewIds: ['crew-1'] });
+    await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
+    await waitForOrbit(page, 60_000);
+    await setTransferState(page, 'EARTH', 'MOON');
   });
 
   test('(1) transfer state stores origin and destination bodies', async ({ page }) => {
-    await startTestFlight(page, DEEP_SPACE_SHIP, { bodyId: 'EARTH', crewIds: ['crew-1'] });
-    await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
-    await waitForOrbit(page);
-    await setTransferState(page, 'EARTH', 'MOON');
-
     const fs = (await getFlightState(page))!;
     expect(fs.phase).toBe('TRANSFER');
     expect(fs.transferState).not.toBeNull();
@@ -895,14 +896,16 @@ test.describe('Body-specific biomes and science opportunities', () => {
 
 test.describe('Surface operations — flag planting', () => {
   test.beforeEach(async ({ page }) => {
+    test.setTimeout(90_000);
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
+    // Tests (1) and (2) both operate on a crewed lander on the Moon surface.
+    // Test (3) uses an uncrewed probe on Mars, so it overrides this baseline.
+    await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MOON', crewIds: ['crew-1'] });
+    await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
   });
 
   test('(1) can plant flag on Moon (crewed, landed)', async ({ page }) => {
-    await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MOON', crewIds: ['crew-1'] });
-    await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
-
     const gsBefore = (await getGameState(page))!;
     const moneyBefore: number = gsBefore.money as number;
     const repBefore: number = gsBefore.reputation as number;
@@ -945,6 +948,17 @@ test.describe('Surface operations — flag planting', () => {
   });
 
   test('(2) cannot plant second flag on same body', async ({ page }) => {
+    // Plant a first flag as setup (previously relied on test (1)'s side effect).
+    await page.evaluate(async (): Promise<void> => {
+      if (typeof window.__plantFlag === 'function') {
+        window.__plantFlag();
+      } else if (typeof window.__surfaceAction === 'function') {
+        window.__surfaceAction('plant-flag');
+      }
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
+    });
+
+    // Attempt a second flag — should fail.
     const result = await page.evaluate(async (): Promise<SurfaceActionResult | null> => {
       let r: SurfaceActionResult | null = null;
       if (typeof window.__plantFlag === 'function') {
@@ -1854,15 +1868,18 @@ test.describe('Map view controls during transfer', () => {
 
 test.describe('Integration — full lunar mission flow', () => {
   test.beforeEach(async ({ page }) => {
+    test.setTimeout(120_000);
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, phase6Fixture());
+    // Launch a crewed lunar lander and teleport to Moon orbit. All tests in
+    // this block then do additional teleports (land, plant flags, etc.) on
+    // top of this baseline so each is independent.
+    await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MOON', crewIds: ['crew-1'] });
+    await teleportCraft(page, { posY: MOON_ORBIT_ALT, velX: MOON_ORBIT_VEL, bodyId: 'MOON' });
+    await waitForOrbit(page, 60_000);
   });
 
   test('(1) launch from Earth, teleport to Moon orbit', async ({ page }) => {
-    await startTestFlight(page, LUNAR_LANDER, { bodyId: 'MOON', crewIds: ['crew-1'] });
-    await teleportCraft(page, { posY: MOON_ORBIT_ALT, velX: MOON_ORBIT_VEL, bodyId: 'MOON' });
-    await waitForOrbit(page);
-
     const fs = (await getFlightState(page))!;
     expect(fs.phase).toBe('ORBIT');
     expect(fs.bodyId).toBe('MOON');
@@ -1870,6 +1887,11 @@ test.describe('Integration — full lunar mission flow', () => {
 
   test('(2) land on Moon surface', async ({ page }) => {
     await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
+    await page.waitForFunction(
+      () => window.__flightPs?.landed === true,
+      undefined,
+      { timeout: 5_000 },
+    );
 
     const ps = (await getPhysicsSnapshot(page))!;
     expect(ps.landed).toBe(true);
@@ -1877,6 +1899,10 @@ test.describe('Integration — full lunar mission flow', () => {
   });
 
   test('(3) perform all surface operations', async ({ page }) => {
+    // Land on Moon first.
+    await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
+    await page.waitForFunction(() => window.__flightPs?.landed === true, undefined, { timeout: 5_000 });
+
     // Plant flag.
     const flagResult = await page.evaluate(async (): Promise<SurfaceActionResult> => {
       let r: SurfaceActionResult = { success: true };
@@ -1909,6 +1935,15 @@ test.describe('Integration — full lunar mission flow', () => {
   });
 
   test('(4) verify surface items created', async ({ page }) => {
+    // Land and plant a flag so there's at least one surface item to verify.
+    await teleportCraft(page, { posY: 0, grounded: true, landed: true, bodyId: 'MOON' });
+    await page.waitForFunction(() => window.__flightPs?.landed === true, undefined, { timeout: 5_000 });
+    await page.evaluate(async (): Promise<void> => {
+      if (typeof window.__plantFlag === 'function') window.__plantFlag();
+      else if (typeof window.__surfaceAction === 'function') window.__surfaceAction('plant-flag');
+      if (typeof window.__resyncPhysicsWorker === 'function') { await window.__resyncPhysicsWorker(); }
+    });
+
     const gs = (await getGameState(page))!;
     const moonItems = (gs.surfaceItems as unknown[] ?? []).filter((i: unknown) => (i as Record<string, unknown>).bodyId === 'MOON');
     expect(moonItems.length).toBeGreaterThanOrEqual(1);
@@ -1922,7 +1957,7 @@ test.describe('Integration — full lunar mission flow', () => {
 
     await page.waitForSelector('#hub-overlay', { state: 'visible', timeout: 5_000 });
     const gs = (await getGameState(page))!;
-    // Period should have advanced.
+    // Period should have advanced past the starting value (30 in phase6Fixture).
     expect(gs.currentPeriod).toBeGreaterThan(30);
   });
 });

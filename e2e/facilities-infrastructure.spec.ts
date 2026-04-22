@@ -245,12 +245,20 @@ test.describe('Facility upgrade purchase from construction menu', () => {
   });
 
   test('(5) max tier facility shows no upgrade button', async ({ page }) => {
-    // Upgrade Launch Pad to tier 3
+    // Launch Pad starts at tier 1; upgrade twice (1→2→3) to reach max tier.
     await openConstructionPanel(page);
 
     const lpItem = page.locator('.cp-facility-item').filter({ hasText: 'Launch Pad' });
     const upgradeBtn = lpItem.locator('.cp-upgrade-btn');
     await upgradeBtn.click();
+    await page.waitForFunction(
+      () => window.__gameState?.hubs?.[0]?.facilities?.['launch-pad']?.tier === 2,
+      undefined,
+      { timeout: 5_000 },
+    );
+
+    // Second upgrade: 2 → 3.
+    await lpItem.locator('.cp-upgrade-btn').click();
     await page.waitForFunction(
       () => window.__gameState?.hubs?.[0]?.facilities?.['launch-pad']?.tier === 3,
       undefined,
@@ -279,16 +287,17 @@ test.describe('Facility upgrade purchase from construction menu', () => {
 test.describe('Launch Pad — mass limits per tier', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
-  });
-
-  test('(1) tier 1 enforces 18,000 kg mass limit', async ({ page }) => {
+    // Load a save once per test so every test starts with an initialised
+    // game state (was previously only done inside test (1)).
     const envelope = freshStartFixture({
       money: 5_000_000,
       parts: ALL_PARTS,
       facilities: { ...STARTER_FACILITIES },
     });
     await seedAndLoadSave(page, envelope);
+  });
 
+  test('(1) tier 1 enforces 18,000 kg mass limit', async ({ page }) => {
     // Check launch pad mass limit is 18,000 at tier 1
     const massLimit = await page.evaluate((): MassLimitResult => {
       const w = window;
@@ -332,16 +341,15 @@ test.describe('Launch Pad — mass limits per tier', () => {
 test.describe('VAB — part count and size limits per tier', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
-  });
-
-  test('(1) tier 1 limits: 20 parts, 400px height, 120px width', async ({ page }) => {
     const envelope = freshStartFixture({
       money: 5_000_000,
       parts: ALL_PARTS,
       facilities: { ...STARTER_FACILITIES },
     });
     await seedAndLoadSave(page, envelope);
+  });
 
+  test('(1) tier 1 limits: 20 parts, 400px height, 120px width', async ({ page }) => {
     const limits = await page.evaluate((): VabLimitsResult => {
       const w = window;
       const gs = w.__gameState;
@@ -384,10 +392,8 @@ test.describe('VAB — part count and size limits per tier', () => {
 test.describe('Mission Control — contract pool and active caps per tier', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
-  });
-
-  test('(1) tier 1: max 2 active contracts, 4 board pool', async ({ page }) => {
-    // Create fixture with tier 1 MCC and multiple contracts on the board
+    // Base fixture: early game with tier 1 MCC and a small contract board
+    // so every test starts with an initialised game state.
     const contracts: Record<string, unknown>[] = [];
     for (let i = 0; i < 6; i++) {
       contracts.push(buildContract({
@@ -415,7 +421,9 @@ test.describe('Mission Control — contract pool and active caps per tier', () =
       contracts: { board: contracts, active, completed: [], failed: [] },
     });
     await seedAndLoadSave(page, envelope);
+  });
 
+  test('(1) tier 1: max 2 active contracts, 4 board pool', async ({ page }) => {
     // MCC tier 1 caps: 4 pool, 2 active
     const gs = await getGameState(page) as GameState;
     expect(gs.hubs[0].facilities[FacilityId.MISSION_CONTROL].tier).toBe(1);
@@ -584,6 +592,17 @@ test.describe('Crew Admin — training system', () => {
   });
 
   test('(3) crew in training is unavailable for flight assignment', async ({ page }) => {
+    // Put a crew member into training (previously relied on side effect of test (2)).
+    await page.evaluate(() => {
+      const gs = window.__gameState;
+      if (!gs) return;
+      const crew = (gs.crew as unknown as CrewSnapshot[]).find(c => c.status === 'active' && !c.trainingSkill);
+      if (crew) {
+        crew.trainingSkill = 'piloting';
+        crew.trainingEnds = ((gs.currentPeriod as number | undefined) ?? 0) + 3;
+      }
+    });
+
     const gs = await getGameState(page) as GameState;
     const trainingCrew = (gs.crew as unknown as CrewSnapshot[]).find(c => c.trainingSkill != null);
     expect(trainingCrew).toBeTruthy();
@@ -603,6 +622,17 @@ test.describe('Crew Admin — training system', () => {
   });
 
   test('(4) training completes after required periods with +15 skill gain', async ({ page }) => {
+    // Put a crew member into training first (previously relied on test (2)).
+    await page.evaluate(() => {
+      const gs = window.__gameState;
+      if (!gs) return;
+      const crew = (gs.crew as unknown as CrewSnapshot[]).find(c => c.status === 'active' && !c.trainingSkill);
+      if (crew) {
+        crew.trainingSkill = 'piloting';
+        crew.trainingEnds = ((gs.currentPeriod as number | undefined) ?? 0) + 3;
+      }
+    });
+
     const gsBefore = await getGameState(page) as GameState;
     const traineeBefore = (gsBefore.crew as unknown as CrewSnapshot[]).find(c => c.trainingSkill != null)!;
     const skillBefore = traineeBefore.skills.piloting;
@@ -820,9 +850,6 @@ test.describe('Crew training opportunity cost — crew unavailable during traini
 test.describe('Tracking Station — map view scope per tier', () => {
   test.beforeEach(async ({ page }) => {
     await page.setViewportSize({ width: VP_W, height: VP_H });
-  });
-
-  test('(1) tier 1: local body map view only', async ({ page }) => {
     const envelope = orbitalFixture({
       facilities: {
         ...ALL_FACILITIES,
@@ -830,7 +857,9 @@ test.describe('Tracking Station — map view scope per tier', () => {
       },
     });
     await seedAndLoadSave(page, envelope);
+  });
 
+  test('(1) tier 1: local body map view only', async ({ page }) => {
     const gs = await getGameState(page) as GameState;
     expect(gs.hubs[0].facilities[FacilityId.TRACKING_STATION].tier).toBe(1);
     // Tier 1: local body only — map shows objects around current body

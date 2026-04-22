@@ -239,21 +239,17 @@ async function injectOrbitalObject(page: Page, obj: Record<string, unknown>): Pr
 
 test.describe('Orbit entry detection', () => {
   test.beforeEach(async ({ page }) => {
+    test.setTimeout(90_000);
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
-  });
-
-  test('@smoke (1) craft transitions to ORBIT when periapsis is above minimum altitude', async ({ page }) => {
-    test.setTimeout(60_000);
     await startTestFlight(page, ORBITAL_ROCKET, { crewIds: ['crew-1'] });
-
     // Teleport to circular orbit at 100 km — teleportCraft clears engines
     // and throttle to prevent an immediate ORBIT → MANOEUVRE transition.
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
+    await waitForOrbit(page, 30_000);
+  });
 
-    // Wait for automatic orbit detection.
-    await waitForOrbit(page, 15_000);
-
+  test('@smoke (1) craft transitions to ORBIT when periapsis is above minimum altitude', async ({ page }) => {
     const fs = await getFlightState(page) as FlightStateSnapshot | null;
     expect(fs).not.toBeNull();
     expect(fs!.phase).toBe('ORBIT');
@@ -263,14 +259,6 @@ test.describe('Orbit entry detection', () => {
   });
 
   test('(2) orbit entry populates the orbitBandId field', async ({ page }) => {
-    test.setTimeout(60_000);
-    // Ensure we're in orbit (resilient to test 1 leaving bad state).
-    const needsSetup = await page.evaluate(() => window.__flightState?.phase !== 'ORBIT');
-    if (needsSetup) {
-      await startTestFlight(page, ORBITAL_ROCKET, { crewIds: ['crew-1'] });
-      await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
-      await waitForOrbit(page, 15_000);
-    }
     // Wait for orbitBandId to be assigned (may take a frame after orbit entry).
     await page.waitForFunction(
       () => window.__flightState?.orbitBandId != null,
@@ -449,16 +437,15 @@ test.describe('Orbital manoeuvres', () => {
 
 test.describe('Docking mode local positioning', () => {
   test.beforeEach(async ({ page }) => {
+    test.setTimeout(120_000);
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
+    await startTestFlight(page, DOCKING_ROCKET, { crewIds: ['crew-1'] });
+    await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
+    await waitForOrbit(page, 60_000);
   });
 
   test('(1) pressing V toggles docking mode in orbit', async ({ page }) => {
-    test.setTimeout(60_000);
-    await startTestFlight(page, DOCKING_ROCKET, { crewIds: ['crew-1'] });
-    await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
-    await waitForOrbit(page);
-
     // Verify starting in NORMAL mode.
     const modeBefore = await page.evaluate(() => window.__flightPs?.controlMode);
     expect(modeBefore).toBe('NORMAL');
@@ -476,8 +463,15 @@ test.describe('Docking mode local positioning', () => {
   });
 
   test('(2) throttle is cut to zero on docking mode toggle', async ({ page }) => {
-    test.setTimeout(60_000);
-    // Set throttle high first.
+    // Enter docking mode.
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
+    await page.waitForFunction(
+      () => window.__flightPs?.controlMode === 'DOCKING',
+      undefined,
+      { timeout: 10_000 },
+    );
+
+    // Set throttle high.
     await page.evaluate(async () => {
       const ps = window.__flightPs;
       if (ps) ps.throttle = 0.5;
@@ -503,7 +497,13 @@ test.describe('Docking mode local positioning', () => {
   });
 
   test('(3) RCS mode is available inside docking mode', async ({ page }) => {
-    // Already in docking mode. Press R for RCS.
+    // Enter docking mode, then press R for RCS.
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
+    await page.waitForFunction(
+      () => window.__flightPs?.controlMode === 'DOCKING',
+      undefined,
+      { timeout: 10_000 },
+    );
     await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyR', key: 'r', bubbles: true })));
     await page.waitForFunction(
       () => window.__flightPs?.controlMode === 'RCS',
@@ -524,16 +524,13 @@ test.describe('Docking mode local positioning', () => {
   });
 
   test('(4) docking target HUD renders without errors when offsets are set', async ({ page }) => {
-    // Enter docking mode if not already in it.
-    const mode = await page.evaluate(() => window.__flightPs?.controlMode);
-    if (mode !== 'DOCKING') {
-      await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
-      await page.waitForFunction(
-        () => window.__flightPs?.controlMode === 'DOCKING',
-        undefined,
-        { timeout: 10_000 },
-      );
-    }
+    // Enter docking mode.
+    await page.evaluate(() => window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyV', key: 'v', bubbles: true })));
+    await page.waitForFunction(
+      () => window.__flightPs?.controlMode === 'DOCKING',
+      undefined,
+      { timeout: 10_000 },
+    );
 
     // Set docking port states and offsets so the render path is exercised.
     await page.evaluate(async () => {
@@ -971,22 +968,21 @@ test.describe('Satellite Network Ops Centre tiers', () => {
 
 test.describe('Docking approach and guidance', () => {
   test.beforeEach(async ({ page }) => {
+    test.setTimeout(120_000);
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
-  });
-
-  test('(1) docking state initialises as IDLE', async ({ page }) => {
-    test.setTimeout(60_000);
     await startTestFlight(page, DOCKING_ROCKET, { crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
-    await waitForOrbit(page);
-
-    // Ensure docking state is initialised.
+    await waitForOrbit(page, 60_000);
+    // Ensure docking state is initialised so all tests can rely on it.
     await page.waitForFunction(
       () => window.__flightState?.dockingState != null,
       undefined,
       { timeout: 5_000 },
     );
+  });
+
+  test('(1) docking state initialises as IDLE', async ({ page }) => {
 
     const dockingState = await page.evaluate(() => {
       const ds = window.__flightState?.dockingState;
@@ -1216,23 +1212,20 @@ test.describe('Undocking and control assignment', () => {
 
 test.describe('Crew transfer and fuel transfer', () => {
   test.beforeEach(async ({ page }) => {
+    test.setTimeout(120_000);
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
-  });
-
-  test('(1) crew transfer event is logged during docked state', async ({ page }) => {
-    test.setTimeout(60_000);
     await startTestFlight(page, DOCKING_ROCKET, { crewIds: ['crew-1', 'crew-2'] });
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
-    await waitForOrbit(page);
-
-    // Wait for docking state.
+    await waitForOrbit(page, 60_000);
     await page.waitForFunction(
       () => window.__flightState?.dockingState != null,
       undefined,
       { timeout: 5_000 },
     );
+  });
 
+  test('(1) crew transfer event is logged during docked state', async ({ page }) => {
     // Set up docked state and simulate crew transfer.
     await page.evaluate(async () => {
       const ds = window.__flightState?.dockingState;
@@ -1302,23 +1295,21 @@ test.describe('Crew transfer and fuel transfer', () => {
 
 test.describe('Power system', () => {
   test.beforeEach(async ({ page }) => {
+    test.setTimeout(120_000);
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
-  });
-
-  test('(1) solar panels initialise power state with panel area and battery capacity', async ({ page }) => {
-    test.setTimeout(60_000);
     await startTestFlight(page, SOLAR_PROBE);
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
-    await waitForOrbit(page);
-
-    // Wait for power state to be populated.
+    await waitForOrbit(page, 60_000);
+    // Wait for power state to be populated so all tests can rely on it.
     await page.waitForFunction(
       () => window.__flightPs?.powerState?.solarPanelArea! > 0,
       undefined,
       { timeout: 5_000 },
     );
+  });
 
+  test('(1) solar panels initialise power state with panel area and battery capacity', async ({ page }) => {
     const powerInfo = await page.evaluate(() => {
       const ps = window.__flightPs;
       if (!ps?.powerState) return null;
@@ -1386,14 +1377,14 @@ test.describe('Power system', () => {
   });
 
   test('(5) craft without solar panels has limited power from built-in battery', async ({ page }) => {
-    test.setTimeout(60_000);
-    // Return from current flight.
+    test.setTimeout(180_000);
+    // Return from the SOLAR_PROBE flight set up by beforeEach.
     await returnToAgency(page);
 
     // Start with a basic probe (no solar panels).
     await startTestFlight(page, BASIC_PROBE);
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
-    await waitForOrbit(page);
+    await waitForOrbit(page, 60_000);
     await page.waitForFunction(
       () => window.__flightPs?.powerState != null,
       undefined,
@@ -1423,6 +1414,7 @@ test.describe('Power system', () => {
 
 test.describe('Grabbing arm and satellite repair', () => {
   test.beforeEach(async ({ page }) => {
+    test.setTimeout(120_000);
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture({
       satelliteNetwork: {
@@ -1446,21 +1438,17 @@ test.describe('Grabbing arm and satellite repair', () => {
         },
       ],
     }));
-  });
-
-  test('(1) craft with grabbing arm detects the arm in active parts', async ({ page }) => {
-    test.setTimeout(60_000);
     await startTestFlight(page, GRAB_ROCKET, { crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
-    await waitForOrbit(page);
-
-    // Wait for the flight assembly to be populated.
+    await waitForOrbit(page, 60_000);
     await page.waitForFunction(
       () => (window.__flightAssembly?.parts?.size ?? 0) > 0,
       undefined,
       { timeout: 10_000 },
     );
+  });
 
+  test('(1) craft with grabbing arm detects the arm in active parts', async ({ page }) => {
     const hasArm = await page.evaluate(() => {
       const ps = window.__flightPs;
       const assembly = window.__flightAssembly;
@@ -1634,22 +1622,20 @@ test.describe('Integrated orbital operations', () => {
 
 test.describe('Docking thresholds', () => {
   test.beforeEach(async ({ page }) => {
+    test.setTimeout(120_000);
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
-  });
-
-  test('(1) speed OK when relative speed <= 2.0 m/s', async ({ page }) => {
-    test.setTimeout(60_000);
     await startTestFlight(page, DOCKING_ROCKET, { crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
-    await waitForOrbit(page);
-
+    await waitForOrbit(page, 60_000);
     await page.waitForFunction(
       () => window.__flightState?.dockingState != null,
       undefined,
       { timeout: 5_000 },
     );
+  });
 
+  test('(1) speed OK when relative speed <= 2.0 m/s', async ({ page }) => {
     const result = await page.evaluate(async () => {
       const ds = window.__flightState?.dockingState;
       if (!ds) return null;
@@ -1802,21 +1788,20 @@ test.describe('Grab arm thresholds', () => {
 
 test.describe('Power system eclipse behaviour', () => {
   test.beforeEach(async ({ page }) => {
+    test.setTimeout(120_000);
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
-  });
-
-  test('(1) power state tracks sunlit/eclipse status', async ({ page }) => {
-    test.setTimeout(60_000);
     await startTestFlight(page, SOLAR_PROBE);
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
-    await waitForOrbit(page);
+    await waitForOrbit(page, 60_000);
     await page.waitForFunction(
       () => window.__flightPs?.powerState != null,
       undefined,
       { timeout: 5_000 },
     );
+  });
 
+  test('(1) power state tracks sunlit/eclipse status', async ({ page }) => {
     const sunlitInfo = await page.evaluate(() => {
       const ps = window.__flightPs;
       if (!ps?.powerState) return null;
@@ -1920,23 +1905,21 @@ test.describe('Satellite leasing', () => {
 
 test.describe('Orbital elements tracking', () => {
   test.beforeEach(async ({ page }) => {
+    test.setTimeout(120_000);
     await page.setViewportSize({ width: VP_W, height: VP_H });
     await seedAndLoadSave(page, orbitalOpsFixture());
-  });
-
-  test('(1) circular orbit has near-zero eccentricity', async ({ page }) => {
-    test.setTimeout(60_000);
     await startTestFlight(page, ORBITAL_ROCKET, { crewIds: ['crew-1'] });
     await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
-    await waitForOrbit(page);
-
+    await waitForOrbit(page, 60_000);
     // Wait for orbital elements to be computed after orbit detection.
     await page.waitForFunction(
       () => window.__flightState?.orbitalElements != null,
       undefined,
       { timeout: 10_000 },
     );
+  });
 
+  test('(1) circular orbit has near-zero eccentricity', async ({ page }) => {
     const elements = await page.evaluate(() => {
       const fs = window.__flightState;
       return fs?.orbitalElements as { semiMajorAxis: number; eccentricity: number } | null ?? null;
@@ -1974,7 +1957,7 @@ test.describe('Complete orbital lifecycle', () => {
   });
 
   test('(1) launch -> orbit -> manoeuvre -> orbit -> return lifecycle', async ({ page }) => {
-    test.setTimeout(60_000);
+    test.setTimeout(120_000);
     await startTestFlight(page, ORBITAL_ROCKET, { crewIds: ['crew-1'] });
 
     // Phase starts at PRELAUNCH.
@@ -2035,9 +2018,16 @@ test.describe('Complete orbital lifecycle', () => {
   });
 
   test('(2) period advances after orbital flight return', async ({ page }) => {
+    test.setTimeout(120_000);
+    // Launch a brief orbital flight and return — period should advance from 30 to 31.
+    await startTestFlight(page, ORBITAL_ROCKET, { crewIds: ['crew-1'] });
+    await teleportCraft(page, { posY: EARTH_ORBIT_ALT, velX: EARTH_ORBIT_VEL, bodyId: 'EARTH' });
+    await waitForOrbit(page);
+    await returnToAgency(page);
+
     const gs = await getGameState(page) as GameStateSnapshot | null;
     expect(gs).not.toBeNull();
-    // Started at period 30 — should now be 31.
+    // Started at period 30 — should now be at least 31 after one flight.
     expect(gs!.currentPeriod).toBeGreaterThanOrEqual(31);
   });
 });
