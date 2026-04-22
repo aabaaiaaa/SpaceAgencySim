@@ -11,6 +11,7 @@ import { createFlightState } from '../../core/gameState.ts';
 import { FlightPhase } from '../../core/constants.ts';
 import { isPlayerLocked, getPhaseLabel, isInUnsafeBeltOrbit } from '../../core/flightPhase.ts';
 import { processFlightReturn } from '../../core/flightReturn.ts';
+import { getMissionsReadyToTurnIn } from '../../core/missions.ts';
 import { refreshTopBar } from '../topbar.ts';
 import { getFCState, getPhysicsState, getFlightState } from './_state.ts';
 import { showPhaseNotification } from './_flightPhase.ts';
@@ -356,10 +357,13 @@ export function handleMenuReturnToAgency(): void {
     return;
   }
 
-  // --- Mid-flight abort: warn about lost parts ---
+  // --- Mid-flight: warn before abort, but reword when missions are ready to turn in ---
   if (ps && !ps.landed && !ps.crashed) {
     s.preMenuTimeWarp = s.timeWarp;
     s.timeWarp = 0;
+
+    const missionsReady = s.state ? getMissionsReadyToTurnIn(s.state) : [];
+    const hasMissionsReady = missionsReady.length > 0;
 
     // Calculate total cost of active parts at risk.
     let totalCost = 0;
@@ -370,6 +374,7 @@ export function handleMenuReturnToAgency(): void {
         if (def) totalCost += def.cost ?? 0;
       }
     }
+    const costStr: string = '$' + Math.round(totalCost).toLocaleString('en-US');
 
     const host: HTMLElement = document.getElementById('ui-overlay') ?? document.body;
     const backdrop: HTMLDivElement = document.createElement('div');
@@ -380,7 +385,7 @@ export function handleMenuReturnToAgency(): void {
     modal.className = 'topbar-modal';
     modal.setAttribute('role', 'alertdialog');
     modal.setAttribute('aria-modal', 'true');
-    modal.setAttribute('aria-label', 'Abort Flight');
+    modal.setAttribute('aria-label', hasMissionsReady ? 'Return to Agency' : 'Abort Flight');
     _addTracked(modal, 'click', (e: Event) => e.stopPropagation());
 
     // Title
@@ -388,24 +393,58 @@ export function handleMenuReturnToAgency(): void {
     titleRow.className = 'topbar-modal-title-row';
     const h2: HTMLHeadingElement = document.createElement('h2');
     h2.className = 'topbar-modal-title';
-    h2.textContent = 'Abort Flight?';
+    h2.textContent = hasMissionsReady ? 'Return to Agency?' : 'Abort Flight?';
     titleRow.appendChild(h2);
     modal.appendChild(titleRow);
 
-    // Message
-    const msg: HTMLParagraphElement = document.createElement('p');
-    msg.className = 'confirm-msg';
-    const costStr: string = '$' + Math.round(totalCost).toLocaleString('en-US');
-    msg.textContent =
-      'Your rocket is still in flight. Returning now means no parts will be recovered.';
-    modal.appendChild(msg);
+    if (hasMissionsReady) {
+      // Lead paragraph summarising what's about to be turned in.
+      const lead: HTMLParagraphElement = document.createElement('p');
+      lead.className = 'confirm-msg';
+      lead.textContent = missionsReady.length === 1
+        ? 'You’re returning with a completed mission.'
+        : 'You’re returning with completed missions.';
+      modal.appendChild(lead);
 
-    const costLine: HTMLParagraphElement = document.createElement('p');
-    costLine.className = 'confirm-msg';
-    costLine.style.fontWeight = '600';
-    costLine.style.marginTop = '-12px';
-    costLine.textContent = `Parts at risk: ${costStr}`;
-    modal.appendChild(costLine);
+      // Per-mission reward summary.
+      const list: HTMLUListElement = document.createElement('ul');
+      list.className = 'abort-missions-list';
+      list.dataset.testid = 'abort-missions-list';
+      for (const mission of missionsReady) {
+        const li: HTMLLIElement = document.createElement('li');
+        const rewardParts: string[] = [];
+        if (mission.reward > 0) {
+          rewardParts.push('$' + Math.round(mission.reward).toLocaleString('en-US'));
+        }
+        const unlockCount = mission.unlockedParts ? mission.unlockedParts.length : 0;
+        if (unlockCount > 0) {
+          rewardParts.push(`${unlockCount} part${unlockCount === 1 ? '' : 's'} unlocked`);
+        }
+        const rewardStr = rewardParts.length > 0 ? ` — ${rewardParts.join(', ')}` : '';
+        li.textContent = mission.title + rewardStr;
+        list.appendChild(li);
+      }
+      modal.appendChild(list);
+
+      // Trailing warning about the rest of the craft.
+      const warn: HTMLParagraphElement = document.createElement('p');
+      warn.className = 'confirm-msg';
+      warn.textContent = `The rest of your craft is still in flight — parts at risk: ${costStr}.`;
+      modal.appendChild(warn);
+    } else {
+      const msg: HTMLParagraphElement = document.createElement('p');
+      msg.className = 'confirm-msg';
+      msg.textContent =
+        'Your rocket is still in flight. Returning now means no parts will be recovered.';
+      modal.appendChild(msg);
+
+      const costLine: HTMLParagraphElement = document.createElement('p');
+      costLine.className = 'confirm-msg';
+      costLine.style.fontWeight = '600';
+      costLine.style.marginTop = '-12px';
+      costLine.textContent = `Parts at risk: ${costStr}`;
+      modal.appendChild(costLine);
+    }
 
     // Buttons
     const btnRow: HTMLDivElement = document.createElement('div');
@@ -420,17 +459,18 @@ export function handleMenuReturnToAgency(): void {
       backdrop.remove();
     });
 
-    const abortBtn: HTMLButtonElement = document.createElement('button');
-    abortBtn.className = 'confirm-btn confirm-btn-danger';
-    abortBtn.textContent = 'Abort & Return';
-    abortBtn.dataset.testid = 'abort-confirm-btn';
-    _addTracked(abortBtn, 'click', () => {
+    const confirmBtn: HTMLButtonElement = document.createElement('button');
+    confirmBtn.className =
+      'confirm-btn ' + (hasMissionsReady ? 'confirm-btn-primary' : 'confirm-btn-danger');
+    confirmBtn.textContent = hasMissionsReady ? 'Return to Agency' : 'Abort & Return';
+    confirmBtn.dataset.testid = 'abort-confirm-btn';
+    _addTracked(confirmBtn, 'click', () => {
       backdrop.remove();
       handleAbortReturnToAgency();
     });
 
     btnRow.appendChild(continueBtn);
-    btnRow.appendChild(abortBtn);
+    btnRow.appendChild(confirmBtn);
     modal.appendChild(btnRow);
 
     _addTracked(backdrop, 'click', () => {
@@ -457,15 +497,35 @@ function _handleReturnToAgency(): void {
 }
 
 /**
- * Handle abort: skip the post-flight summary and return directly to the hub.
+ * Handle the confirm-button click on the mid-flight return modal.
+ *
+ * When any accepted mission has all required objectives complete, route
+ * through the normal post-flight summary so the player sees the mission
+ * outcomes, reward breakdown, and (on summary dismiss) the standard
+ * unlock-parts notification. This is the same flow a successful landing
+ * takes — and it's what fixes the reported "parts don't trigger" issue,
+ * since the unlock-notification call lives on the summary path.
+ *
+ * When no missions are ready, skip the summary and process the flight
+ * return directly. Aborting a failed/abandoned flight shouldn't force the
+ * player through a celebratory summary screen.
  */
 export function handleAbortReturnToAgency(): void {
   const s = getFCState();
   if (s.summaryShown) return;
+
+  // If any missions would be turned in, route through the summary — its
+  // "Return to Space Agency" button already handles processFlightReturn and
+  // showUnlockNotification.
+  const state = s.state;
+  if (state && getMissionsReadyToTurnIn(state).length > 0) {
+    _handleReturnToAgency();
+    return;
+  }
+
   s.summaryShown = true;
 
   // Capture references before stopFlightScene nulls them.
-  const state       = s.state;
   const flightState = getFlightState();
   const ps          = getPhysicsState();
   const assembly    = s.assembly;

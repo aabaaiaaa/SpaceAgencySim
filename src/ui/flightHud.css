@@ -286,6 +286,42 @@
   overflow-y: auto;
 }
 
+.hud-obj-return-btn {
+  display: block;
+  width: 100%;
+  background: rgba(32, 96, 40, 0.88);
+  border: 1px solid #40a060;
+  color: #d8ffe0;
+  font-family: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.hud-obj-return-btn:hover {
+  background: rgba(48, 120, 56, 0.92);
+  border-color: #60c478;
+}
+
+.hud-obj-return-btn:active {
+  background: rgba(64, 144, 72, 0.96);
+}
+
+.hud-obj-return-btn:focus-visible {
+  outline: 2px solid #80e098;
+  outline-offset: 1px;
+}
+
+.hud-obj-return-btn[hidden] {
+  display: none;
+}
+
 .hud-obj-mission-title {
   font-size: 9px;
   color: #40c070;

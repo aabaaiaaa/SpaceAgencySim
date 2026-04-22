@@ -46,7 +46,9 @@ import { getBiome } from '../core/biomes.ts';
 import { getAvailableSurfaceActions } from '../core/surfaceOps.ts';
 import './flightHud.css';
 import { markThrottleDirty } from './flightController/_loop.ts';
+import { handleMenuReturnToAgency } from './flightController/_menuActions.ts';
 import { setThrottleInstant } from '../core/throttleControl.ts';
+import { getMissionsReadyToTurnIn } from '../core/missions.ts';
 import { createListenerTracker, type ListenerTracker } from './listenerTracker.ts';
 import {
   G0,
@@ -113,6 +115,7 @@ let _elApo: HTMLElement | null = null;            // left-panel apoapsis (id: hu
 let _elStagingList: HTMLElement | null = null;    // left-panel staging container
 let _elFuelList: HTMLElement | null = null;       // left-panel fuel list
 let _elObjList: HTMLElement | null = null;        // objectives panel (top-right, unchanged)
+let _elReturnBtn: HTMLButtonElement | null = null; // "Return to Agency" shortcut at top of objectives panel
 let _elLaunchTip: HTMLElement | null = null;      // launch pad "press space" tip
 
 // Altitude tape elements:
@@ -252,6 +255,7 @@ export function destroyFlightHud(): void {
   _elBandWarning   = null;
   _elBiome         = null;
   _elObjList       = null;
+  _elReturnBtn     = null;
   _elLaunchTip     = null;
 
   _elAltTape       = null;
@@ -622,6 +626,19 @@ function _buildLeftPanel(): void {
 function _buildObjectivesPanel(): void {
   const panel = document.createElement('div');
   panel.id = 'flight-hud-objectives';
+
+  _elReturnBtn = document.createElement('button') as HTMLButtonElement;
+  _elReturnBtn.id = 'flight-hud-return-btn';
+  _elReturnBtn.className = 'hud-obj-return-btn';
+  _elReturnBtn.type = 'button';
+  _elReturnBtn.textContent = 'Return to Agency';
+  _elReturnBtn.hidden = true;
+  _elReturnBtn.dataset.testid = 'hud-return-btn';
+  _elReturnBtn.setAttribute('aria-label', 'Return to Agency to turn in completed missions');
+  _listeners?.add(_elReturnBtn, 'click', () => {
+    handleMenuReturnToAgency();
+  });
+  panel.appendChild(_elReturnBtn);
 
   _elObjList = document.createElement('div');
   _elObjList.id = 'flight-hud-obj-list';
@@ -1194,6 +1211,13 @@ function _updateObjectivesPanel(): void {
   ).join('|');
   if (_elObjList.dataset.fp === fingerprint) return; // Nothing changed — skip.
   _elObjList.dataset.fp = fingerprint;
+
+  // Toggle the "Return to Agency" shortcut button. The fingerprint captures
+  // objective-completion bits, so this runs only when completion state changes.
+  if (_elReturnBtn) {
+    const ready = getMissionsReadyToTurnIn(_state).length > 0;
+    _elReturnBtn.hidden = !ready;
+  }
 
   _elObjList.innerHTML = '';
   for (const mission of missions) {

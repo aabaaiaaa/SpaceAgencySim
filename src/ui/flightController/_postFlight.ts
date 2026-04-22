@@ -8,6 +8,7 @@
 import { getPartById } from '../../data/parts.ts';
 import { PartType, DEATH_FINE_PER_ASTRONAUT } from '../../core/constants.ts';
 import { processFlightReturn } from '../../core/flightReturn.ts';
+import { canTurnInMission } from '../../core/missions.ts';
 import { createFlightState } from '../../core/gameState.ts';
 import { getSurfaceHubsForRecovery } from '../../core/hubs.ts';
 import { refreshTopBar } from '../topbar.ts';
@@ -269,7 +270,7 @@ export function showPostFlightSummary(
       section.appendChild(objList);
 
       // Show reward info if all required objectives are completed.
-      const requiredComplete: boolean = missionObjectives!.filter((o) => !o.optional).every((o) => o.completed);
+      const requiredComplete: boolean = canTurnInMission(mission);
       if (requiredComplete && mission.reward > 0) {
         // Calculate total reward including bonus objectives.
         let totalReward = mission.reward;

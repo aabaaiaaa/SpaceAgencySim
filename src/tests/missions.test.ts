@@ -9,6 +9,8 @@ import {
   getUnlockedMissions,
   getUnlockedParts,
   checkObjectiveCompletion,
+  canTurnInMission,
+  getMissionsReadyToTurnIn,
 } from '../core/missions.ts';
 import { processFlightReturn } from '../core/flightReturn.ts';
 import { MISSIONS, ObjectiveType, MissionStatus, rebuildMissionsIndex } from '../data/missions.ts';
@@ -2116,5 +2118,115 @@ describe('checkObjectiveCompletion() — MULTI_SATELLITE', () => {
     });
     checkObjectiveCompletion(state, fs);
     expect(state.missions.accepted[0].objectives![0].completed).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// canTurnInMission() / getMissionsReadyToTurnIn()
+// ---------------------------------------------------------------------------
+
+describe('canTurnInMission()', () => {
+  it('returns false when objectives is undefined @smoke', () => {
+    const stub = makeCompletedStub('m-none');
+    stub.objectives = undefined;
+    expect(canTurnInMission(stub)).toBe(false);
+  });
+
+  it('returns false when objectives array is empty', () => {
+    const stub = makeCompletedStub('m-empty');
+    stub.objectives = [];
+    expect(canTurnInMission(stub)).toBe(false);
+  });
+
+  it('returns false when a single required objective is incomplete', () => {
+    const stub = makeCompletedStub('m-single-incomplete');
+    stub.objectives = [
+      { id: 'o1', type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 100 }, completed: false, description: 'climb' },
+    ];
+    expect(canTurnInMission(stub)).toBe(false);
+  });
+
+  it('returns true when a single required objective is complete @smoke', () => {
+    const stub = makeCompletedStub('m-single-complete');
+    stub.objectives = [
+      { id: 'o1', type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 100 }, completed: true, description: 'climb' },
+    ];
+    expect(canTurnInMission(stub)).toBe(true);
+  });
+
+  it('returns true when required complete but an optional objective is incomplete', () => {
+    const stub = makeCompletedStub('m-mixed');
+    stub.objectives = [
+      { id: 'r1', type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 100 }, completed: true, description: 'climb' },
+      { id: 'b1', type: ObjectiveType.REACH_SPEED, target: { speed: 500 }, completed: false, description: 'bonus', optional: true },
+    ];
+    expect(canTurnInMission(stub)).toBe(true);
+  });
+
+  it('returns false when any required objective is incomplete even if optional is complete', () => {
+    const stub = makeCompletedStub('m-req-missing');
+    stub.objectives = [
+      { id: 'r1', type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 100 }, completed: false, description: 'climb' },
+      { id: 'b1', type: ObjectiveType.REACH_SPEED, target: { speed: 500 }, completed: true, description: 'bonus', optional: true },
+    ];
+    expect(canTurnInMission(stub)).toBe(false);
+  });
+
+  it('returns true when all objectives (required and optional) are complete', () => {
+    const stub = makeCompletedStub('m-all');
+    stub.objectives = [
+      { id: 'r1', type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 100 }, completed: true, description: 'climb' },
+      { id: 'b1', type: ObjectiveType.REACH_SPEED, target: { speed: 500 }, completed: true, description: 'bonus', optional: true },
+    ];
+    expect(canTurnInMission(stub)).toBe(true);
+  });
+});
+
+describe('getMissionsReadyToTurnIn()', () => {
+  let state: GameState;
+
+  beforeEach(() => {
+    state = freshState();
+  });
+
+  it('returns empty when no missions are accepted', () => {
+    expect(getMissionsReadyToTurnIn(state)).toEqual([]);
+  });
+
+  it('returns only missions whose required objectives are all complete @smoke', () => {
+    const ready = makeCompletedStub('m-ready');
+    ready.state = MissionState.ACCEPTED;
+    ready.objectives = [
+      { id: 'o1', type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 100 }, completed: true, description: 'done' },
+    ];
+
+    const notReady = makeCompletedStub('m-not-ready');
+    notReady.state = MissionState.ACCEPTED;
+    notReady.objectives = [
+      { id: 'o1', type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 100 }, completed: false, description: 'pending' },
+    ];
+
+    state.missions.accepted = [notReady, ready];
+    const result = getMissionsReadyToTurnIn(state);
+    expect(result.map((m) => m.id)).toEqual(['m-ready']);
+  });
+
+  it('preserves accepted-array order when multiple are ready', () => {
+    const a = makeCompletedStub('m-a');
+    a.objectives = [{ id: 'o', type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 1 }, completed: true, description: '' }];
+    const b = makeCompletedStub('m-b');
+    b.objectives = [{ id: 'o', type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 1 }, completed: true, description: '' }];
+    const c = makeCompletedStub('m-c');
+    c.objectives = [{ id: 'o', type: ObjectiveType.REACH_ALTITUDE, target: { altitude: 1 }, completed: true, description: '' }];
+
+    state.missions.accepted = [a, b, c];
+    expect(getMissionsReadyToTurnIn(state).map((m) => m.id)).toEqual(['m-a', 'm-b', 'm-c']);
+  });
+
+  it('ignores missions without objectives', () => {
+    const noObjectives = makeCompletedStub('m-no-objs');
+    noObjectives.objectives = [];
+    state.missions.accepted = [noObjectives];
+    expect(getMissionsReadyToTurnIn(state)).toEqual([]);
   });
 });

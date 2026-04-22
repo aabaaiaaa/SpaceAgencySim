@@ -440,6 +440,23 @@
   margin-bottom: 22px;
   line-height: 1.55;
 }
+.abort-missions-list {
+  list-style: none;
+  padding: 0;
+  margin: -10px 0 18px 0;
+  border: 1px solid rgba(64, 160, 96, 0.4);
+  border-radius: var(--radius-sm);
+  background: rgba(32, 80, 48, 0.22);
+}
+.abort-missions-list li {
+  font-size: 0.88rem;
+  color: #c8e8d4;
+  padding: 7px 12px;
+  line-height: 1.45;
+}
+.abort-missions-list li + li {
+  border-top: 1px solid rgba(64, 160, 96, 0.25);
+}
 .confirm-btn-row {
   display: flex;
   gap: 10px;

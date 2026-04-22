@@ -38,7 +38,7 @@ import { getTechTreeUnlockedParts } from './techtree.ts';
 import { awardFacility } from './construction.ts';
 import { MissionState } from './constants.ts';
 
-import type { GameState, FlightState, MissionInstance, FlightEvent } from './gameState.ts';
+import type { GameState, FlightState, Mission, MissionInstance, FlightEvent } from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -368,6 +368,30 @@ export function completeMission(state: GameState, id: string): CompleteMissionRe
     awardedFacility,
     newlyUnlockedMissions,
   };
+}
+
+/**
+ * Returns true if all required (non-optional) objectives of a mission are
+ * satisfied — i.e. the mission is ready to be turned in on return to the hub.
+ *
+ * A mission with no `objectives` array, or an empty one, is never turn-in
+ * ready. Optional objectives are ignored; a mission with required objectives
+ * fully complete but optional objectives incomplete IS considered ready.
+ */
+export function canTurnInMission(mission: Mission): boolean {
+  const objectives = mission.objectives;
+  if (!Array.isArray(objectives) || objectives.length === 0) return false;
+  return objectives.filter((obj) => !obj.optional).every((obj) => obj.completed);
+}
+
+/**
+ * Returns the subset of `state.missions.accepted` whose required objectives
+ * are all complete — the missions that would be turned in if the player
+ * returned to the hub right now. Order preserves the `accepted` array order.
+ */
+export function getMissionsReadyToTurnIn(state: GameState): MissionInstance[] {
+  const accepted = state.missions?.accepted ?? [];
+  return accepted.filter((m) => canTurnInMission(m));
 }
 
 // ---------------------------------------------------------------------------

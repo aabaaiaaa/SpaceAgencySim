@@ -19,7 +19,7 @@
  * @module core/flightReturn
  */
 
-import { completeMission } from './missions.ts';
+import { completeMission, canTurnInMission } from './missions.ts';
 import { earn, applyInterest, applyDeathFine } from './finance.ts';
 import { advancePeriod } from './period.ts';
 import { initWeather } from './weather.ts';
@@ -110,8 +110,7 @@ export function processFlightReturn(state: GameState, flightState: FlightState, 
   // -- 1-3. Mission completion --
   const acceptedSnapshot = [...(state.missions?.accepted ?? [])];
   for (const mission of acceptedSnapshot) {
-    const allObjectivesMet = Array.isArray(mission.objectives) && mission.objectives.length > 0 && mission.objectives.filter((obj) => !obj.optional).every((obj) => obj.completed);
-    if (allObjectivesMet) {
+    if (canTurnInMission(mission)) {
       const result: CompleteMissionResult = completeMission(state, mission.id);
       if (result.success) completedMissions.push({ mission: result.mission!, reward: result.reward!, unlockedParts: result.unlockedParts!, newlyAvailableMissions: result.newlyUnlockedMissions! });
     }
