@@ -344,17 +344,6 @@
   line-height: 1.5;
   vertical-align: middle;
 }
-.vab-part-cost-free {
-  color: #50c860;
-  font-weight: 700;
-}
-.vab-part-cost-orig {
-  text-decoration: line-through;
-  color: #365474;
-  margin-left: 3px;
-  font-size: 8px;
-}
-
 /* ── Inventory panel ────────────────────────────────────────────────── */
 .vab-inv-body {
   overflow-y: auto;
@@ -377,7 +366,31 @@
   color: #3a6848;
   border-bottom: 1px solid #0e1e30;
 }
+.vab-inv-group-toggle {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+  transition: background .08s, color .08s;
+}
+.vab-inv-group-toggle:hover {
+  background: rgba(14, 38, 74, 0.35);
+  color: #70b080;
+}
+.vab-inv-group-arrow {
+  display: inline-block;
+  width: 10px;
+  color: #4a6a8a;
+}
+.vab-inv-group-count {
+  color: #4a6a8a;
+  font-weight: 500;
+}
 .vab-inv-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   padding: 5px 10px;
   border-bottom: 1px solid rgba(14, 30, 48, 0.5);
   transition: background .08s;
@@ -385,18 +398,36 @@
 .vab-inv-item:hover {
   background: rgba(14, 38, 74, 0.35);
 }
+.vab-inv-row-drag {
+  flex: 1;
+  min-width: 0;
+  cursor: grab;
+  padding: 2px 0;
+  touch-action: none;
+}
+.vab-inv-row-drag:active {
+  cursor: grabbing;
+}
+.vab-inv-row-name {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  color: #9ab8d0;
+  margin-bottom: 2px;
+}
 .vab-inv-item-info {
   display: flex;
   gap: 8px;
   font-size: 10px;
-  margin-bottom: 4px;
 }
 .vab-inv-wear { font-weight: 700; }
 .vab-inv-flights { color: #4a6a8a; }
 .vab-inv-rel { color: #6080a0; }
 .vab-inv-item-actions {
   display: flex;
-  gap: 4px;
+  flex-direction: column;
+  gap: 3px;
+  flex-shrink: 0;
 }
 .vab-inv-btn {
   background: rgba(12, 26, 54, 0.92);
@@ -548,6 +579,14 @@
 }
 .vab-side-panel[hidden] {
   display: none;
+}
+
+/* Inventory panel docks to the right, immediately left of the parts panel. */
+#vab-inventory-panel {
+  left: auto;
+  border-right: none;
+  border-left: 1px solid #162c48;
+  box-shadow: -6px 0 28px rgba(0,0,0,.75);
 }
 
 .vab-side-hdr {

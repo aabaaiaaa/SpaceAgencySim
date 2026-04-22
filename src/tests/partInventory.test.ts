@@ -26,6 +26,7 @@ import {
   scrapPart,
   useInventoryPart,
   recoverPartsToInventory,
+  computeAssemblyCashCost,
 } from '../core/partInventory.ts';
 import {
   PartType,
@@ -387,5 +388,60 @@ describe('wear constants', () => {
 
   it('scrap value is less than refurbish cost', () => {
     expect(SCRAP_VALUE_FRACTION).toBeLessThan(REFURBISH_COST_FRACTION);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// computeAssemblyCashCost
+// ---------------------------------------------------------------------------
+
+describe('computeAssemblyCashCost', () => {
+  it('sums def.cost across all placed parts when none are from inventory', () => {
+    const assembly = createRocketAssembly();
+    const cmdId  = addPartToAssembly(assembly, 'cmd-mk1', 0, 0);
+    const tankId = addPartToAssembly(assembly, 'tank-small', 0, -40);
+
+    const total = computeAssemblyCashCost(assembly, new Set());
+
+    const expected = getPartById('cmd-mk1')!.cost + getPartById('tank-small')!.cost;
+    expect(total).toBe(expected);
+    // Guard against future part-catalog shifts making this a tautology:
+    expect(cmdId).not.toBe(tankId);
+  });
+
+  it('excludes parts whose instanceIds are in the inventory-sourced set', () => {
+    const assembly = createRocketAssembly();
+    const cmdId  = addPartToAssembly(assembly, 'cmd-mk1', 0, 0);
+    const tankId = addPartToAssembly(assembly, 'tank-small', 0, -40);
+
+    const total = computeAssemblyCashCost(assembly, new Set([tankId]));
+
+    expect(total).toBe(getPartById('cmd-mk1')!.cost);
+    expect(cmdId).not.toBe(tankId);
+  });
+
+  it('returns 0 for an empty assembly', () => {
+    const assembly = createRocketAssembly();
+    expect(computeAssemblyCashCost(assembly, new Set())).toBe(0);
+  });
+
+  it('returns 0 when every placed part is inventory-sourced', () => {
+    const assembly = createRocketAssembly();
+    const cmdId  = addPartToAssembly(assembly, 'cmd-mk1', 0, 0);
+    const tankId = addPartToAssembly(assembly, 'tank-small', 0, -40);
+
+    const total = computeAssemblyCashCost(assembly, new Set([cmdId, tankId]));
+
+    expect(total).toBe(0);
+  });
+
+  it('treats unknown part IDs as cost 0', () => {
+    const assembly = createRocketAssembly();
+    addPartToAssembly(assembly, 'cmd-mk1', 0, 0);
+    addPartToAssembly(assembly, 'no-such-part', 0, -40);
+
+    const total = computeAssemblyCashCost(assembly, new Set());
+
+    expect(total).toBe(getPartById('cmd-mk1')!.cost);
   });
 });

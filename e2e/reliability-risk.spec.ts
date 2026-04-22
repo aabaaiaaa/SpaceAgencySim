@@ -794,21 +794,23 @@ test.describe('VAB inventory tab — refurbish and scrap', () => {
         { id: 'inv-tank-a', partId: 'tank-small', wear: 10, flights: 1 },
       ];
     });
-  });
 
-  test('(1) inventory button opens inventory panel in VAB', async ({ page }) => {
     await navigateToVab(page);
-
-    // Click inventory button
     await page.click('#vab-btn-inventory');
     await expect(page.locator('#vab-inventory-panel')).toBeVisible({ timeout: 5_000 });
   });
 
+  test('(1) inventory button opens inventory panel in VAB', async ({ page }) => {
+    await expect(page.locator('#vab-inventory-panel')).toBeVisible({ timeout: 5_000 });
+  });
+
   test('(2) inventory items display wear and effective reliability', async ({ page }) => {
-    // Check that inventory items are rendered with wear info
+    // Expand the multi-copy engine group so its individual entries are visible.
+    await page.click('.vab-inv-group-toggle[data-part-id="engine-spark"]');
+
+    // After expansion, both engine entries plus the solo tank row are visible.
     const items = page.locator('.vab-inv-item');
-    const count = await items.count();
-    expect(count).toBeGreaterThanOrEqual(2); // At least 2 engine entries
+    await expect(items).toHaveCount(3, { timeout: 3_000 });
 
     // Check that wear percentage is shown
     const wearText = await page.locator('.vab-inv-wear').first().textContent();
@@ -820,11 +822,13 @@ test.describe('VAB inventory tab — refurbish and scrap', () => {
   });
 
   test('(3) refurbish button resets wear to 10% and deducts cost', async ({ page }) => {
+    await page.click('.vab-inv-group-toggle[data-part-id="engine-spark"]');
+
     const gsBefore = await getGameState(page) as GameStateSnapshot;
     const moneyBefore = gsBefore.money;
 
-    // Click refurbish on the first inventory item
-    const refurbBtn = page.locator('.vab-inv-btn-refurb').first();
+    // Click refurbish on the first engine inventory item.
+    const refurbBtn = page.locator('.vab-inv-item[data-inv-id="inv-eng-a"] .vab-inv-btn-refurb');
     await expect(refurbBtn).toBeVisible({ timeout: 3_000 });
     await refurbBtn.click();
 
@@ -847,12 +851,14 @@ test.describe('VAB inventory tab — refurbish and scrap', () => {
   });
 
   test('(4) scrap button removes part and adds money', async ({ page }) => {
+    await page.click('.vab-inv-group-toggle[data-part-id="engine-spark"]');
+
     const gsBefore = await getGameState(page) as GameStateSnapshot;
     const moneyBefore = gsBefore.money;
     const invCountBefore = gsBefore.partInventory.length;
 
-    // Click scrap on the first remaining inventory item
-    const scrapBtn = page.locator('.vab-inv-btn-scrap').first();
+    // Click scrap on the first engine inventory item.
+    const scrapBtn = page.locator('.vab-inv-item[data-inv-id="inv-eng-a"] .vab-inv-btn-scrap');
     await expect(scrapBtn).toBeVisible({ timeout: 3_000 });
     await scrapBtn.click();
 

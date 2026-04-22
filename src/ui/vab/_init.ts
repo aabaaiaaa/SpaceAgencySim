@@ -41,8 +41,9 @@ import {
   updateOffscreenIndicators,
   setCanvasCallbacks,
   startDrag,
+  startInventoryDrag,
 } from './_canvasInteraction.ts';
-import { refundOrReturnPart } from './_inventory.ts';
+import { refundOrReturnPart, setupInventoryPanelDrag } from './_inventory.ts';
 import { renderStagingPanel, setupStagingDnD, syncAndRenderStaging, setStagingCallbacks } from './_staging.ts';
 import { renderEngineerPanel, runAndRenderValidation as rawRunAndRenderValidation } from './_engineerPanel.ts';
 import {
@@ -353,6 +354,10 @@ export function initVabUI(
   const partsPanel = root.querySelector('#vab-parts-panel') as HTMLElement;
   setupPanelDrag(partsPanel, startDrag);
 
+  // ── Inventory panel drag (inventory copy → canvas) ───────────────────────
+  const invPanel = root.querySelector('#vab-inventory-panel') as HTMLElement | null;
+  if (invPanel) setupInventoryPanelDrag(invPanel, startInventoryDrag);
+
   // ── Context menu ─────────────────────────────────────────────────────────
   initContextMenu();
 
@@ -389,6 +394,7 @@ export function resetVabUI(): void {
   S.selectedInstanceId = null;
   S.lastValidation   = null;
   S.inventoryUsedParts.clear();
+  S.expandedInventoryGroups.clear();
   if (S.gameState) {
     S.gameState.vabAssembly     = null;
     S.gameState.vabStagingConfig = null;

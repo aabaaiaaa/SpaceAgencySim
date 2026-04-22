@@ -13,12 +13,18 @@ import type { ValidationResult } from '../../core/rocketvalidator.ts';
 /** The panel width for each side panel. */
 export const SIDE_PANEL_WIDTH: number = 300;
 
+/** The parts panel width (must match #vab-parts-panel in vab.css). */
+export const PARTS_PANEL_WIDTH: number = 280;
+
 export interface VabDragState {
   partId: string;
   instanceId: string | null;
   startX: number;
   startY: number;
   hasMoved: boolean;
+  /** If set, drag originated from the inventory panel and will consume this
+   *  specific inventory entry on drop (instead of buying a new part). */
+  inventoryEntryId?: string;
 }
 
 export interface VabPendingPickup {
@@ -45,6 +51,7 @@ export interface VabState {
   currentDesignName: string;
   openPanels: Set<string>;
   inventoryUsedParts: Map<string, InventoryPart>;
+  expandedInventoryGroups: Set<string>;
   canvasArea: HTMLElement | null;
   pendingPickup: VabPendingPickup | null;
   scaleTicks: HTMLElement | null;
@@ -68,8 +75,9 @@ const _state: VabState = {
   selectedInstanceId:  null,
   currentDesignId:     null,
   currentDesignName:   '',
-  openPanels:          new Set(),
-  inventoryUsedParts:  new Map(),
+  openPanels:              new Set(),
+  inventoryUsedParts:      new Map(),
+  expandedInventoryGroups: new Set(),
   canvasArea:          null,
   pendingPickup:       null,
   scaleTicks:          null,
@@ -110,8 +118,9 @@ export function resetVabState(): void {
   _state.selectedInstanceId  = null;
   _state.currentDesignId     = null;
   _state.currentDesignName   = '';
-  _state.openPanels          = new Set();
-  _state.inventoryUsedParts  = new Map();
+  _state.openPanels              = new Set();
+  _state.inventoryUsedParts      = new Map();
+  _state.expandedInventoryGroups = new Set();
   _state.canvasArea          = null;
   _state.pendingPickup       = null;
   _state.scaleTicks          = null;

@@ -38,9 +38,10 @@ import {
   autoStageNewPart,
 } from '../../core/rocketbuilder.ts';
 import type { PlacedPart, PartConnection } from '../../core/rocketbuilder.ts';
+import { removeFromInventory } from '../../core/partInventory.ts';
+import type { InventoryPart } from '../../core/gameState.ts';
 import { FacilityId, VAB_MAX_PARTS } from '../../core/constants.ts';
 import { getFacilityTier } from '../../core/construction.ts';
-import { useInventoryPart } from '../../core/partInventory.ts';
 import { getRocketBounds } from '../../core/rocketvalidator.ts';
 import { refreshTopBar } from '../topbar.ts';
 import { getVabState } from './_state.ts';
@@ -405,6 +406,20 @@ export function startDrag(partId: string, instanceId: string | null, clientX: nu
 }
 
 /**
+ * Begin dragging a specific inventory entry from the inventory panel.
+ * On drop, that inventory entry is consumed (free) instead of buying new.
+ */
+export function startInventoryDrag(partId: string, inventoryEntryId: string, clientX: number, clientY: number): void {
+  const S = getVabState();
+  S.dragState = { partId, instanceId: null, startX: clientX, startY: clientY, hasMoved: false, inventoryEntryId };
+  const tracker = getVabListenerTracker();
+  if (!tracker) throw new Error('VAB listener tracker not initialised');
+  tracker.add(window, 'pointermove',   onDragMove   as EventListener, { capture: true });
+  tracker.add(window, 'pointerup',     onDragEnd    as EventListener, { capture: true });
+  tracker.add(window, 'pointercancel', cancelDrag   as EventListener, { capture: true });
+}
+
+/**
  * Cancel an in-progress drag.
  */
 function cancelDrag(): void {
@@ -480,7 +495,7 @@ function onDragEnd(e: PointerEvent): void {
   window.removeEventListener('pointerup',    onDragEnd,   { capture: true });
   window.removeEventListener('pointercancel', cancelDrag, { capture: true });
 
-  const { partId, instanceId, hasMoved } = S.dragState;
+  const { partId, instanceId, hasMoved, inventoryEntryId } = S.dragState;
   S.dragState = null;
 
   vabClearDragGhost();
@@ -588,17 +603,10 @@ function onDragEnd(e: PointerEvent): void {
           autoStageNewPart(S.assembly!, S.stagingConfig!, mirrorId);
           _renderStagingPanelFn();
           _runAndRenderValidationFn();
-          // Deduct cost for the mirror copy (or use inventory).
+          // Auto-created mirror always buys new.
           const def = getPartById(partId);
           if (def && S.gameState) {
-            const mirrorInv = useInventoryPart(S.gameState, partId);
-            if (mirrorInv) {
-              S.inventoryUsedParts.set(mirrorId, mirrorInv);
-              const mirrorPlaced = S.assembly!.parts.get(mirrorId);
-              if (mirrorPlaced) (mirrorPlaced as PlacedPart & { _fromInventory?: boolean })._fromInventory = true;
-            } else {
-              S.gameState.money -= def.cost;
-            }
+            S.gameState.money -= def.cost;
             refreshTopBar();
           }
         }
@@ -629,22 +637,20 @@ function onDragEnd(e: PointerEvent): void {
     const stagingBefore = snapshotStaging();
     const moneyBefore = S.gameState ? S.gameState.money : 0;
 
-    // New part from the panel — use inventory (free) or buy new (deduct cost).
+    // New part from the parts panel always buys new. If dragged from the
+    // inventory panel, consume that specific entry (free) instead.
     const def = getPartById(partId);
-    let invPart = null as ReturnType<typeof useInventoryPart>;
-    if (def && S.gameState) {
-      invPart = useInventoryPart(S.gameState, partId);
-      if (!invPart) {
-        S.gameState.money -= def.cost;
-      }
-      refreshTopBar();
+    let invPart: InventoryPart | null = null;
+    if (inventoryEntryId && S.gameState) {
+      invPart = removeFromInventory(S.gameState, inventoryEntryId);
     }
+    if (def && S.gameState && !invPart) {
+      S.gameState.money -= def.cost;
+    }
+    refreshTopBar();
     const newId = addPartToAssembly(S.assembly!, partId, finalX, finalY);
-    // Track inventory-sourced part.
     if (invPart) {
       S.inventoryUsedParts.set(newId, invPart);
-      const placed = S.assembly!.parts.get(newId);
-      if (placed) (placed as PlacedPart & { _fromInventory?: boolean })._fromInventory = true;
     }
     if (bestCandidate) {
       connectParts(
@@ -670,16 +676,10 @@ function onDragEnd(e: PointerEvent): void {
             bestCandidate.targetInstanceId,    mirror.mirrorTargetSnapIndex,
           );
           addSymmetryPair(S.assembly!, newId, mirrorId);
-          // Deduct cost for the mirror copy (or use inventory).
+          // Auto-created mirror always buys new; player can drag a second
+          // inventory copy from the inventory panel if they want.
           if (def && S.gameState) {
-            const mirrorInv = useInventoryPart(S.gameState, partId);
-            if (mirrorInv) {
-              S.inventoryUsedParts.set(mirrorId, mirrorInv);
-              const mirrorPlaced = S.assembly!.parts.get(mirrorId);
-              if (mirrorPlaced) (mirrorPlaced as PlacedPart & { _fromInventory?: boolean })._fromInventory = true;
-            } else {
-              S.gameState.money -= def.cost;
-            }
+            S.gameState.money -= def.cost;
             refreshTopBar();
           }
         }

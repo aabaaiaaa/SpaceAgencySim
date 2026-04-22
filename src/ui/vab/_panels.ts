@@ -27,12 +27,13 @@ import {
 import {
   refurbishPart,
   scrapPart,
+  computeAssemblyCashCost,
 } from '../../core/partInventory.ts';
 import { refreshTopBar } from '../topbar.ts';
-import { getVabState, SIDE_PANEL_WIDTH } from './_state.ts';
+import { getVabState, SIDE_PANEL_WIDTH, PARTS_PANEL_WIDTH } from './_state.ts';
 import { fmt$ } from './_partsPanel.ts';
 import { drawScaleTicks, updateScaleBarExtents } from './_scalebar.ts';
-import { renderInventoryPanel, refreshInventoryPanel, refundOrReturnPart } from './_inventory.ts';
+import { renderInventoryPanel, refreshInventoryPanel, refundOrReturnPart, toggleInventoryGroup } from './_inventory.ts';
 import {
   setSelectedPart,
   updateOffscreenIndicators,
@@ -118,11 +119,8 @@ export function updateStatusBar(): void {
   if (!partsEl || !costEl || !S.assembly) return;
 
   const count = S.assembly.parts.size;
-  let totalCost = 0;
-  for (const placed of S.assembly.parts.values()) {
-    const def = getPartById(placed.partId);
-    if (def) totalCost += def.cost;
-  }
+  const inventoryIds = new Set(S.inventoryUsedParts.keys());
+  const totalCost = computeAssemblyCashCost(S.assembly, inventoryIds);
 
   const vabTier = S.gameState ? getFacilityTier(S.gameState, FacilityId.VAB) : 1;
   const maxParts = VAB_MAX_PARTS[vabTier] ?? VAB_MAX_PARTS[1];
@@ -147,31 +145,47 @@ export function updateStatusBar(): void {
 
 /**
  * Recompute positions of all open side panels and the canvas area offset.
+ *
+ * Inventory docks on the right edge, immediately left of the parts panel.
+ * Engineer and staging stack from the left, starting next to the scale bar.
  */
 export function recomputePanelPositions(): void {
   const S = getVabState();
   const root = document.getElementById('vab-main');
   if (!root) return;
 
-  const panelMap: Record<string, HTMLElement | null> = {
-    inventory: document.getElementById('vab-inventory-panel'),
-    engineer:  document.getElementById('vab-engineer-panel'),
-    staging:   document.getElementById('vab-staging-panel'),
+  const leftPanelOrder = ['engineer', 'staging'] as const;
+  const leftPanels: Record<string, HTMLElement | null> = {
+    engineer: document.getElementById('vab-engineer-panel'),
+    staging:  document.getElementById('vab-staging-panel'),
   };
+  const inventoryEl = document.getElementById('vab-inventory-panel');
 
-  let idx = 0;
-  for (const [id, el] of Object.entries(panelMap)) {
+  let leftIdx = 0;
+  for (const id of leftPanelOrder) {
+    const el = leftPanels[id];
     if (!el) continue;
     if (S.openPanels.has(id)) {
-      el.style.left = `${VAB_SCALE_BAR_WIDTH + idx * SIDE_PANEL_WIDTH}px`;
-      idx++;
+      el.style.left  = `${VAB_SCALE_BAR_WIDTH + leftIdx * SIDE_PANEL_WIDTH}px`;
+      el.style.right = '';
+      leftIdx++;
     } else {
       el.setAttribute('hidden', '');
     }
   }
 
+  if (inventoryEl) {
+    if (S.openPanels.has('inventory')) {
+      inventoryEl.style.left  = 'auto';
+      inventoryEl.style.right = `${PARTS_PANEL_WIDTH}px`;
+    } else {
+      inventoryEl.setAttribute('hidden', '');
+    }
+  }
+
   if (S.canvasArea) {
-    S.canvasArea.style.marginLeft = `${S.openPanels.size * SIDE_PANEL_WIDTH}px`;
+    S.canvasArea.style.marginLeft  = `${leftIdx * SIDE_PANEL_WIDTH}px`;
+    S.canvasArea.style.marginRight = S.openPanels.has('inventory') ? `${SIDE_PANEL_WIDTH}px` : '';
   }
 }
 
@@ -223,28 +237,38 @@ export function bindButtons(root: HTMLElement): void {
     recomputePanelPositions();
   });
 
-  // Inventory panel: refurbish / scrap actions (event delegation).
+  // Inventory panel: refurbish / scrap actions + group expand/collapse.
   const invBody = root.querySelector('#vab-inventory-body');
   if (invBody) _addTracked(invBody, 'click', (e: Event) => {
-    const btn = (e.target as HTMLElement)?.closest?.('.vab-inv-btn') as HTMLElement | null;
-    if (!btn || !S.gameState) return;
-    const invId = btn.dataset.invId;
-    if (!invId) return;
+    const target = e.target as HTMLElement | null;
+    if (!target) return;
 
-    if (btn.classList.contains('vab-inv-btn-refurb')) {
-      const result = refurbishPart(S.gameState, invId);
-      if (result.success) {
-        renderInventoryPanel();
-        refreshTopBar();
-        _vabRefreshPartsFn(S.gameState);
+    const btn = target.closest?.('.vab-inv-btn') as HTMLElement | null;
+    if (btn && S.gameState) {
+      const invId = btn.dataset.invId;
+      if (!invId) return;
+      if (btn.classList.contains('vab-inv-btn-refurb')) {
+        const result = refurbishPart(S.gameState, invId);
+        if (result.success) {
+          renderInventoryPanel();
+          refreshTopBar();
+          _vabRefreshPartsFn(S.gameState);
+        }
+      } else if (btn.classList.contains('vab-inv-btn-scrap')) {
+        const result = scrapPart(S.gameState, invId);
+        if (result.success) {
+          renderInventoryPanel();
+          refreshTopBar();
+          _vabRefreshPartsFn(S.gameState);
+        }
       }
-    } else if (btn.classList.contains('vab-inv-btn-scrap')) {
-      const result = scrapPart(S.gameState, invId);
-      if (result.success) {
-        renderInventoryPanel();
-        refreshTopBar();
-        _vabRefreshPartsFn(S.gameState);
-      }
+      return;
+    }
+
+    const groupHdr = target.closest?.('.vab-inv-group-toggle') as HTMLElement | null;
+    if (groupHdr) {
+      const partId = groupHdr.dataset.partId;
+      if (partId) toggleInventoryGroup(partId);
     }
   });
 
@@ -287,12 +311,10 @@ export function bindButtons(root: HTMLElement): void {
   if (clearAllBtn) _addTracked(clearAllBtn, 'click', () => {
     if (!S.assembly || S.assembly.parts.size === 0) return;
     if (!confirm('Remove all parts? This will refund their cost.')) return;
-    // Compute total cost for undo and snapshot staging.
-    let totalCost = 0;
-    for (const placed of S.assembly.parts.values()) {
-      const def = getPartById(placed.partId);
-      if (def) totalCost += def.cost;
-    }
+    // Compute cash refund for undo (inventory-sourced parts refund no cash; they
+    // return to inventory instead — see refundOrReturnPart).
+    const inventoryIdsForClear = new Set(S.inventoryUsedParts.keys());
+    const totalCost = computeAssemblyCashCost(S.assembly, inventoryIdsForClear);
     const stagingBefore = snapshotStaging();
     recordClearAll(totalCost, stagingBefore);
     for (const [instId, placed] of S.assembly.parts) {

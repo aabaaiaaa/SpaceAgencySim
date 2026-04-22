@@ -183,6 +183,27 @@ export function useInventoryPart(state: GameState, partId: string): InventoryPar
   return removeFromInventory(state, available[0].id);
 }
 
+/**
+ * Sum the cash cost of an assembly, excluding parts sourced from inventory.
+ *
+ * Inventory-sourced parts cost nothing at assembly time (they were already
+ * paid for on a previous build and recovered). Callers pass the set of
+ * instance IDs that came from inventory; those are skipped. Unknown part
+ * catalog IDs contribute 0.
+ */
+export function computeAssemblyCashCost(
+  assembly: RocketAssembly,
+  inventoryInstanceIds: ReadonlySet<string>,
+): number {
+  let total = 0;
+  for (const placed of assembly.parts.values()) {
+    if (inventoryInstanceIds.has(placed.instanceId)) continue;
+    const def = getPartById(placed.partId);
+    if (def) total += def.cost;
+  }
+  return total;
+}
+
 export interface RecoverPartsResult {
   partsRecovered: number;
   entries: InventoryPart[];

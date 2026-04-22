@@ -172,7 +172,7 @@ export function buildPartsHTML(state: GameState): string {
       const rh = Math.max(4,  Math.round(p.height * scale));
       const invCount = getInventoryCount(state, p.id);
       const invBadge = invCount > 0
-        ? `<span class="vab-inv-badge" title="${invCount} in inventory (free)">${invCount}</span>`
+        ? `<span class="vab-inv-badge" title="${invCount} in inventory — drag from inventory panel to reuse">${invCount}</span>`
         : '';
 
       // Calculate import-adjusted cost for off-world hubs.
@@ -181,11 +181,9 @@ export function buildPartsHTML(state: GameState): string {
         ? ` <span class="vab-part-import-tax" data-import-tax="${importMultiplier}">(${importMultiplier}x import)</span>`
         : '';
 
-      const costLabel = invCount > 0
-        ? `<span class="vab-part-cost-free">Free</span><span class="vab-part-cost-orig">${fmt$(adjustedCost)}</span>${importTag}`
-        : `<span>${fmt$(adjustedCost)}</span>${importTag}`;
+      const costLabel = `<span>${fmt$(adjustedCost)}</span>${importTag}`;
 
-      const titleCost = invCount > 0 ? 'Free (inventory)' : fmt$(adjustedCost);
+      const titleCost = fmt$(adjustedCost);
       rows.push(
         `<div class="vab-part-card" data-part-id="${p.id}" tabindex="0" ` +
             `title="${p.name} — ${p.mass} kg · ${titleCost}">` +
@@ -292,7 +290,7 @@ export function showPartDetail(partId: string): void {
       : null;
     invInfo =
       `<div class="vab-detail-inv">` +
-        `<span class="vab-detail-inv-count">${invCount} in inventory (free)</span>` +
+        `<span class="vab-detail-inv-count">${invCount} in inventory — drag from inventory panel</span>` +
         `<span class="vab-detail-inv-wear">Best: ${bestWear}% wear` +
           (effRel ? ` / ${effRel}% eff. reliability` : '') +
         `</span>` +
