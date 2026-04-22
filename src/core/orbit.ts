@@ -617,6 +617,8 @@ interface CreateOrbitalObjectOpts {
   type: string;
   name: string;
   elements: OrbitalElements;
+  /** Linked RocketDesign id — enables the Tracking Station Take-Control flow. */
+  rocketDesignId?: string;
 }
 
 /**
@@ -624,13 +626,14 @@ interface CreateOrbitalObjectOpts {
  *
  * @param opts  Object creation options.
  */
-export function createOrbitalObject({ id, bodyId, type, name, elements }: CreateOrbitalObjectOpts): OrbitalObject {
+export function createOrbitalObject({ id, bodyId, type, name, elements, rocketDesignId }: CreateOrbitalObjectOpts): OrbitalObject {
   return {
     id,
     bodyId,
     type,
     name,
     elements: { ...elements },
+    ...(rocketDesignId ? { rocketDesignId } : {}),
   };
 }
 

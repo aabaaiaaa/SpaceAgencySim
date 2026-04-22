@@ -605,6 +605,33 @@ export function getAllowedMapZooms(state: GameState): string[] {
   return [MapZoom.ORBIT_DETAIL, MapZoom.LOCAL_BODY];
 }
 
+/**
+ * Resolve the body to focus the Tracking Station map on when no flight is active.
+ * Uses the active hub's body; falls back to Earth when no active hub is resolvable.
+ */
+export function getInspectionBodyId(state: GameState): string {
+  const hubs = state?.hubs;
+  const activeId = state?.activeHubId;
+  if (!hubs || !activeId) return 'EARTH';
+  const hub = hubs.find((h) => h.id === activeId);
+  return hub?.bodyId ?? 'EARTH';
+}
+
+/**
+ * Allowed zoom levels for the Tracking Station inspection map (no active flight).
+ *
+ * Flight-only zooms (ORBIT_DETAIL, CRAFT_TO_TARGET) are excluded because they
+ * require craft / target orbital elements that don't exist without a flight.
+ *
+ * Returns an empty list when the Tracking Station facility is not built.
+ */
+export function getInspectionAllowedZooms(state: GameState): string[] {
+  const tier = getTrackingStationTier(state);
+  if (tier >= 2) return [MapZoom.LOCAL_BODY, MapZoom.SOLAR_SYSTEM];
+  if (tier >= 1) return [MapZoom.LOCAL_BODY];
+  return [];
+}
+
 // ---------------------------------------------------------------------------
 // Shadow Overlay
 // ---------------------------------------------------------------------------

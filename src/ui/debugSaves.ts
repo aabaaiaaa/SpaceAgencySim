@@ -154,6 +154,34 @@ export function openDebugSavePanel(container: HTMLElement, state: GameState): vo
 /**
  * Generates a debug state and copies all properties onto the live state object.
  */
+/**
+ * Assign a default rocketDesignId to debug-loaded field craft and orbital
+ * CRAFT/STATION/SATELLITE objects that don't already have one.  Picks the
+ * most-relevant saved design (by name hint, or first available) so the
+ * Tracking Station Take-Control flow works on these hand-crafted states.
+ */
+function _backfillTakeControlLinks(s: GameState): void {
+  const designs = s.savedDesigns ?? [];
+  if (designs.length === 0) return;
+
+  const pickDesign = (hint: RegExp): string => {
+    const match = designs.find((d) => hint.test(d.name));
+    return (match ?? designs[0]).id;
+  };
+
+  const craftDesign = pickDesign(/capsule|orbit|craft|lander|vessel/i);
+  const satDesign = pickDesign(/sat|bus|probe/i);
+
+  for (const fc of s.fieldCraft ?? []) {
+    if (!fc.rocketDesignId) fc.rocketDesignId = craftDesign;
+  }
+  for (const obj of s.orbitalObjects ?? []) {
+    if (obj.rocketDesignId) continue;
+    if (obj.type === 'SATELLITE') obj.rocketDesignId = satDesign;
+    else if (obj.type === 'CRAFT' || obj.type === 'STATION') obj.rocketDesignId = craftDesign;
+  }
+}
+
 function _loadDebugState(liveState: GameState, def: DebugSaveDefinition, feedbackEl: FeedbackElement): void {
   const snapshot = def.generate();
 
@@ -167,6 +195,10 @@ function _loadDebugState(liveState: GameState, def: DebugSaveDefinition, feedbac
   // Populate available missions based on completed missions and dependency chains.
   getUnlockedMissions(liveState);
   reconcileParts(liveState);
+
+  // Back-fill rocketDesignId on tracked craft/field craft that lack one so
+  // the Tracking Station Take-Control flow is usable on debug-loaded saves.
+  _backfillTakeControlLinks(liveState);
 
   // Update window.__gameState for e2e test access.
   if (typeof window !== 'undefined') {

@@ -93,6 +93,8 @@ export interface MakeSatelliteOpts {
   name?: string;
   /** Rotational phase offset (radians) to space satellites around the same band. */
   phaseOffset?: number;
+  /** RocketDesign id — enables the Tracking Station Take-Control flow. */
+  rocketDesignId?: string;
 }
 
 export interface SatellitePair {
@@ -108,6 +110,7 @@ export function makeSatellite(opts: MakeSatelliteOpts): SatellitePair {
     type: OrbitalObjectType.SATELLITE,
     name: opts.name ?? `${opts.partId} @ ${opts.bandId}`,
     elements,
+    ...(opts.rocketDesignId ? { rocketDesignId: opts.rocketDesignId } : {}),
   };
   const satelliteRecord: SatelliteRecord = {
     id: opts.recordId,
@@ -282,6 +285,8 @@ export interface MakeFieldCraftOpts {
   bandId?: string;
   suppliesRemaining?: number;
   hasExtendedLifeSupport?: boolean;
+  /** RocketDesign id — enables the Tracking Station Take-Control flow. */
+  rocketDesignId?: string;
 }
 
 export function makeFieldCraft(opts: MakeFieldCraftOpts): FieldCraft {
@@ -299,6 +304,7 @@ export function makeFieldCraft(opts: MakeFieldCraftOpts): FieldCraft {
     deployedPeriod: opts.deployedPeriod,
     orbitalElements: elements,
     orbitBandId: bandId,
+    ...(opts.rocketDesignId ? { rocketDesignId: opts.rocketDesignId } : {}),
   };
 }
 

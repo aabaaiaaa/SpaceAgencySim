@@ -63,6 +63,8 @@ interface DeploySatelliteOptions {
   elements: OrbitalElements;
   name?: string;
   altitude: number;
+  /** Rocket design that deployed this satellite — enables the Take-Control flow. */
+  rocketDesignId?: string;
 }
 
 interface DeployResult {
@@ -79,7 +81,7 @@ interface DeployResult {
  */
 export function deploySatellite(
   state: GameState,
-  { partId, bodyId, elements, name, altitude }: DeploySatelliteOptions,
+  { partId, bodyId, elements, name, altitude, rocketDesignId }: DeploySatelliteOptions,
 ): DeployResult {
   // Require Satellite Ops facility.
   if (!hasFacility(state, FacilityId.SATELLITE_OPS)) {
@@ -131,6 +133,7 @@ export function deploySatellite(
     type: OrbitalObjectType.SATELLITE,
     name: satName,
     elements,
+    rocketDesignId,
   });
   state.orbitalObjects.push(orbObj);
 
@@ -195,6 +198,7 @@ export function deploySatellitesFromFlight(
       bodyId,
       elements,
       altitude,
+      rocketDesignId: flightState.rocketId,
     });
 
     if (result.success) {

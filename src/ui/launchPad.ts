@@ -22,11 +22,8 @@ import { getPartById } from '../data/parts.ts';
 import { PartType, FacilityId, LAUNCH_PAD_MAX_MASS, LAUNCH_PAD_TIER_LABELS, DEATH_FINE_PER_ASTRONAUT } from '../core/constants.ts';
 import { getCurrentWeather, getWeatherSkipCost, skipWeather } from '../core/weather.ts';
 import {
-  createRocketAssembly,
-  addPartToAssembly,
-  connectParts,
-  createStagingConfig,
-  syncStagingWithAssembly,
+  designToAssembly,
+  designToStagingConfig,
 } from '../core/rocketbuilder.ts';
 import { getActiveCrew } from '../core/crew.ts';
 import { getFacilityTier } from '../core/construction.ts';
@@ -406,7 +403,7 @@ function _buildRocketCard(design: RocketDesign): HTMLElement {
   const canAfford = _state ? _state.money >= cost : false;
 
   // Check mass against launch pad tier limit.
-  const assembly = _designToAssembly(design);
+  const assembly = designToAssembly(design);
   const rocketMass = getTotalMass(assembly);
   const padTier = _state ? getFacilityTier(_state, FacilityId.LAUNCH_PAD) : 1;
   const maxMass = (LAUNCH_PAD_MAX_MASS as Record<number, number>)[padTier] ?? (LAUNCH_PAD_MAX_MASS as Record<number, number>)[1];
@@ -457,114 +454,6 @@ function _buildRocketCard(design: RocketDesign): HTMLElement {
 // Private — launch flow
 // ---------------------------------------------------------------------------
 
-const OPPOSITE_SIDE: Readonly<Record<string, string>> = Object.freeze({
-  top: 'bottom', bottom: 'top', left: 'right', right: 'left',
-});
-
-/** Positional tolerance for snap-point matching (world units). */
-const SNAP_TOLERANCE = 1;
-
-/**
- * Reconstruct a live RocketAssembly from a saved RocketDesign.
- * Parts are added in the same order they were saved, so the auto-generated
- * instanceIds (inst-1, inst-2, ...) match the original staging references.
- *
- * After placing parts, connections are rebuilt by finding pairs of snap points
- * that coincide positionally — this is required for the fuel system's BFS
- * traversal to route propellant from tanks to engines.
- */
-function _designToAssembly(design: RocketDesign): RocketAssembly {
-  const assembly = createRocketAssembly();
-  for (const part of design.parts) {
-    addPartToAssembly(assembly, part.partId, part.position.x, part.position.y);
-  }
-
-  // Rebuild connections from snap-point positions.
-  _rebuildConnections(assembly);
-
-  return assembly;
-}
-
-/**
- * Infer part connections by checking snap-point overlap.
- *
- * For every pair of parts, check whether a snap point from one part coincides
- * (within tolerance) with a complementary-side snap point from the other.
- * When a match is found, record a connection so the fuel system can traverse
- * the assembly graph.
- */
-function _rebuildConnections(assembly: RocketAssembly): void {
-  const parts = [...assembly.parts.values()];
-  const occupied = new Set<string>(); // "instanceId:snapIndex" -> already connected
-
-  for (let i = 0; i < parts.length; i++) {
-    const pA = parts[i];
-    const defA = getPartById(pA.partId);
-    if (!defA) continue;
-
-    for (let j = i + 1; j < parts.length; j++) {
-      const pB = parts[j];
-      const defB = getPartById(pB.partId);
-      if (!defB) continue;
-
-      for (let si = 0; si < defA.snapPoints.length; si++) {
-        const spA = defA.snapPoints[si];
-        const keyA = `${pA.instanceId}:${si}`;
-        if (occupied.has(keyA)) continue;
-
-        // World position of snap A (offsetY: positive = below centre in screen coords).
-        const awx = pA.x + spA.offsetX;
-        const awy = pA.y - spA.offsetY;
-
-        const neededSide = OPPOSITE_SIDE[spA.side];
-
-        for (let sj = 0; sj < defB.snapPoints.length; sj++) {
-          const spB = defB.snapPoints[sj];
-          if (spB.side !== neededSide) continue;
-
-          const keyB = `${pB.instanceId}:${sj}`;
-          if (occupied.has(keyB)) continue;
-
-          const bwx = pB.x + spB.offsetX;
-          const bwy = pB.y - spB.offsetY;
-
-          if (Math.abs(awx - bwx) < SNAP_TOLERANCE && Math.abs(awy - bwy) < SNAP_TOLERANCE) {
-            connectParts(assembly, pA.instanceId, si, pB.instanceId, sj);
-            occupied.add(keyA);
-            occupied.add(keyB);
-          }
-        }
-      }
-    }
-  }
-}
-
-/**
- * Reconstruct a live StagingConfig from a saved RocketDesign's staging data.
- * Falls back to a default single-stage config if staging data is missing.
- */
-function _designToStagingConfig(design: RocketDesign, assembly: RocketAssembly): StagingConfig {
-  const staging = design.staging;
-
-  if (staging && Array.isArray(staging.stages)) {
-    const config: StagingConfig = {
-      stages:          staging.stages.map((ids) => ({
-        instanceIds: Array.isArray(ids) ? ids.map(String) : [],
-      })),
-      unstaged:        Array.isArray(staging.unstaged) ? staging.unstaged.map(String) : [],
-      currentStageIdx: 0,
-    };
-    // Clean up any stale references.
-    syncStagingWithAssembly(assembly, config);
-    return config;
-  }
-
-  // Fallback: create default staging and let sync populate it.
-  const config = createStagingConfig();
-  syncStagingWithAssembly(assembly, config);
-  return config;
-}
-
 /**
  * Handle clicking Launch on a rocket design card.
  * Checks for crew seats and shows a crew dialog if needed.
@@ -572,8 +461,8 @@ function _designToStagingConfig(design: RocketDesign, assembly: RocketAssembly):
 function _handleLaunch(design: RocketDesign): void {
   if (!_state) return;
 
-  const assembly      = _designToAssembly(design);
-  const stagingConfig = _designToStagingConfig(design, assembly);
+  const assembly      = designToAssembly(design);
+  const stagingConfig = designToStagingConfig(design, assembly);
 
   // Check for extreme weather — show a warning before launching.
   const weather = getCurrentWeather(_state);

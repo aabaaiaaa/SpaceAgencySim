@@ -12,12 +12,160 @@
   padding-top: var(--topbar-height);
 }
 
+/* Map tab: background transparent so PIXI map shows through; children re-enable pointer events. */
+#ts-overlay.map-active {
+  background: transparent;
+  pointer-events: none;
+  cursor: grab;
+}
+#ts-overlay.map-active:active {
+  cursor: grabbing;
+}
+
+#ts-overlay.map-active > * {
+  pointer-events: auto;
+}
+
 #ts-header {
   display: flex;
   align-items: center;
   gap: var(--space-lg);
   padding: var(--header-padding);
   flex-shrink: 0;
+  background: rgba(8, 12, 24, 0.85);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* -- Tab strip ----------------------------------------------------------- */
+#ts-tabs {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.ts-tab-btn {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #8899aa;
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s, border-color 0.12s;
+}
+.ts-tab-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #e0f0ff;
+}
+.ts-tab-btn.active {
+  background: rgba(96, 170, 255, 0.15);
+  border-color: rgba(96, 170, 255, 0.5);
+  color: #e0f0ff;
+}
+
+/* -- Map tab ------------------------------------------------------------- */
+/*
+ * Specificity note: the `#ts-overlay.map-active > *` rule above re-enables
+ * pointer-events on direct children.  To let clicks in the map area pass
+ * through to the canvas below we need a more specific selector (two IDs).
+ */
+#ts-overlay #ts-map-view {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  pointer-events: none;
+}
+
+#ts-map-controls {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(8, 12, 24, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 10px 12px;
+  pointer-events: auto;
+  font-size: 0.82rem;
+}
+
+.ts-control-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ts-control-group select {
+  background: rgba(0, 0, 0, 0.4);
+  color: #e0f0ff;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+.ts-control-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #e0f0ff;
+  font-family: inherit;
+  font-size: inherit;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.ts-control-btn:hover {
+  background: rgba(96, 170, 255, 0.2);
+}
+
+.ts-time-controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.ts-time-readout {
+  color: #80c8ff;
+  font-weight: 600;
+  margin-right: 6px;
+  min-width: 100px;
+}
+
+/* -- Map sidebar --------------------------------------------------------- */
+#ts-map-sidebar {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 340px;
+  max-height: calc(100% - 24px);
+  overflow-y: auto;
+  background: rgba(8, 12, 24, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  padding: 12px 14px;
+  pointer-events: auto;
+  font-size: 0.85rem;
+}
+
+#ts-map-sidebar .ts-section {
+  margin-bottom: 14px;
+}
+
+#ts-map-sidebar .ts-section:last-child {
+  margin-bottom: 0;
+}
+
+/* -- Details tab --------------------------------------------------------- */
+#ts-details-view {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 20px 40px;
 }
 
 #ts-back-btn {
@@ -44,12 +192,6 @@
 }
 
 /* -- Content ------------------------------------------------------------- */
-#ts-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px 20px 40px;
-}
-
 .ts-section {
   margin-bottom: 24px;
 }
@@ -126,8 +268,9 @@
 
 .ts-obj-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 8px 12px;
   background: rgba(255,255,255,0.03);
   border: 1px solid rgba(255,255,255,0.08);
   border-radius: 5px;
@@ -138,14 +281,13 @@
 .ts-obj-row .obj-name {
   font-weight: 600;
   color: #e0f0ff;
-  flex: 1;
-  min-width: 120px;
+  flex: 1 1 auto;
+  min-width: 90px;
 }
 
 .ts-obj-row .obj-type {
   color: #8899aa;
   font-size: 0.78rem;
-  min-width: 80px;
 }
 
 .ts-obj-row .obj-body {
@@ -155,6 +297,25 @@
 
 .ts-obj-row.debris .obj-name {
   color: #ff9060;
+}
+
+.ts-obj-row.clickable {
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  transition: background 0.12s, border-color 0.12s;
+}
+.ts-obj-row.clickable:hover {
+  background: rgba(96, 170, 255, 0.10);
+  border-color: rgba(96, 170, 255, 0.35);
+}
+.ts-obj-row.selected {
+  background: rgba(255, 136, 68, 0.18);
+  border-color: rgba(255, 136, 68, 0.55);
+}
+.ts-obj-row.selected .obj-name {
+  color: #ffc899;
 }
 
 /* -- Weather forecast ---------------------------------------------------- */
@@ -294,4 +455,112 @@
   font-size: 0.82rem;
   color: #60dd80;
   font-weight: 600;
+}
+
+/* -- Take Control button ------------------------------------------------- */
+.ts-field-craft-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.ts-take-control-btn {
+  background: rgba(96, 221, 128, 0.18);
+  border: 1px solid rgba(96, 221, 128, 0.55);
+  color: #b8f0c8;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.ts-take-control-btn:hover {
+  background: rgba(96, 221, 128, 0.32);
+  color: #e0ffe8;
+}
+
+.ts-take-control-btn--compact {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.ts-take-control-btn:disabled,
+.ts-map-take-control-btn:disabled {
+  background: rgba(120, 120, 120, 0.15);
+  border-color: rgba(120, 120, 120, 0.35);
+  color: #888;
+  cursor: not-allowed;
+}
+
+/* -- Selection detail panel (inline under selected Tracked Object row) --- */
+.ts-obj-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.ts-obj-detail {
+  background: rgba(96, 170, 255, 0.06);
+  border: 1px solid rgba(96, 170, 255, 0.2);
+  border-top: none;
+  border-radius: 0 0 5px 5px;
+  padding: 10px 14px;
+  margin-top: -1px;
+  font-size: 0.82rem;
+  color: #c0d0e0;
+}
+
+.ts-obj-detail-info > div {
+  margin-bottom: 4px;
+}
+.ts-obj-detail-info > div:last-child {
+  margin-bottom: 0;
+}
+
+.ts-supply-warning {
+  color: #ffaa30;
+  font-weight: 600;
+}
+.ts-supply-critical {
+  color: #ff6060;
+  font-weight: 600;
+}
+
+.ts-obj-detail-actions {
+  margin-top: 8px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Only flatten the selected-row bottom corners when a detail panel follows. */
+.ts-obj-wrapper:has(.ts-obj-detail) .ts-obj-row.selected {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* -- Floating Take Control button over the map --------------------------- */
+.ts-map-take-control-btn {
+  position: fixed;
+  z-index: calc(var(--z-facility) + 10);
+  pointer-events: auto;
+  background: rgba(96, 221, 128, 0.85);
+  border: 1px solid rgba(96, 221, 128, 0.95);
+  color: #08110c;
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
+  transition: background 0.12s;
+  white-space: nowrap;
+}
+.ts-map-take-control-btn:hover {
+  background: rgba(96, 221, 128, 1);
 }

@@ -114,6 +114,19 @@ function _buildFlightOverlay(container: HTMLElement): void {
  * Initialises the PixiJS renderer, creates the physics state, mounts the HUD
  * overlay, builds the in-flight control overlay, and starts the game loop.
  */
+/**
+ * Optional initial physics overrides, applied after `createPhysicsState()`.
+ * Used by the Tracking Station "Take Control" flow to start a flight in orbit
+ * at a specific position and velocity rather than from the launch pad.
+ */
+export interface FlightSceneInitialOverrides {
+  posX?: number;
+  posY?: number;
+  velX?: number;
+  velY?: number;
+  angle?: number;
+}
+
 export async function startFlightScene(
   container: HTMLElement,
   state: GameState,
@@ -121,6 +134,7 @@ export async function startFlightScene(
   stagingConfig: StagingConfig,
   flightState: FlightState,
   onFlightEnd: (state: GameState | null, results?: unknown, dest?: string) => void,
+  initialOverrides?: FlightSceneInitialOverrides,
 ): Promise<void> {
   logger.debug('flight', 'Starting flight scene', { missionId: flightState.missionId, bodyId: flightState.bodyId });
 
@@ -175,6 +189,25 @@ export async function startFlightScene(
 
   // Create the physics state from the (normalised) assembly and initial flight state.
   const ps = createPhysicsState(s.assembly, flightState);
+
+  // Apply caller-supplied position/velocity overrides (e.g. Take-Control flow
+  // resuming a field craft in orbit).  Kept narrow — only fields the flight
+  // resume path needs today.
+  if (initialOverrides) {
+    if (typeof initialOverrides.posX === 'number') ps.posX = initialOverrides.posX;
+    if (typeof initialOverrides.posY === 'number') ps.posY = initialOverrides.posY;
+    if (typeof initialOverrides.velX === 'number') ps.velX = initialOverrides.velX;
+    if (typeof initialOverrides.velY === 'number') ps.velY = initialOverrides.velY;
+    if (typeof initialOverrides.angle === 'number') ps.angle = initialOverrides.angle;
+    // When resuming mid-flight the rocket is already fully staged up — collapse
+    // staging so no parts are gated off from the fuel network.
+    if (flightState.inOrbit) {
+      stagingConfig.currentStageIdx = Math.max(0, stagingConfig.stages.length - 1);
+      ps.grounded = false;
+      ps.landed = false;
+    }
+  }
+
   setPhysicsState(ps);
 
   // Store a reference to the top-level game state so the malfunction system

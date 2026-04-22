@@ -165,6 +165,17 @@ let _selectedTransferTarget: string | null = null;
 let _wheelHandler: ((e: WheelEvent) => void) | null = null;
 let _mouseMoveHandler: ((e: MouseEvent) => void) | null = null;
 let _clickHandler: ((e: MouseEvent) => void) | null = null;
+let _pointerDownHandler: ((e: PointerEvent) => void) | null = null;
+let _pointerMoveDragHandler: ((e: PointerEvent) => void) | null = null;
+let _pointerUpHandler: ((e: PointerEvent) => void) | null = null;
+
+// Pan state — screen-space offset applied to the body-centred origin.
+let _panX = 0;
+let _panY = 0;
+let _panDragging = false;
+let _panDragStartX = 0;
+let _panDragStartY = 0;
+let _panDragMoveDist = 0;
 
 // Tooltip DOM element and mouse position tracking.
 let _tooltipEl: HTMLDivElement | null = null;
@@ -196,6 +207,16 @@ interface _HubMarkerInfo {
   y: number;
 }
 let _renderedHubMarkers: _HubMarkerInfo[] = [];
+
+interface _OrbitalObjectMarker {
+  id: string;
+  name: string;
+  type: string;
+  bodyId: string;
+  x: number;
+  y: number;
+}
+let _renderedOrbitalObjects: _OrbitalObjectMarker[] = [];
 
 // ---------------------------------------------------------------------------
 // Pre-generated asteroid belt dots
@@ -382,6 +403,26 @@ export function initMapRenderer(): void {
   if (_clickHandler) window.removeEventListener('click', _clickHandler);
   _clickHandler = _onMapClick;
   window.addEventListener('click', _clickHandler);
+
+  // Drag-to-pan handlers.
+  if (_pointerDownHandler) window.removeEventListener('pointerdown', _pointerDownHandler);
+  if (_pointerMoveDragHandler) window.removeEventListener('pointermove', _pointerMoveDragHandler);
+  if (_pointerUpHandler) {
+    window.removeEventListener('pointerup', _pointerUpHandler);
+    window.removeEventListener('pointercancel', _pointerUpHandler);
+  }
+  _pointerDownHandler = _onMapPointerDown;
+  _pointerMoveDragHandler = _onMapPointerMoveDrag;
+  _pointerUpHandler = _onMapPointerUp;
+  window.addEventListener('pointerdown', _pointerDownHandler);
+  window.addEventListener('pointermove', _pointerMoveDragHandler);
+  window.addEventListener('pointerup', _pointerUpHandler);
+  window.addEventListener('pointercancel', _pointerUpHandler);
+
+  _panX = 0;
+  _panY = 0;
+  _panDragging = false;
+  _panDragMoveDist = 0;
 }
 
 /**
@@ -431,6 +472,24 @@ export function destroyMapRenderer(): void {
     window.removeEventListener('click', _clickHandler);
     _clickHandler = null;
   }
+  if (_pointerDownHandler) {
+    window.removeEventListener('pointerdown', _pointerDownHandler);
+    _pointerDownHandler = null;
+  }
+  if (_pointerMoveDragHandler) {
+    window.removeEventListener('pointermove', _pointerMoveDragHandler);
+    _pointerMoveDragHandler = null;
+  }
+  if (_pointerUpHandler) {
+    window.removeEventListener('pointerup', _pointerUpHandler);
+    window.removeEventListener('pointercancel', _pointerUpHandler);
+    _pointerUpHandler = null;
+  }
+  _renderedOrbitalObjects = [];
+  _panX = 0;
+  _panY = 0;
+  _panDragging = false;
+  _panDragMoveDist = 0;
   if (_tooltipEl) {
     _tooltipEl.remove();
     _tooltipEl = null;
@@ -645,6 +704,27 @@ export function getRenderedHubMarkers(): readonly HubMarkerInfo[] {
   return _renderedHubMarkers;
 }
 
+/** Position + metadata for a rendered orbital-object / field-craft marker. */
+export interface RenderedObjectMarker {
+  readonly id: string;
+  readonly name: string;
+  readonly type: string;
+  readonly bodyId: string;
+  readonly x: number;
+  readonly y: number;
+}
+
+/**
+ * Return the screen-space marker for the currently selected target, or null
+ * if no target is selected / the target isn't being rendered this frame
+ * (e.g. it's at a different body than the current map focus).
+ */
+export function getSelectedObjectMarker(): RenderedObjectMarker | null {
+  if (!_selectedTarget) return null;
+  const found = _renderedOrbitalObjects.find((o) => o.id === _selectedTarget);
+  return found ?? null;
+}
+
 /**
  * Find the nearest rendered hub marker within `radius` pixels of the given
  * screen coordinates.  Returns `null` if no marker is close enough.
@@ -684,8 +764,8 @@ export function renderMapFrame(
 
   const w  = window.innerWidth;
   const h  = window.innerHeight;
-  const cx = w / 2;
-  const cy = h / 2;
+  const cx = w / 2 + _panX;
+  const cy = h / 2 + _panY;
   const R  = BODY_RADIUS[bodyId];
 
   const isTransfer = flightState.phase === FlightPhase.TRANSFER ||
@@ -760,6 +840,102 @@ export function renderMapFrame(
   _drawRouteOverlay(state, cx, cy, scale, bodyId);
 
   // 9. Tooltip proximity check (uses cached arc/marker positions from above).
+  _updateMapTooltip();
+}
+
+/**
+ * Render one frame of the map in inspection mode (Tracking Station, no flight).
+ *
+ * Unlike {@link renderMapFrame}, this variant does not take a physics or flight
+ * state — the player is not flying.  It renders only the overlays that make
+ * sense without a craft: body, bands, asteroid belt, orbital objects, hub
+ * markers, surface items, shadow, comms coverage and routes.
+ *
+ * `previewTimeElapsed` is the synthetic time to use for orbital-object
+ * positions and the day/night shadow; callers advance it locally without
+ * progressing real game periods.
+ */
+export function renderInspectionMapFrame(
+  state: ReadonlyGameState,
+  bodyId: string,
+  previewTimeElapsed: number,
+  zoomLevel: string,
+  options?: { showDebris?: boolean; showShadow?: boolean },
+): void {
+  if (!_mapRoot || !_mapRoot.visible) return;
+
+  const w  = window.innerWidth;
+  const h  = window.innerHeight;
+  const cx = w / 2 + _panX;
+  const cy = h / 2 + _panY;
+  const R  = BODY_RADIUS[bodyId];
+
+  // View radius (inspection never has craft/target/transfer state).
+  if (_customViewRadius) {
+    _viewRadius = _customViewRadius;
+  } else {
+    _viewRadius = getViewRadius(zoomLevel, bodyId, null, null, null);
+  }
+  const screenHalf = Math.min(w, h) / 2 * 0.88;
+  const scale = screenHalf / _viewRadius;
+
+  // Minimal stub so shared draw helpers that read `timeElapsed` still work.
+  const stubFlight: ReadonlyFlightState = {
+    phase: FlightPhase.PRELAUNCH,
+    transferState: null,
+    orbitalElements: null,
+    timeElapsed: previewTimeElapsed,
+  };
+
+  _resetLabels();
+
+  // Background.
+  _bgGraphics!.clear();
+  _bgGraphics!.rect(0, 0, w, h);
+  _bgGraphics!.fill(MAP_BG);
+
+  // Altitude bands.
+  _drawBands(bodyId, cx, cy, scale);
+
+  // Asteroid belt visualisation (Sun view only).
+  _drawAsteroidBelt(bodyId, cx, cy, scale, w, h);
+
+  // Explicitly clear flight-only layers so nothing stale from a prior flight
+  // render lingers on screen.
+  _transferGraphics!.clear();
+  _orbitsGraphics!.clear();
+  _craftGraphics!.clear();
+  _asteroidObjGraphics!.clear();
+
+  // Child celestial bodies (moons/planets around the current focus body).
+  // _drawCelestialBodies uses the `_transferGraphics` layer, which we just
+  // cleared above, so draw it here before the body itself.
+  _drawCelestialBodies(stubFlight, cx, cy, scale, bodyId);
+
+  // Orbital objects.
+  _drawOrbitalObjects(state, stubFlight, cx, cy, scale, bodyId, options);
+
+  // Body on top of orbits.
+  _drawBody(cx, cy, scale, R);
+
+  // Surface items and hub markers.
+  _drawSurfaceItems(state, bodyId, cx, cy, scale, R);
+  _drawHubMarkers(state, bodyId, cx, cy, scale, R);
+
+  // Day/night shadow.
+  if (options?.showShadow !== false) {
+    _drawShadow(cx, cy, scale, R, previewTimeElapsed);
+  } else if (_shadowGraphics) {
+    _shadowGraphics.clear();
+  }
+
+  // Comms coverage.
+  _drawCommsOverlay(state, bodyId, cx, cy, scale, R);
+
+  // Route overlay.
+  _drawRouteOverlay(state, cx, cy, scale, bodyId);
+
+  // Tooltip proximity.
   _updateMapTooltip();
 }
 
@@ -1124,6 +1300,10 @@ function _drawAsteroidBelt(bodyId: string, cx: number, cy: number, scale: number
   }
 }
 
+/** Colour used for player-owned field craft on the map. */
+const FIELD_CRAFT_COLOR = 0x66ddaa;
+const FIELD_CRAFT_ORBIT_COLOR = 0x2f6655;
+
 function _drawOrbitalObjects(
   state: ReadonlyGameState,
   flightState: ReadonlyFlightState,
@@ -1133,15 +1313,14 @@ function _drawOrbitalObjects(
   bodyId: string,
   options?: { showDebris?: boolean },
 ): void {
+  _renderedOrbitalObjects = [];
   if (!_mapRoot) return;
   _objectsGraphics!.clear();
-
-  if (!state.orbitalObjects || state.orbitalObjects.length === 0) return;
 
   const showDebris = options?.showDebris !== false;
   const t = flightState.timeElapsed;
 
-  for (const obj of state.orbitalObjects) {
+  for (const obj of state.orbitalObjects ?? []) {
     if (obj.bodyId !== bodyId) continue;
     // Hide debris objects when Tracking Station tier < 2.
     if (!showDebris && obj.type === 'DEBRIS') continue;
@@ -1163,6 +1342,15 @@ function _drawOrbitalObjects(
     _objectsGraphics!.circle(sx, sy, dotSize);
     _objectsGraphics!.fill(dotColor);
 
+    _renderedOrbitalObjects.push({
+      id: obj.id,
+      name: obj.name,
+      type: obj.type,
+      bodyId: obj.bodyId,
+      x: sx,
+      y: sy,
+    });
+
     // Label (target always labelled; others only if not too dense).
     if (isTarget) {
       _useLabel(obj.name, sx + dotSize + 4, sy - 6, dotColor);
@@ -1173,6 +1361,49 @@ function _drawOrbitalObjects(
         _objectsGraphics!.circle(sx, sy, dotSize + 6 + pulse * 3);
         _objectsGraphics!.stroke({ color: 0x00ccff, width: 1.5, alpha: 0.4 + pulse * 0.3 });
       }
+    }
+  }
+
+  // Field craft — crewed vessels left in orbit.  They live in a separate
+  // `state.fieldCraft` array (not `state.orbitalObjects`) but deserve to
+  // appear on the map so players can see them and click to take control.
+  const fieldCraft = (state as unknown as { fieldCraft?: ReadonlyArray<{
+    id: string; name: string; bodyId: string; status: string;
+    orbitalElements: OrbitalElements | null;
+  }> }).fieldCraft ?? [];
+  for (const c of fieldCraft) {
+    if (c.bodyId !== bodyId) continue;
+    if (c.status !== 'IN_ORBIT' || !c.orbitalElements) continue;
+
+    const isTarget = c.id === _selectedTarget;
+    const orbitColor = isTarget ? TARGET_ORBIT_COLOR : FIELD_CRAFT_ORBIT_COLOR;
+    const dotColor   = isTarget ? TARGET_COLOR : FIELD_CRAFT_COLOR;
+
+    _drawOrbitEllipse(_objectsGraphics!, c.orbitalElements, bodyId, cx, cy, scale,
+      orbitColor, isTarget ? 1.8 : 1.2, isTarget ? 0.7 : 0.45);
+
+    const pos = getObjectMapPosition(c.orbitalElements, t, bodyId);
+    const sx = cx + pos.x * scale;
+    const sy = cy - pos.y * scale;
+    const dotSize = isTarget ? 6 : 4;
+
+    _objectsGraphics!.circle(sx, sy, dotSize);
+    _objectsGraphics!.fill(dotColor);
+
+    _renderedOrbitalObjects.push({
+      id: c.id,
+      name: c.name,
+      type: 'FIELD_CRAFT',
+      bodyId: c.bodyId,
+      x: sx,
+      y: sy,
+    });
+
+    if (isTarget) {
+      _useLabel(c.name, sx + dotSize + 4, sy - 6, dotColor);
+      const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 300);
+      _objectsGraphics!.circle(sx, sy, dotSize + 6 + pulse * 3);
+      _objectsGraphics!.stroke({ color: FIELD_CRAFT_COLOR, width: 1.5, alpha: 0.4 + pulse * 0.3 });
     }
   }
 }
@@ -1941,6 +2172,10 @@ function _drawRouteOverlay(
 const ROUTE_HIT_DIST = 15;
 /** Threshold in pixels for detecting mouse proximity to a hub marker. */
 const HUB_HIT_DIST = 12;
+/** Threshold in pixels for detecting mouse proximity to an orbital-object marker. */
+const OBJECT_HIT_DIST = 10;
+/** Pixel threshold: below this, a pointerdown-up is treated as a click, not a drag. */
+const CLICK_VS_DRAG_THRESHOLD = 5;
 /** Number of sample points along a Bezier for hit-testing. */
 const BEZIER_HIT_SAMPLES = 16;
 
@@ -2006,6 +2241,15 @@ function _updateMapTooltip(): void {
     }
   }
 
+  // --- Check orbital-object markers ---
+  for (const obj of _renderedOrbitalObjects) {
+    const d = Math.hypot(obj.x - mx, obj.y - my);
+    if (d < OBJECT_HIT_DIST) {
+      _showTooltip(mx, my, `${obj.name}\n${obj.type}`);
+      return;
+    }
+  }
+
   // --- Check route arcs (only when overlay is visible) ---
   if (_routeOverlayVisible) {
     for (const arc of _renderedRouteArcs) {
@@ -2062,10 +2306,14 @@ function _showTooltip(mx: number, my: number, text: string): void {
 }
 
 /**
- * Handle click events on the map — dispatch hub-click events for the UI layer.
+ * Handle click events on the map — dispatch hub-click or object-click events.
+ *
+ * A click that followed a pan drag (cumulative movement >= CLICK_VS_DRAG_THRESHOLD)
+ * is ignored, so the player doesn't accidentally select while panning.
  */
 function _onMapClick(e: MouseEvent): void {
   if (!_mapRoot || !_mapRoot.visible) return;
+  if (_panDragMoveDist >= CLICK_VS_DRAG_THRESHOLD) return;
 
   const mx = e.clientX;
   const my = e.clientY;
@@ -2074,6 +2322,16 @@ function _onMapClick(e: MouseEvent): void {
     const d = Math.hypot(hub.x - mx, hub.y - my);
     if (d < HUB_HIT_DIST) {
       window.dispatchEvent(new CustomEvent('map-hub-click', { detail: { hubId: hub.hubId } }));
+      return;
+    }
+  }
+
+  for (const obj of _renderedOrbitalObjects) {
+    const d = Math.hypot(obj.x - mx, obj.y - my);
+    if (d < OBJECT_HIT_DIST) {
+      window.dispatchEvent(new CustomEvent('map-object-click', {
+        detail: { objectId: obj.id, name: obj.name, type: obj.type, bodyId: obj.bodyId },
+      }));
       return;
     }
   }
@@ -2098,6 +2356,56 @@ function _onWheel(e: WheelEvent): void {
   const minR = BODY_RADIUS.EARTH * 1.02;
   const maxR = 600_000_000_000; // ~4 AU, enough for asteroid belt (3.2 AU).
   _customViewRadius = Math.max(minR, Math.min(maxR, _customViewRadius));
+}
+
+/** CSS selector matching any DOM control that should suppress map pan. */
+const PAN_EXCLUDE_SELECTOR =
+  'button, input, select, textarea, [role="button"],' +
+  ' .ts-obj-row, #ts-map-controls, #ts-map-sidebar, #ts-header,' +
+  ' #ts-details-view, #ui-overlay, [data-no-map-pan]';
+
+/**
+ * Start a drag-to-pan gesture — only tracked when the map scene is visible
+ * and the pointerdown did not originate from a DOM control layered above
+ * the canvas (topbar, map controls, sidebar, buttons, etc.).
+ */
+function _onMapPointerDown(e: PointerEvent): void {
+  if (!_mapRoot || !_mapRoot.visible) return;
+  if (e.button !== 0) return;
+  const target = e.target as HTMLElement | null;
+  if (target && target.closest && target.closest(PAN_EXCLUDE_SELECTOR)) return;
+
+  _panDragging = true;
+  _panDragStartX = e.clientX;
+  _panDragStartY = e.clientY;
+  _panDragMoveDist = 0;
+}
+
+function _onMapPointerMoveDrag(e: PointerEvent): void {
+  if (!_panDragging) return;
+  const dx = e.clientX - _panDragStartX;
+  const dy = e.clientY - _panDragStartY;
+  _panX += dx;
+  _panY += dy;
+  _panDragMoveDist += Math.hypot(dx, dy);
+  _panDragStartX = e.clientX;
+  _panDragStartY = e.clientY;
+}
+
+function _onMapPointerUp(_e: PointerEvent): void {
+  _panDragging = false;
+  // _panDragMoveDist is cleared on the next pointerdown so _onMapClick can
+  // consult it to distinguish a click from a drag-release.
+}
+
+/**
+ * Reset the map pan offset to zero (re-centres the body on screen).
+ * Intended for the Tracking Station "Recenter" control and body-change flows.
+ */
+export function resetMapPan(): void {
+  _panX = 0;
+  _panY = 0;
+  _panDragMoveDist = 0;
 }
 
 // ---------------------------------------------------------------------------

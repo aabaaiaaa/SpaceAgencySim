@@ -21,6 +21,8 @@ import {
   isTransferPlanningAvailable,
   isDeepSpaceCommsAvailable,
   getAllowedMapZooms,
+  getInspectionBodyId,
+  getInspectionAllowedZooms,
 } from '../core/mapView.ts';
 import { BODY_RADIUS, ALTITUDE_BANDS, FlightPhase, EARTH_HUB_ID } from '../core/constants.ts';
 import { computeOrbitalElements, circularOrbitVelocity } from '../core/orbit.ts';
@@ -640,5 +642,85 @@ describe('Tracking Station tier-based features', () => {
   it('getAllowedMapZooms returns 2 zooms when not built', () => {
     const zooms = getAllowedMapZooms(makeState(0));
     expect(zooms).toHaveLength(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Inspection-mode helpers (Tracking Station map view without an active flight)
+// ---------------------------------------------------------------------------
+
+describe('getInspectionBodyId', () => {
+  it("returns the active hub's body id", () => {
+    const state = {
+      hubs: [makeEarthHub({ id: 'earth-hq', bodyId: 'EARTH' })],
+      activeHubId: 'earth-hq',
+    } as Partial<GameState> as GameState;
+    expect(getInspectionBodyId(state)).toBe('EARTH');
+  });
+
+  it('returns the body of a non-Earth active hub', () => {
+    const hub = makeEarthHub({ id: 'mars-base', bodyId: 'MARS' });
+    const state = {
+      hubs: [hub],
+      activeHubId: 'mars-base',
+    } as Partial<GameState> as GameState;
+    expect(getInspectionBodyId(state)).toBe('MARS');
+  });
+
+  it("falls back to 'EARTH' when the active hub cannot be resolved", () => {
+    const state = {
+      hubs: [],
+      activeHubId: 'missing-hub',
+    } as Partial<GameState> as GameState;
+    expect(getInspectionBodyId(state)).toBe('EARTH');
+  });
+
+  it("falls back to 'EARTH' when hubs field is missing", () => {
+    const state = {} as GameState;
+    expect(getInspectionBodyId(state)).toBe('EARTH');
+  });
+});
+
+describe('getInspectionAllowedZooms', () => {
+  function makeStateWithTier(tier: number): GameState {
+    const hub = tier === 0
+      ? makeEarthHub({ facilities: {} })
+      : makeEarthHub({ facilities: { 'tracking-station': { built: true, tier } } });
+    return {
+      orbitalObjects: [],
+      hubs: [hub],
+      activeHubId: EARTH_HUB_ID,
+    } as Partial<GameState> as GameState;
+  }
+
+  it('returns LOCAL_BODY only at tier 1', () => {
+    const zooms = getInspectionAllowedZooms(makeStateWithTier(1));
+    expect(zooms).toEqual([MapZoom.LOCAL_BODY]);
+  });
+
+  it('returns LOCAL_BODY + SOLAR_SYSTEM at tier 2', () => {
+    const zooms = getInspectionAllowedZooms(makeStateWithTier(2));
+    expect(zooms).toHaveLength(2);
+    expect(zooms).toContain(MapZoom.LOCAL_BODY);
+    expect(zooms).toContain(MapZoom.SOLAR_SYSTEM);
+  });
+
+  it('returns LOCAL_BODY + SOLAR_SYSTEM at tier 3', () => {
+    const zooms = getInspectionAllowedZooms(makeStateWithTier(3));
+    expect(zooms).toHaveLength(2);
+    expect(zooms).toContain(MapZoom.LOCAL_BODY);
+    expect(zooms).toContain(MapZoom.SOLAR_SYSTEM);
+  });
+
+  it('never includes ORBIT_DETAIL or CRAFT_TO_TARGET (flight-only zooms)', () => {
+    for (const tier of [1, 2, 3]) {
+      const zooms = getInspectionAllowedZooms(makeStateWithTier(tier));
+      expect(zooms).not.toContain(MapZoom.ORBIT_DETAIL);
+      expect(zooms).not.toContain(MapZoom.CRAFT_TO_TARGET);
+    }
+  });
+
+  it('returns an empty list when Tracking Station is not built', () => {
+    expect(getInspectionAllowedZooms(makeStateWithTier(0))).toEqual([]);
   });
 });

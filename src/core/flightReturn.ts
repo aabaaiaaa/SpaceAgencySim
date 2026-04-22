@@ -230,7 +230,7 @@ export function processFlightReturn(state: GameState, flightState: FlightState, 
         const rocketDesign = state.rockets?.find((r) => r.id === flightState.rocketId);
         const craftName = rocketDesign?.name ?? `Craft-${(flightState.rocketId ?? '').slice(0, 6)}`;
         const fieldStatus = wasInOrbit ? FieldCraftStatus.IN_ORBIT : FieldCraftStatus.LANDED;
-        deployedFieldCraft = createFieldCraft(state, { name: craftName, bodyId: landingBodyId, status: fieldStatus, crewIds: survivingIds, hasExtendedLifeSupport: hasExtendedLifeSupport(assembly, ps), deployedPeriod: state.currentPeriod, orbitalElements: flightState?.orbitalElements ?? null, orbitBandId: flightState?.orbitBandId ?? null });
+        deployedFieldCraft = createFieldCraft(state, { name: craftName, bodyId: landingBodyId, status: fieldStatus, crewIds: survivingIds, hasExtendedLifeSupport: hasExtendedLifeSupport(assembly, ps), deployedPeriod: state.currentPeriod, orbitalElements: flightState?.orbitalElements ?? null, orbitBandId: flightState?.orbitBandId ?? null, rocketDesignId: flightState?.rocketId });
         state.fieldCraft.push(deployedFieldCraft);
       }
     }

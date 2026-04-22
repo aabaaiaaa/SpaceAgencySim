@@ -16,6 +16,7 @@
 
 import { getPartById, ActivationBehaviour } from '../data/parts.ts';
 import { getInstrumentKey }                from './sciencemodule.ts';
+import type { RocketDesign }               from './gameState.ts';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -736,4 +737,98 @@ export function fireStagingStep(config: StagingConfig): StagingStepResult {
     config.currentStageIdx = nextStageIndex;
   }
   return { firedStageIndex, nextStageIndex, instanceIds };
+}
+
+// ---------------------------------------------------------------------------
+// Design → Assembly / StagingConfig reconstruction
+// ---------------------------------------------------------------------------
+
+/** Positional tolerance for snap-point matching when rebuilding connections. */
+const SNAP_TOLERANCE = 1;
+
+/**
+ * Rebuild the connection graph by finding pairs of snap points that coincide
+ * positionally.  Called after re-placing parts from a saved design — the
+ * fuel system's BFS traversal requires these edges to route propellant.
+ */
+function _rebuildConnectionsFromDesign(assembly: RocketAssembly): void {
+  const parts = [...assembly.parts.values()];
+  const occupied = new Set<string>();
+
+  for (let i = 0; i < parts.length; i++) {
+    const pA = parts[i];
+    const defA = getPartById(pA.partId);
+    if (!defA) continue;
+
+    for (let j = i + 1; j < parts.length; j++) {
+      const pB = parts[j];
+      const defB = getPartById(pB.partId);
+      if (!defB) continue;
+
+      for (let si = 0; si < defA.snapPoints.length; si++) {
+        const spA = defA.snapPoints[si];
+        const keyA = `${pA.instanceId}:${si}`;
+        if (occupied.has(keyA)) continue;
+
+        const awx = pA.x + spA.offsetX;
+        const awy = pA.y - spA.offsetY;
+        const neededSide = OPPOSITE_SIDE[spA.side];
+
+        for (let sj = 0; sj < defB.snapPoints.length; sj++) {
+          const spB = defB.snapPoints[sj];
+          if (spB.side !== neededSide) continue;
+          const keyB = `${pB.instanceId}:${sj}`;
+          if (occupied.has(keyB)) continue;
+
+          const bwx = pB.x + spB.offsetX;
+          const bwy = pB.y - spB.offsetY;
+          if (Math.abs(awx - bwx) < SNAP_TOLERANCE && Math.abs(awy - bwy) < SNAP_TOLERANCE) {
+            connectParts(assembly, pA.instanceId, si, pB.instanceId, sj);
+            occupied.add(keyA);
+            occupied.add(keyB);
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Reconstruct a live RocketAssembly from a saved RocketDesign.
+ *
+ * Parts are re-added in saved order so the auto-generated instanceIds match
+ * the design's staging references.  Connections are inferred by snap-point
+ * positional coincidence.
+ */
+export function designToAssembly(design: RocketDesign): RocketAssembly {
+  const assembly = createRocketAssembly();
+  for (const part of design.parts) {
+    addPartToAssembly(assembly, part.partId, part.position.x, part.position.y);
+  }
+  _rebuildConnectionsFromDesign(assembly);
+  return assembly;
+}
+
+/**
+ * Reconstruct a live StagingConfig from a saved RocketDesign's staging data.
+ * Falls back to a default single-stage config if staging data is missing.
+ */
+export function designToStagingConfig(design: RocketDesign, assembly: RocketAssembly): StagingConfig {
+  const staging = design.staging;
+
+  if (staging && Array.isArray(staging.stages)) {
+    const config: StagingConfig = {
+      stages:          staging.stages.map((ids) => ({
+        instanceIds: Array.isArray(ids) ? ids.map(String) : [],
+      })),
+      unstaged:        Array.isArray(staging.unstaged) ? staging.unstaged.map(String) : [],
+      currentStageIdx: 0,
+    };
+    syncStagingWithAssembly(assembly, config);
+    return config;
+  }
+
+  const config = createStagingConfig();
+  syncStagingWithAssembly(assembly, config);
+  return config;
 }

@@ -218,7 +218,7 @@ export function undock(dockingState: DockingSystemState, ps: PhysicsState, assem
   const elements: OrbitalElements | null = flightState.orbitalElements ? { ...flightState.orbitalElements } : computeOrbitalElements(ps.posX, ps.posY, ps.velX, ps.velY, bodyId);
   if (elements) {
     elements.meanAnomalyAtEpoch += 0.001;
-    state.orbitalObjects.push({ id: objectId, bodyId, type: OrbitalObjectType.CRAFT, name: `Undocked-${objectId.slice(0, 6)}`, elements });
+    state.orbitalObjects.push({ id: objectId, bodyId, type: OrbitalObjectType.CRAFT, name: `Undocked-${objectId.slice(0, 6)}`, elements, rocketDesignId: flightState.rocketId });
   }
   flightState.events.push({ time: flightState.timeElapsed, type: 'UNDOCKING_COMPLETE', description: `Undocked from ${objectId}` });
   dockingState.combinedMass = _calculateCombinedMass(ps, assembly, dockingState, state);

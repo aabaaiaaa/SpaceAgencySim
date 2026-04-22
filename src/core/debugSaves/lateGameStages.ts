@@ -63,8 +63,17 @@ function addSatellites(
     phaseOffset?: number;
   }>,
 ): void {
+  // Default rocket-design link so Take-Control works on debug-loaded sats.
+  // Prefer the 'sat-bus' role; otherwise fall back to the first saved design.
+  const defaultDesign =
+    s.savedDesigns.find((d) => /bus|sat/i.test(d.name)) ??
+    s.savedDesigns[0] ??
+    null;
   for (const r of recs) {
-    const { orbitalObject, satelliteRecord } = makeSatellite(r);
+    const { orbitalObject, satelliteRecord } = makeSatellite({
+      ...r,
+      rocketDesignId: defaultDesign?.id,
+    });
     s.orbitalObjects.push(orbitalObject);
     s.satelliteNetwork.satellites.push(satelliteRecord);
   }

@@ -169,6 +169,8 @@ interface CreateFieldCraftOptions {
   orbitalElements?: OrbitalElements | null;
   /** Altitude band, or null. */
   orbitBandId?: string | null;
+  /** RocketDesign ID used to rebuild the assembly for Take-Control. */
+  rocketDesignId?: string;
 }
 
 /**
@@ -186,6 +188,7 @@ export function createFieldCraft(
     deployedPeriod,
     orbitalElements = null,
     orbitBandId = null,
+    rocketDesignId,
   }: CreateFieldCraftOptions,
 ): FieldCraft {
   const id = `fc-${state.nextFieldCraftId++}`;
@@ -200,6 +203,7 @@ export function createFieldCraft(
     deployedPeriod,
     orbitalElements: orbitalElements ? { ...orbitalElements } : null,
     orbitBandId,
+    rocketDesignId,
   };
 }
 

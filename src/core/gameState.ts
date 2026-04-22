@@ -400,6 +400,12 @@ export interface OrbitalObject {
   radius?: number;
   /** Mass in kg (for asteroids). */
   mass?: number;
+  /**
+   * ID of the RocketDesign this object was built from (CRAFT / STATION types).
+   * Used by the Tracking Station "Take Control" flow to rebuild the assembly.
+   * Optional — older saves and non-player objects won't have it.
+   */
+  rocketDesignId?: string;
 }
 
 /** State of a single built facility. */
@@ -586,6 +592,12 @@ export interface FieldCraft {
   orbitalElements: OrbitalElements | null;
   /** Altitude band ID if in orbit (e.g. 'LEO'). */
   orbitBandId: string | null;
+  /**
+   * ID of the RocketDesign this craft was built from, used by the Tracking
+   * Station "Take Control" flow to rebuild the assembly.  Optional because
+   * saves written before this field existed won't have it.
+   */
+  rocketDesignId?: string;
 }
 
 /** A single recovered part sitting in the player's inventory. */
