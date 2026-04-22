@@ -509,47 +509,49 @@ function onDragEnd(e: PointerEvent): void {
     return;
   }
 
-  // --- Drop on parts panel = discard / delete ---------------------------
+  // --- Drop on parts panel or open inventory panel = discard / delete ---
   const partsPanel = document.getElementById('vab-parts-panel');
-  if (partsPanel) {
-    const panelRect = partsPanel.getBoundingClientRect();
-    const overPanel = (
-      e.clientX >= panelRect.left && e.clientX <= panelRect.right &&
-      e.clientY >= panelRect.top  && e.clientY <= panelRect.bottom
+  const inventoryPanel = document.getElementById('vab-inventory-panel');
+  const isOverRect = (el: HTMLElement | null): boolean => {
+    if (!el || el.hasAttribute('hidden')) return false;
+    const r = el.getBoundingClientRect();
+    return (
+      e.clientX >= r.left && e.clientX <= r.right &&
+      e.clientY >= r.top  && e.clientY <= r.bottom
     );
-    if (overPanel) {
-      if (instanceId !== null) {
-        // Record deletion undo BEFORE removing (uses pre-move connections).
-        const stagingBefore = snapshotStaging();
-        const costRefund = getPartById(partId)?.cost ?? 0;
-        // Re-add the old connections temporarily so recordDeletion can capture them.
-        if (_preMoveData) {
-          for (const c of _preMoveData.oldConnections) S.assembly!.connections.push({ ...c });
-          // Restore old position temporarily for accurate snapshot.
-          const p = S.assembly!.parts.get(instanceId);
-          if (p) { p.x = _preMoveData.oldX; p.y = _preMoveData.oldY; }
-        }
-        recordDeletion([instanceId], costRefund, stagingBefore);
-        // Remove the temporary connections before the actual removal.
-        if (_preMoveData) {
-          for (let i = S.assembly!.connections.length - 1; i >= 0; i--) {
-            const c = S.assembly!.connections[i];
-            if (c.fromInstanceId === instanceId || c.toInstanceId === instanceId) {
-              S.assembly!.connections.splice(i, 1);
-            }
+  };
+  if (isOverRect(partsPanel) || isOverRect(inventoryPanel)) {
+    if (instanceId !== null) {
+      // Record deletion undo BEFORE removing (uses pre-move connections).
+      const stagingBefore = snapshotStaging();
+      const costRefund = getPartById(partId)?.cost ?? 0;
+      // Re-add the old connections temporarily so recordDeletion can capture them.
+      if (_preMoveData) {
+        for (const c of _preMoveData.oldConnections) S.assembly!.connections.push({ ...c });
+        // Restore old position temporarily for accurate snapshot.
+        const p = S.assembly!.parts.get(instanceId);
+        if (p) { p.x = _preMoveData.oldX; p.y = _preMoveData.oldY; }
+      }
+      recordDeletion([instanceId], costRefund, stagingBefore);
+      // Remove the temporary connections before the actual removal.
+      if (_preMoveData) {
+        for (let i = S.assembly!.connections.length - 1; i >= 0; i--) {
+          const c = S.assembly!.connections[i];
+          if (c.fromInstanceId === instanceId || c.toInstanceId === instanceId) {
+            S.assembly!.connections.splice(i, 1);
           }
         }
-        _preMoveData = null;
-        refundOrReturnPart(instanceId, partId, _vabRefreshPartsFn);
-        if (S.selectedInstanceId === instanceId) setSelectedPart(null);
-        removePartFromAssembly(S.assembly!, instanceId);
-        _syncAndRenderStagingFn();
-        _runAndRenderValidationFn();
-        refreshInventoryPanel();
       }
-      vabRenderParts();
-      return;
+      _preMoveData = null;
+      refundOrReturnPart(instanceId, partId, _vabRefreshPartsFn);
+      if (S.selectedInstanceId === instanceId) setSelectedPart(null);
+      removePartFromAssembly(S.assembly!, instanceId);
+      _syncAndRenderStagingFn();
+      _runAndRenderValidationFn();
+      refreshInventoryPanel();
     }
+    vabRenderParts();
+    return;
   }
 
   // Determine world drop position.

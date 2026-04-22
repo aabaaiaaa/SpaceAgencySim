@@ -208,9 +208,6 @@ export function initVabUI(
     <div id="vab-toolbar">
       <div class="vab-toolbar-btns">
         <button class="vab-btn" id="vab-back-btn" type="button">&#8592; Hub</button>
-        <button class="vab-btn" id="vab-btn-inventory" type="button">
-          Inventory
-        </button>
         <button class="vab-btn" id="vab-btn-engineer" type="button">
           Rocket Engineer
         </button>
@@ -247,6 +244,9 @@ export function initVabUI(
                min="0.25" max="4" step="0.05" value="1"
                title="Zoom level">
         <span class="vab-toolbar-spacer"></span>
+        <button class="vab-btn" id="vab-btn-inventory" type="button">
+          Inventory
+        </button>
         <span class="vab-toolbar-stat" id="vab-status-parts">Parts: 0</span>
         <span class="vab-toolbar-stat" id="vab-status-mass">Mass: 0 kg</span>
         <span class="vab-toolbar-stat vab-toolbar-cost" id="vab-status-cost">Cost: $0</span>
