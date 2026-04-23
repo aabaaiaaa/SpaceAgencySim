@@ -80,16 +80,26 @@ export type MapThrustDir = (typeof MapThrustDir)[keyof typeof MapThrustDir];
 // ---------------------------------------------------------------------------
 
 /** A point on the map with optional time label. */
-interface MapPoint {
+export interface MapPoint {
   x: number;
   y: number;
 }
 
 /** A prediction point on the map with time. */
-interface MapPrediction {
+export interface MapPrediction {
   x: number;
   y: number;
   t: number;
+}
+
+/** Result of {@link generateSuborbitalArc}. */
+export interface SuborbitalArc {
+  /** Above-surface polyline, in time order starting from startTime. */
+  path: MapPoint[];
+  /** Evenly-spaced-in-time samples along the arc, for prediction-tick rendering. */
+  predictions: MapPrediction[];
+  /** Body-centred impact position and time, or null if the arc never intersects the surface. */
+  impact: { x: number; y: number; t: number } | null;
 }
 
 /** A transfer target for display on the map. */
@@ -317,6 +327,91 @@ export function generateOrbitPredictions(
     predictions.push({ x: pos.x, y: pos.y, t });
   }
   return predictions;
+}
+
+/**
+ * Generate a suborbital arc starting from the craft's current position and
+ * walking forward in time along the (ellipse-shaped) trajectory until it
+ * intersects the body's surface, or until a full orbital period has been
+ * sampled if no intersection occurs.
+ *
+ * Used by the map view to draw the path an ascending or descending craft
+ * will take — the apoapsis remains geometric, so callers can draw it
+ * directly from the elements; this helper focuses on the time-ordered
+ * above-surface polyline and the future impact point.
+ */
+export function generateSuborbitalArc(
+  elements: OrbitalElements,
+  bodyId: string,
+  currentTime: number,
+  numSamples: number = 120,
+): SuborbitalArc {
+  const R = BODY_RADIUS[bodyId];
+  const period = getOrbitalPeriod(elements.semiMajorAxis, bodyId);
+
+  // Phase 1: coarse scan to locate impact (if any) within one orbital period.
+  const scanSamples = 240;
+  const scanDt = period / scanSamples;
+  let impactTime: number | null = null;
+  {
+    const start = getObjectMapPosition(elements, currentTime, bodyId);
+    let prevR = Math.hypot(start.x, start.y);
+    for (let i = 1; i <= scanSamples; i++) {
+      const t = currentTime + scanDt * i;
+      const pos = getObjectMapPosition(elements, t, bodyId);
+      const r = Math.hypot(pos.x, pos.y);
+      if (prevR >= R && r < R) {
+        const frac = (prevR - R) / (prevR - r);
+        impactTime = currentTime + scanDt * (i - 1) + scanDt * frac;
+        break;
+      }
+      prevR = r;
+    }
+  }
+
+  // Phase 2: resample the above-surface window at numSamples points so short
+  // arcs get the same visual resolution as long ones.
+  const endTime = impactTime ?? (currentTime + period);
+  const span = endTime - currentTime;
+  const dt = span / numSamples;
+
+  const path: MapPoint[] = [];
+  const sampleTimes: number[] = [];
+  for (let i = 0; i <= numSamples; i++) {
+    const t = currentTime + dt * i;
+    const pos = getObjectMapPosition(elements, t, bodyId);
+    const r = Math.hypot(pos.x, pos.y);
+    if (impactTime !== null && i === numSamples) {
+      // Snap final point exactly to impact.
+      const rawR = Math.hypot(pos.x, pos.y) || 1;
+      path.push({ x: pos.x * (R / rawR), y: pos.y * (R / rawR) });
+      sampleTimes.push(impactTime);
+    } else if (r >= R) {
+      path.push(pos);
+      sampleTimes.push(t);
+    }
+  }
+
+  let impact: SuborbitalArc['impact'] = null;
+  if (impactTime !== null && path.length > 0) {
+    const last = path[path.length - 1];
+    impact = { x: last.x, y: last.y, t: impactTime };
+  }
+
+  // Evenly-spaced prediction ticks across the above-surface path (excluding
+  // the endpoints). Up to 12 ticks; gracefully reduces for short arcs.
+  const predictions: MapPrediction[] = [];
+  const maxTicks = 12;
+  if (path.length >= 3) {
+    const interior = path.length - 2;
+    const ticks = Math.min(maxTicks, interior);
+    for (let k = 1; k <= ticks; k++) {
+      const idx = Math.max(1, Math.min(path.length - 2, Math.round((interior * k) / (ticks + 1)) + 1));
+      predictions.push({ x: path[idx].x, y: path[idx].y, t: sampleTimes[idx] });
+    }
+  }
+
+  return { path, predictions, impact };
 }
 
 // ---------------------------------------------------------------------------

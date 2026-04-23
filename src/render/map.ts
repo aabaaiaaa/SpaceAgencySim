@@ -37,6 +37,7 @@ import {
   getViewRadius,
   MapZoom,
   generateOrbitPredictions,
+  generateSuborbitalArc,
   getMapTransferTargets,
   getMapTransferRoute,
   generateTransferTrajectory,
@@ -77,6 +78,8 @@ const PREDICTION_COLOR  = 0x00ccff;
 const SHADOW_COLOR      = 0x000000;
 const PE_COLOR          = 0x44aaff;
 const AP_COLOR          = 0xff6644;
+const SUBORBITAL_COLOR  = 0xffaa30;
+const IMPACT_COLOR      = 0xff4040;
 
 const TRANSFER_TARGET_COLOR = 0xffcc44;
 const TRANSFER_ROUTE_COLOR  = 0xffaa22;
@@ -1510,31 +1513,59 @@ function _drawCraft(ps: ReadonlyPhysicsState, flightState: ReadonlyFlightState, 
     // Periapsis & apoapsis markers.
     _drawApsides(flightState.orbitalElements, bodyId, cx, cy, scale);
   } else {
-    // Sub-orbital — project the trajectory as if it were a (possibly
-    // intersecting-surface) ellipse and clip to above-surface.
+    // Sub-orbital — mirror the stable-orbit render (arc, apsides, predictions,
+    // labels) so the player can see the shape of their ballistic trajectory,
+    // where it peaks, and where it'll hit the ground.
     const projected = computeOrbitalElements(
       ps.posX, ps.posY, ps.velX, ps.velY, bodyId, flightState.timeElapsed,
     );
     if (projected) {
-      const path = generateOrbitPath(projected, bodyId, 180);
-      let started = false;
-      for (let i = 0; i < path.length; i++) {
-        const r = Math.sqrt(path[i].x ** 2 + path[i].y ** 2);
-        if (r > R) {
-          const px = cx + path[i].x * scale;
-          const py = cy - path[i].y * scale;
-          if (!started) {
-            _orbitsGraphics!.moveTo(px, py);
-            started = true;
-          } else {
-            _orbitsGraphics!.lineTo(px, py);
-          }
-        } else {
-          started = false;
+      const arc = generateSuborbitalArc(projected, bodyId, flightState.timeElapsed);
+
+      // Path polyline (above surface, start → impact).
+      if (arc.path.length >= 2) {
+        _orbitsGraphics!.moveTo(cx + arc.path[0].x * scale, cy - arc.path[0].y * scale);
+        for (let i = 1; i < arc.path.length; i++) {
+          _orbitsGraphics!.lineTo(cx + arc.path[i].x * scale, cy - arc.path[i].y * scale);
         }
+        _orbitsGraphics!.stroke({ color: SUBORBITAL_COLOR, width: 2, alpha: 0.7 });
       }
-      if (started) {
-        _orbitsGraphics!.stroke({ color: CRAFT_ORBIT_COLOR, width: 1.5, alpha: 0.4 });
+
+      // Prediction ticks along the arc.
+      for (let i = 0; i < arc.predictions.length; i++) {
+        const p = arc.predictions[i];
+        const px = cx + p.x * scale;
+        const py = cy - p.y * scale;
+        const alpha = 0.6 - (i / Math.max(1, arc.predictions.length)) * 0.35;
+        _orbitsGraphics!.circle(px, py, 1.5);
+        _orbitsGraphics!.fill({ color: SUBORBITAL_COLOR, alpha });
+      }
+
+      // Apoapsis marker + label (geometric — position derived from elements).
+      const { semiMajorAxis: a, eccentricity: e, argPeriapsis: omega } = projected;
+      const rAp  = a * (1 + e);
+      const apX  = cx + rAp * Math.cos(omega + Math.PI) * scale;
+      const apY  = cy - rAp * Math.sin(omega + Math.PI) * scale;
+      const apAlt = rAp - R;
+      if (apAlt > 0) {
+        _orbitsGraphics!.circle(apX, apY, 3);
+        _orbitsGraphics!.stroke({ color: AP_COLOR, width: 1.5 });
+        _useLabel(`Ap ${_fmtAlt(apAlt)}`, apX + 6, apY - 5, AP_COLOR);
+      }
+
+      // Impact marker + altitude-zero label.
+      if (arc.impact) {
+        const ix = cx + arc.impact.x * scale;
+        const iy = cy - arc.impact.y * scale;
+        _orbitsGraphics!.circle(ix, iy, 4);
+        _orbitsGraphics!.stroke({ color: IMPACT_COLOR, width: 1.5 });
+        // Crosshair lines for clarity.
+        _orbitsGraphics!.moveTo(ix - 5, iy);
+        _orbitsGraphics!.lineTo(ix + 5, iy);
+        _orbitsGraphics!.moveTo(ix, iy - 5);
+        _orbitsGraphics!.lineTo(ix, iy + 5);
+        _orbitsGraphics!.stroke({ color: IMPACT_COLOR, width: 1 });
+        _useLabel('Impact', ix + 7, iy - 5, IMPACT_COLOR);
       }
     }
   }

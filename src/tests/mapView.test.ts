@@ -8,6 +8,7 @@ import {
   getObjectMapPosition,
   computeOrbitalThrustAngle,
   generateOrbitPredictions,
+  generateSuborbitalArc,
   isMapViewAvailable,
   getMapTransferTargets,
   generateTransferTrajectory,
@@ -722,5 +723,82 @@ describe('getInspectionAllowedZooms', () => {
 
   it('returns an empty list when Tracking Station is not built', () => {
     expect(getInspectionAllowedZooms(makeStateWithTier(0))).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suborbital arc generation
+// ---------------------------------------------------------------------------
+
+describe('generateSuborbitalArc', () => {
+  it('@smoke returns an above-surface path and an impact point for a ballistic trajectory', () => {
+    // Ascending with mixed vertical/horizontal velocity — representative of an
+    // in-flight rocket during its gravity turn.
+    const elements = computeOrbitalElements(0, 20_000, 2000, 1500, 'EARTH', 0);
+    expect(elements).not.toBeNull();
+
+    const arc = generateSuborbitalArc(elements!, 'EARTH', 0);
+
+    expect(arc.path.length).toBeGreaterThan(1);
+    // All path points are at or above the body radius.
+    const R = BODY_RADIUS.EARTH;
+    for (const pt of arc.path) {
+      const r = Math.hypot(pt.x, pt.y);
+      expect(r).toBeGreaterThanOrEqual(R - 1);
+    }
+
+    expect(arc.impact).not.toBeNull();
+    expect(arc.impact!.t).toBeGreaterThan(0);
+    // Impact is on the body surface (within numerical tolerance).
+    const impactR = Math.hypot(arc.impact!.x, arc.impact!.y);
+    expect(Math.abs(impactR - R)).toBeLessThan(R * 0.01);
+  });
+
+  it('has predictions spaced in time from startTime to impact', () => {
+    const elements = computeOrbitalElements(0, 30_000, 3000, 1500, 'EARTH', 0);
+    const arc = generateSuborbitalArc(elements!, 'EARTH', 0);
+
+    expect(arc.predictions.length).toBeGreaterThan(1);
+    // Times are monotonically increasing and bounded by impact time.
+    for (let i = 1; i < arc.predictions.length; i++) {
+      expect(arc.predictions[i].t).toBeGreaterThan(arc.predictions[i - 1].t);
+    }
+    if (arc.impact) {
+      for (const p of arc.predictions) {
+        expect(p.t).toBeLessThanOrEqual(arc.impact.t + 0.01);
+      }
+    }
+  });
+
+  it('returns null impact when the entire orbit is above surface', () => {
+    const elements = computeOrbitalElements(0, 200_000, 7788, 0, 'EARTH', 0);
+    expect(elements).not.toBeNull();
+
+    const arc = generateSuborbitalArc(elements!, 'EARTH', 0);
+
+    expect(arc.impact).toBeNull();
+    // Path wraps around a full orbit since there's no impact to terminate at.
+    expect(arc.path.length).toBeGreaterThan(10);
+  });
+
+  it('starts the path at the current craft position (not some arbitrary point)', () => {
+    // Ascending at 30 km with upward velocity + small horizontal component.
+    const startAlt = 30_000;
+    const startPosX = 5000;
+    const velX = 200;
+    const velY = 800;
+    const elements = computeOrbitalElements(startPosX, startAlt, velX, velY, 'EARTH', 0);
+    expect(elements).not.toBeNull();
+
+    const arc = generateSuborbitalArc(elements!, 'EARTH', 0);
+
+    expect(arc.path.length).toBeGreaterThan(1);
+    const first = arc.path[0];
+    const R = BODY_RADIUS.EARTH;
+    // First path point should correspond roughly to the craft's current body-centred position.
+    const expectedX = startPosX;
+    const expectedY = startAlt + R;
+    expect(Math.abs(first.x - expectedX)).toBeLessThan(Math.max(1000, expectedX * 0.02));
+    expect(Math.abs(first.y - expectedY)).toBeLessThan(Math.max(1000, expectedY * 0.02));
   });
 });

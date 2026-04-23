@@ -158,7 +158,7 @@ function _buildFlightSection(): HTMLDivElement {
     <h3>Staging & Other</h3>
     <table class="help-table">
       <tr><td><kbd>Space</kbd></td><td>Fire next stage (engines, decouplers, parachutes)</td></tr>
-      <tr><td><kbd>M</kbd></td><td>Toggle map view (when in orbit)</td></tr>
+      <tr><td><kbd>M</kbd></td><td>Toggle map view (any time during flight, requires Tracking Station). Shows your current trajectory — bound orbits as ellipses, suborbital arcs as amber lines with an apoapsis marker and an impact point.</td></tr>
       <tr><td><kbd>V</kbd></td><td>Toggle docking mode (when in orbit)</td></tr>
       <tr><td><kbd>R</kbd></td><td>Toggle RCS mode (inside docking mode)</td></tr>
     </table>
