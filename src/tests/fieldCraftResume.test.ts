@@ -19,6 +19,7 @@ function makeFieldCraft(overrides: Partial<FieldCraft> = {}): FieldCraft {
     crewIds: ['crew-1'],
     suppliesRemaining: 10,
     hasExtendedLifeSupport: false,
+    hasCommandCapability: true,
     deployedPeriod: 0,
     orbitalElements: makeCircularElements(200_000),
     orbitBandId: 'LEO',
@@ -71,6 +72,18 @@ describe('canResumeFieldCraft @smoke', () => {
   it('returns false when the craft id does not match any field craft', () => {
     const state = makeStateWithField(makeFieldCraft());
     expect(canResumeFieldCraft(state, 'fc-does-not-exist')).toBe(false);
+  });
+
+  it('returns true when the linked design lives only in state.rockets (VAB quick-launch)', () => {
+    // VAB quick-launch pushes the ad-hoc design to state.rockets, not
+    // state.savedDesigns. Take Control must still resolve it.
+    const design = makeRocketDesign({ id: 'launch-123' });
+    const state = makeGameState({
+      fieldCraft: [makeFieldCraft({ rocketDesignId: 'launch-123' })],
+      savedDesigns: [],
+      rockets: [design],
+    });
+    expect(canResumeFieldCraft(state, 'fc-1')).toBe(true);
   });
 });
 
@@ -145,6 +158,18 @@ describe('prepareFieldCraftResume', () => {
       expect(err).toBeInstanceOf(ResumeUnavailableError);
       expect((err as ResumeUnavailableError).reason).toBe('designNotFound');
     }
+  });
+
+  it('prepares a flight when the design lives only in state.rockets (VAB quick-launch)', () => {
+    const design = makeRocketDesign({ id: 'launch-456' });
+    const state = makeGameState({
+      fieldCraft: [makeFieldCraft({ rocketDesignId: 'launch-456' })],
+      savedDesigns: [],
+      rockets: [design],
+    });
+    const prep = prepareFieldCraftResume(state, 'fc-1');
+    expect(prep.design.id).toBe('launch-456');
+    expect(prep.flightState.rocketId).toBe('launch-456');
   });
 
   it('does not mutate the field craft or design arrays on success', () => {

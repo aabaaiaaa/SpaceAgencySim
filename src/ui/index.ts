@@ -344,7 +344,12 @@ async function loadScreen<T>(importFn: () => Promise<T>, screenName: string): Pr
 
 /**
  * Handle a navigation request from the hub.
+ *
+ * Exported as `handleNavigation` for external callers (e.g. the debug-save
+ * panel needs to wire the rebuilt hub's onNavigate after a state reload).
  */
+export { _handleNavigation as handleNavigation };
+
 async function _handleNavigation(container: HTMLElement, state: GameState, destination: string): Promise<void> {
   // Block navigation to unbuilt facilities (except in sandbox where all are built).
   if (state.gameMode !== GameMode.SANDBOX && !hasFacility(state, destination)) {
@@ -360,6 +365,14 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
       setTimeout(() => msg.remove(), 2000);
     }
     return;
+  }
+
+  // Crew Hab plays the crew-management role at off-world hubs — route its
+  // click to the Crew Administration screen.  Done AFTER the built-check
+  // so the check verifies 'crew-hab' (which is built) rather than
+  // 'crew-admin' (which is Earth-only).
+  if (destination === 'crew-hab') {
+    destination = 'crew-admin';
   }
 
   if (destination === 'vab') {
@@ -609,26 +622,18 @@ async function _handleNavigation(container: HTMLElement, state: GameState, desti
         _cachedLogistics = mod;
         hideLoadingIndicator();
 
-        mod.openLogisticsPanel(state, container);
-        _logisticsOpen = true;
-
-        // Override back button to return to hub
-        const backBtn = document.getElementById('logistics-back-btn');
-        if (backBtn) {
-          // Clone to remove existing listeners
-          const newBtn = backBtn.cloneNode(true) as HTMLElement;
-          backBtn.replaceWith(newBtn);
-          _getListeners().add(newBtn, 'click', () => {
-            _cachedLogistics?.closeLogisticsPanel();
-            _logisticsOpen = false;
-            _clearListeners();
-            setCurrentScreen('hub');
-            showHubScene();
-            initHubUI(container, state, (dest: string) => {
-              void _handleNavigation(container, state, dest);
-            });
+        const onBack = (): void => {
+          _cachedLogistics?.closeLogisticsPanel();
+          _logisticsOpen = false;
+          _clearListeners();
+          setCurrentScreen('hub');
+          showHubScene();
+          initHubUI(container, state, (dest: string) => {
+            void _handleNavigation(container, state, dest);
           });
-        }
+        };
+        mod.openLogisticsPanel(state, container, onBack);
+        _logisticsOpen = true;
       }
     }
 

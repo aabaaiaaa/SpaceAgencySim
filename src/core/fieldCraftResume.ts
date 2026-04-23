@@ -90,6 +90,18 @@ const RESUMABLE_ORBITAL_TYPES = new Set<string>([
   OrbitalObjectType.SATELLITE,
 ]);
 
+/**
+ * Look up a rocket design by id across both state.savedDesigns (user-saved
+ * templates) and state.rockets (ad-hoc launch designs). VAB quick-launches
+ * push to state.rockets only, so falling back keeps those craft resumable.
+ */
+function _findDesign(state: GameState, designId: string): RocketDesign | undefined {
+  return (
+    (state.savedDesigns ?? []).find((d) => d.id === designId)
+    ?? (state.rockets ?? []).find((d) => d.id === designId)
+  );
+}
+
 export function canResumeCraft(state: GameState, craftId: string): boolean {
   const hit = _lookupCraft(state, craftId);
   if (!hit) return false;
@@ -102,7 +114,7 @@ export function canResumeCraft(state: GameState, craftId: string): boolean {
     designId = hit.orbitalObject!.rocketDesignId;
   }
   if (!designId) return false;
-  return !!(state.savedDesigns ?? []).find((d) => d.id === designId);
+  return !!_findDesign(state, designId);
 }
 
 /** Back-compat alias used by the crewed-vessels sidebar card. */
@@ -157,7 +169,7 @@ export function prepareCraftResume(state: GameState, craftId: string): ResumePre
   if (!designId) {
     throw new ResumeUnavailableError('noDesignLinked', `${displayName} has no linked rocket design`);
   }
-  const design = (state.savedDesigns ?? []).find((d) => d.id === designId);
+  const design = _findDesign(state, designId);
   if (!design) {
     throw new ResumeUnavailableError('designNotFound', `Rocket design ${designId} (for ${displayName}) is no longer available`);
   }

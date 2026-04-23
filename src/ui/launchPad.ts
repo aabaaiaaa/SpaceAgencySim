@@ -29,6 +29,8 @@ import { getActiveCrew } from '../core/crew.ts';
 import { getFacilityTier } from '../core/construction.ts';
 import { getTotalMass } from '../core/rocketvalidator.ts';
 import { createFlightState } from '../core/gameState.ts';
+import type { CelestialBody } from '../core/constants.ts';
+import { getActiveHub } from '../core/hubs.ts';
 import { startFlightScene } from './flightController/_init.ts';
 import { handleFlightEndReturnToHub } from './index.ts';
 import { buildRocketCard } from './rocketCardUtil.ts';
@@ -667,6 +669,11 @@ function _doLaunch(
     if (def) totalFuel += (def.properties?.fuelMass as number) ?? 0;
   }
 
+  // Resolve launch context from the active hub so a craft launched from
+  // (e.g.) the Mun base spawns on the Mun, not Earth.
+  const activeHub = getActiveHub(_state);
+  const isOrbitalLaunch = activeHub.type === 'orbital';
+
   // Write the live flight state.
   _state.currentFlight = createFlightState({
     missionId,
@@ -674,7 +681,14 @@ function _doLaunch(
     crewIds,
     fuelRemaining:   totalFuel,
     deltaVRemaining: 0,
+    bodyId:          activeHub.bodyId as CelestialBody,
+    launchType:      isOrbitalLaunch ? 'orbital' : 'surface',
+    launchHubId:     activeHub.id,
   });
+
+  if (isOrbitalLaunch) {
+    _state.currentFlight.altitude = activeHub.altitude ?? 200_000;
+  }
 
 
   // Capture references before destroying the launch pad overlay.

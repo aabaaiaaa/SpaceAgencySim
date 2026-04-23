@@ -984,14 +984,19 @@ describe('processFlightReturn() — field craft', () => {
     );
     state.rockets = [{ id: 'rocket-1', name: 'Orbital Vessel' } as GameState['rockets'][number]];
 
-    const ps = makePhysicsState({ landed: false, crashed: false });
+    const assembly = makeAssembly([['cmd-1', { partId: 'cmd-mk1' }]]);
+    const ps = makePhysicsState({
+      landed: false,
+      crashed: false,
+      activeParts: new Set(['cmd-1']),
+    });
     const fs = makeFlightState(null, {
       crewIds: ['crew-orbit'],
       inOrbit: true,
       bodyId: 'EARTH',
     });
 
-    const result = processFlightReturn(state, fs, ps, null);
+    const result = processFlightReturn(state, fs, ps, assembly);
 
     expect(result.deployedFieldCraft).not.toBeNull();
     expect(result.deployedFieldCraft!.crewIds).toContain('crew-orbit');
@@ -1005,13 +1010,18 @@ describe('processFlightReturn() — field craft', () => {
     );
     state.rockets = [{ id: 'rocket-1', name: 'Lunar Lander' } as GameState['rockets'][number]];
 
-    const ps = makePhysicsState({ landed: true, crashed: false });
+    const assembly = makeAssembly([['cmd-1', { partId: 'cmd-mk1' }]]);
+    const ps = makePhysicsState({
+      landed: true,
+      crashed: false,
+      activeParts: new Set(['cmd-1']),
+    });
     const fs = makeFlightState(null, {
       crewIds: ['crew-moon'],
       bodyId: 'MOON',
     });
 
-    const result = processFlightReturn(state, fs, ps, null);
+    const result = processFlightReturn(state, fs, ps, assembly);
 
     expect(result.deployedFieldCraft).not.toBeNull();
     expect(result.deployedFieldCraft!.status).toBe(FieldCraftStatus.LANDED);
@@ -1034,16 +1044,122 @@ describe('processFlightReturn() — field craft', () => {
     expect(result.deployedFieldCraft).toBeNull();
   });
 
-  it('does not create field craft for uncrewed flights', () => {
-    const ps = makePhysicsState({ landed: false, crashed: false });
+  it('creates field craft for uncrewed orbital flight with intact probe core', () => {
+    state.rockets = [{ id: 'rocket-1', name: 'Probe Alpha' } as GameState['rockets'][number]];
+
+    const assembly = makeAssembly([
+      ['probe-inst', { partId: 'probe-core-mk1' }],
+      ['tank-inst', { partId: 'tank-small' }],
+    ]);
+    const ps = makePhysicsState({
+      landed: false,
+      crashed: false,
+      activeParts: new Set(['probe-inst', 'tank-inst']),
+    });
+    const fs = makeFlightState(null, {
+      crewIds: [],
+      inOrbit: true,
+      bodyId: 'EARTH',
+    });
+
+    const result = processFlightReturn(state, fs, ps, assembly);
+
+    expect(result.deployedFieldCraft).not.toBeNull();
+    expect(result.deployedFieldCraft!.crewIds).toEqual([]);
+    expect(result.deployedFieldCraft!.status).toBe(FieldCraftStatus.IN_ORBIT);
+    expect(result.deployedFieldCraft!.hasCommandCapability).toBe(true);
+    expect(result.deployedFieldCraft!.rocketDesignId).toBe('rocket-1');
+    expect(state.fieldCraft.length).toBe(1);
+  });
+
+  it('creates field craft for uncrewed landing on non-Earth body with intact probe core', () => {
+    state.rockets = [{ id: 'rocket-1', name: 'Mun Probe' } as GameState['rockets'][number]];
+
+    const assembly = makeAssembly([
+      ['probe-inst', { partId: 'probe-core-mk1' }],
+    ]);
+    const ps = makePhysicsState({
+      landed: true,
+      crashed: false,
+      activeParts: new Set(['probe-inst']),
+    });
+    const fs = makeFlightState(null, {
+      crewIds: [],
+      bodyId: 'MOON',
+    });
+
+    const result = processFlightReturn(state, fs, ps, assembly);
+
+    expect(result.deployedFieldCraft).not.toBeNull();
+    expect(result.deployedFieldCraft!.status).toBe(FieldCraftStatus.LANDED);
+    expect(result.deployedFieldCraft!.bodyId).toBe('MOON');
+    expect(result.deployedFieldCraft!.crewIds).toEqual([]);
+    expect(result.deployedFieldCraft!.hasCommandCapability).toBe(true);
+  });
+
+  it('does not create field craft when uncrewed and no command capability', () => {
+    // Just a tank — no command module, no probe core.
+    const assembly = makeAssembly([
+      ['tank-inst', { partId: 'tank-small' }],
+    ]);
+    const ps = makePhysicsState({
+      landed: false,
+      crashed: false,
+      activeParts: new Set(['tank-inst']),
+    });
     const fs = makeFlightState(null, {
       crewIds: [],
       inOrbit: true,
     });
 
-    const result = processFlightReturn(state, fs, ps, null);
+    const result = processFlightReturn(state, fs, ps, assembly);
 
     expect(result.deployedFieldCraft).toBeNull();
+  });
+
+  it('does not create field craft when uncrewed and probe core destroyed', () => {
+    const assembly = makeAssembly([
+      ['probe-inst', { partId: 'probe-core-mk1' }],
+      ['tank-inst', { partId: 'tank-small' }],
+    ]);
+    // Probe is destroyed, only tank remains active.
+    const ps = makePhysicsState({
+      landed: false,
+      crashed: false,
+      activeParts: new Set(['tank-inst']),
+    });
+    const fs = makeFlightState(null, {
+      crewIds: [],
+      inOrbit: true,
+    });
+
+    const result = processFlightReturn(state, fs, ps, assembly);
+
+    expect(result.deployedFieldCraft).toBeNull();
+  });
+
+  it('creates field craft with hasCommandCapability=true when crew and command module intact', () => {
+    state.crew.push(testCrew({ id: 'crew-orbit', name: 'Orbiter' }));
+    state.rockets = [{ id: 'rocket-1', name: 'Orbital Vessel' } as GameState['rockets'][number]];
+
+    const assembly = makeAssembly([
+      ['cmd-1', { partId: 'cmd-mk1' }],
+    ]);
+    const ps = makePhysicsState({
+      landed: false,
+      crashed: false,
+      activeParts: new Set(['cmd-1']),
+    });
+    const fs = makeFlightState(null, {
+      crewIds: ['crew-orbit'],
+      inOrbit: true,
+      bodyId: 'EARTH',
+    });
+
+    const result = processFlightReturn(state, fs, ps, assembly);
+
+    expect(result.deployedFieldCraft).not.toBeNull();
+    expect(result.deployedFieldCraft!.hasCommandCapability).toBe(true);
   });
 
   it('excludes KIA crew from field craft when crashed in orbit', () => {
@@ -1100,13 +1216,18 @@ describe('processFlightReturn() — field craft', () => {
     );
     state.rockets = [{ id: 'rocket-1', name: 'Ship' } as GameState['rockets'][number]];
 
-    const ps = makePhysicsState({ landed: false, crashed: false });
+    const assembly = makeAssembly([['cmd-1', { partId: 'cmd-mk1' }]]);
+    const ps = makePhysicsState({
+      landed: false,
+      crashed: false,
+      activeParts: new Set(['cmd-1']),
+    });
     const fs = makeFlightState(null, {
       crewIds: ['crew-orbit'],
       inOrbit: true,
     });
 
-    const result = processFlightReturn(state, fs, ps, null);
+    const result = processFlightReturn(state, fs, ps, assembly);
 
     expect(Array.isArray(state.fieldCraft)).toBe(true);
     expect(result.deployedFieldCraft).not.toBeNull();

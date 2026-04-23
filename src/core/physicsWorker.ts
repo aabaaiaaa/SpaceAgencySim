@@ -71,6 +71,11 @@ let frameCounter = 0;
 /**
  * Rebuild a mutable PhysicsState from a serialised snapshot.
  */
+// ⚠️  DESERIALISE CONTRACT — shared rebuild
+// Consumes snapshots produced by BOTH serialisers above.  Any new field
+// on PhysicsSnapshot must be read here too — missing a read means the
+// worker (or any test using this helper) silently loses the data even
+// if the serialisers carried it across.
 function deserialisePhysicsState(snap: PhysicsSnapshot): PhysicsState {
   return {
     posX: snap.posX,
@@ -122,6 +127,11 @@ function deserialisePhysicsState(snap: PhysicsSnapshot): PhysicsState {
       ? _recordToMap(snap.malfunctions)
       : undefined,
     malfunctionMode: snap.malfunctionMode,
+    // Forward the infinite-fuel debug flag via a minimal _gameState shim so
+    // tickFuelSystem can read it inside the worker without needing the full
+    // game-state object.  The rest of the code paths that expect _gameState
+    // (e.g. malfunction checks) are tolerant of missing fields.
+    _gameState: snap.infiniteFuel ? { infiniteFuel: true } as never : undefined,
   };
 }
 
@@ -210,6 +220,12 @@ function deserialiseAssembly(sa: SerialisedAssembly): RocketAssembly {
 /**
  * Serialise the current PhysicsState to a structured-clone-safe snapshot.
  */
+// ⚠️  SERIALISE CONTRACT — worker → main
+// Paired with src/ui/flightController/_workerBridge.ts::_serialisePhysicsState
+// (main → worker).  Both functions must produce the same PhysicsSnapshot
+// shape; adding a field in one place without the other causes silent
+// drift (the infiniteFuel regression fix shipped exactly because of this).
+// See PhysicsSnapshot in physicsWorkerProtocol.ts for the inventory.
 function serialisePhysicsState(ps: PhysicsState): PhysicsSnapshot {
   return {
     posX: ps.posX,
@@ -261,6 +277,7 @@ function serialisePhysicsState(ps: PhysicsState): PhysicsSnapshot {
     capturedBody: ps.capturedBody,
     thrustAligned: ps.thrustAligned,
     malfunctionMode: ps.malfunctionMode,
+    infiniteFuel: !!ps._gameState?.infiniteFuel,
   };
 }
 

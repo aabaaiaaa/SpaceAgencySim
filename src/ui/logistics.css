@@ -135,10 +135,19 @@
   padding: var(--panel-padding);
 }
 
-.logistics-route-map-container {
-  overflow-x: auto;
-  overflow-y: hidden;
+/* -- Route map shell: map fills width, controls pinned to the right -- */
+.logistics-route-map-shell {
+  display: flex;
+  gap: var(--space-md);
+  align-items: stretch;
   margin-bottom: var(--space-lg);
+  width: 100%;
+}
+
+.logistics-route-map-container {
+  flex: 1 1 auto;
+  min-width: 0; /* allow flex shrink */
+  overflow: hidden; /* zoom/pan handled via SVG transform */
 }
 
 .logistics-route-map {
@@ -146,6 +155,114 @@
   border: 1px solid #333;
   border-radius: 4px;
   display: block;
+  width: 100%;
+  user-select: none;
+}
+
+/* -- Vertical zoom controls strip -- */
+.logistics-map-controls {
+  flex: 0 0 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 4px;
+  background: rgba(26, 26, 46, 0.7);
+  border: 1px solid #333;
+  border-radius: 4px;
+}
+
+.logistics-map-control-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #8899aa;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.logistics-map-zoom-btn,
+.logistics-map-recenter-btn {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: #e0f0ff;
+  width: 32px;
+  height: 24px;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.12s;
+}
+.logistics-map-zoom-btn:hover,
+.logistics-map-recenter-btn:hover {
+  background: rgba(96, 170, 255, 0.22);
+}
+.logistics-map-recenter-btn {
+  width: 48px;
+  font-size: 0.7rem;
+  font-weight: 600;
+}
+
+.logistics-map-zoom-slider {
+  /* Vertical range slider via rotation — works in all modern browsers. */
+  writing-mode: vertical-lr;
+  direction: rtl; /* so dragging up = larger value */
+  height: 120px;
+  width: 24px;
+  margin: 2px 0;
+  accent-color: #60a0ff;
+}
+
+.logistics-map-zoom-readout {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #80c8ff;
+  font-variant-numeric: tabular-nums;
+  min-width: 40px;
+  text-align: center;
+}
+
+/* -- Cross-highlight between route table and map ----------------------- */
+
+/* Map leg path — brighten + thicken on hover of its matching row or path. */
+.logistics-route-map .route-line.route-hover {
+  stroke: #ffe066 !important;
+  stroke-width: 4 !important;
+  filter: drop-shadow(0 0 4px rgba(255, 224, 102, 0.9));
+  opacity: 1 !important;
+}
+
+/* Table row — matching tint for the linked row. */
+.logistics-routes-table tr.route-hover {
+  background: rgba(255, 224, 102, 0.12);
+  cursor: pointer;
+}
+.logistics-routes-table tr.route-hover td {
+  color: #ffe8a8;
+}
+
+/* Persistent click-selection (toggle on/off) — both map paths and rows. */
+.logistics-route-map .route-line.route-highlighted {
+  stroke: #60a0ff !important;
+  stroke-width: 3.5 !important;
+  filter: drop-shadow(0 0 3px rgba(96, 170, 255, 0.8));
+  opacity: 1 !important;
+}
+.logistics-routes-table tr.route-highlighted {
+  background: rgba(96, 170, 255, 0.18);
+  box-shadow: inset 3px 0 0 #60a0ff;
+}
+.logistics-routes-table tr.route-highlighted td {
+  color: #e0f0ff;
+}
+
+/* Hover on a selected route — combine: keep selection blue frame, add
+ * amber glow so you see the hover target. */
+.logistics-route-map .route-line.route-highlighted.route-hover {
+  stroke: #ffe066 !important;
 }
 
 .logistics-routes-table {

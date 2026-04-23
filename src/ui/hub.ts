@@ -32,6 +32,9 @@ import {
 import { getPartById } from '../data/parts.ts';
 import { isBankrupt } from '../core/finance.ts';
 import { initWeather, getCurrentWeather, getWeatherForecast } from '../core/weather.ts';
+import { getBodyHazards, getOrbitalHazards } from '../core/environment.ts';
+import type { HazardSeverity, BodyHazard } from '../core/environment.ts';
+import { CELESTIAL_BODIES } from '../data/bodies.ts';
 import { isWeatherPredictionAvailable } from '../core/mapView.ts';
 import './hub.css';
 import type { GameState } from '../core/gameState.ts';
@@ -93,6 +96,16 @@ const BUILDINGS: readonly BuildingDef[] = [
     widthPct:   0.08,
     heightPct:  0.18,
   },
+  // Off-world crew habitat.  Never renders on Earth (crew-hab isn't built
+  // there); never clashes with crew-admin (which is Earth-only).  Placed at
+  // the same slot as crew-admin so either one occupies the spot per hub.
+  {
+    id:         'crew-hab',
+    label:      'Crew Habitation',
+    xCenterPct: 0.42,
+    widthPct:   0.08,
+    heightPct:  0.18,
+  },
   {
     id:         'tracking-station',
     label:      'Tracking Station',
@@ -117,14 +130,14 @@ const BUILDINGS: readonly BuildingDef[] = [
   {
     id:         'library',
     label:      'Library',
-    xCenterPct: 0.88,
-    widthPct:   0.08,
+    xCenterPct: 0.86,
+    widthPct:   0.07,
     heightPct:  0.16,
   },
   {
     id:         'logistics-center',
     label:      'Logistics Center',
-    xCenterPct: 0.95,
+    xCenterPct: 0.945,
     widthPct:   0.06,
     heightPct:  0.18,
   },
@@ -139,6 +152,12 @@ let _overlay: HTMLElement | null = null;
 
 /** Cached reference to the game state for the construction panel. */
 let _state: GameState | null = null;
+
+/** Cached container + navigate callback so lifecycle helpers (e.g. the
+ * construction panel's close button) can re-mount the hub after state
+ * changes without the caller having to pass them through. */
+let _currentContainer: HTMLElement | null = null;
+let _currentOnNavigate: ((destination: string) => void) | null = null;
 
 /**
  * Module-scoped listener tracker. Initialised on first use (since some
@@ -247,6 +266,8 @@ export function showWelcomeModal(container: HTMLElement, state: GameState): void
  */
 export function initHubUI(container: HTMLElement, state: GameState, onNavigate: (destination: string) => void): void {
   _state = state;
+  _currentContainer = container;
+  _currentOnNavigate = onNavigate;
 
   // Ensure the shared module listener tracker exists for this hub session.
   _getListeners();
@@ -259,15 +280,35 @@ export function initHubUI(container: HTMLElement, state: GameState, onNavigate: 
   const activeHub = getActiveHub(state);
   setHubBodyVisuals(activeHub.bodyId, activeHub.type);
 
-  // Tell the PixiJS renderer which facilities are built so it only draws those.
-  // Use the active hub's facilities.
-  if (state.gameMode === GameMode.SANDBOX) {
-    setBuiltFacilities(null); // show all in sandbox
+  // Tell the PixiJS renderer which facilities to draw.  At non-Earth hubs we
+  // filter to the hub-type's allowed facility set so PIXI never renders a
+  // building the DOM layer has hidden (e.g. launch-pad on an orbital hub
+  // in sandbox mode).
+  const isEarthHub = activeHub.id === EARTH_HUB_ID;
+  const hubAllowed: ReadonlySet<string> | null = isEarthHub
+    ? null
+    : new Set(
+        activeHub.type === 'orbital'
+          ? ORBITAL_HUB_FACILITIES
+          : SURFACE_HUB_FACILITIES,
+      );
+
+  if (state.gameMode === GameMode.SANDBOX && isEarthHub) {
+    setBuiltFacilities(null); // Earth sandbox: show all buildings.
   } else {
     const hubFacilities = activeHub.facilities;
-    const builtIds = new Set(
-      Object.keys(hubFacilities).filter((id) => hubFacilities[id]?.built)
-    );
+    const builtIds = new Set<string>();
+    for (const id of Object.keys(hubFacilities)) {
+      if (!hubFacilities[id]?.built) continue;
+      if (hubAllowed && !hubAllowed.has(id)) continue;
+      builtIds.add(id);
+    }
+    // At non-Earth sandbox hubs, also surface the allowed-but-unbuilt list so
+    // the hub visually shows what could be there.  In non-sandbox modes only
+    // built facilities render, as before.
+    if (state.gameMode === GameMode.SANDBOX && hubAllowed) {
+      for (const id of hubAllowed) builtIds.add(id);
+    }
     setBuiltFacilities(builtIds);
   }
 
@@ -330,6 +371,8 @@ export function destroyHubUI(): void {
     _overlay = null;
   }
   _state = null;
+  _currentContainer = null;
+  _currentOnNavigate = null;
 
   // Bulk-remove all listeners registered during this hub session.
   if (_listeners) {
@@ -770,6 +813,85 @@ function _renderReputationBadge(parent: HTMLElement): void {
  * Matches the Launch Pad's compact weather bar format.
  * Initialises weather state if not already present.
  */
+/**
+ * Render a hazard-list panel using the given description and hazards.
+ * Shared by the airless-surface and orbital-hub renderers.
+ */
+function _renderHazardsPanel(
+  parent: HTMLElement,
+  description: string,
+  hazards: readonly BodyHazard[],
+  cssFlag: 'env-airless' | 'env-orbital',
+): void {
+  const panel: HTMLDivElement = document.createElement('div');
+  panel.id = 'weather-panel';
+  panel.classList.add(cssFlag);
+
+  const info: HTMLDivElement = document.createElement('div');
+  info.className = 'weather-info';
+
+  const desc: HTMLSpanElement = document.createElement('span');
+  desc.className = 'weather-description weather-good';
+  desc.textContent = description;
+  info.appendChild(desc);
+
+  if (hazards.length === 0) {
+    const none: HTMLSpanElement = document.createElement('span');
+    none.className = 'env-hazard-none';
+    none.textContent = 'No significant environmental hazards';
+    info.appendChild(none);
+  } else {
+    for (const h of hazards) {
+      const chip: HTMLSpanElement = document.createElement('span');
+      chip.className = `env-hazard env-hazard--${h.severity}`;
+      chip.textContent = `${h.label}: ${_formatSeverity(h.severity)}`;
+      chip.title = h.note;
+      info.appendChild(chip);
+    }
+  }
+
+  panel.appendChild(info);
+  parent.appendChild(panel);
+}
+
+/**
+ * Render an environmental-hazards panel for an airless (or hazard-dominated)
+ * surface body.  Used when the weather system reports "No atmosphere".
+ */
+function _renderAirlessHazardsPanel(parent: HTMLElement, bodyId: string): void {
+  const bodyName = CELESTIAL_BODIES[bodyId]?.name ?? bodyId;
+  _renderHazardsPanel(
+    parent,
+    `${bodyName} — no atmosphere`,
+    getBodyHazards(bodyId),
+    'env-airless',
+  );
+}
+
+/**
+ * Render an orbital-hub hazards panel.  Orbital stations face a vacuum +
+ * radiation + microgravity environment regardless of the parent body's
+ * atmosphere, so atmospheric weather (wind, visibility) is never shown.
+ */
+function _renderOrbitalHazardsPanel(parent: HTMLElement, bodyId: string): void {
+  const bodyName = CELESTIAL_BODIES[bodyId]?.name ?? bodyId;
+  _renderHazardsPanel(
+    parent,
+    `Orbital — ${bodyName}`,
+    getOrbitalHazards(bodyId),
+    'env-orbital',
+  );
+}
+
+function _formatSeverity(s: HazardSeverity): string {
+  switch (s) {
+    case 'low':     return 'Low';
+    case 'medium':  return 'Moderate';
+    case 'high':    return 'High';
+    case 'extreme': return 'Extreme';
+  }
+}
+
 function _renderWeatherPanel(parent: HTMLElement): void {
   if (!_state) return;
 
@@ -780,15 +902,34 @@ function _renderWeatherPanel(parent: HTMLElement): void {
   // Hide weather panel in sandbox mode when weather is disabled.
   if (_state.gameMode === GameMode.SANDBOX && !_state.sandboxSettings?.weatherEnabled) return;
 
-  // Initialise weather if needed (first hub visit or after save load).
-  if (!_state.weather) {
-    initWeather(_state, 'EARTH');
+  // Resolve the active hub's body so conditions reflect where the player
+  // actually is — not a hardcoded Earth.  Re-init weather if the stored
+  // conditions are for a different body.
+  const activeHub = getActiveHub(_state);
+  const hubBodyId = activeHub.bodyId;
+  if (!_state.weather || _state.weather.current?.bodyId !== hubBodyId) {
+    initWeather(_state, hubBodyId);
   }
 
   const weather = getCurrentWeather(_state);
 
-  // Don't show panel for airless bodies.
-  if (weather.description === 'No atmosphere') return;
+  // Orbital hubs: in space, no atmospheric weather regardless of parent body.
+  // Show a vacuum + radiation + microgravity hazard list.  Clear any stale
+  // atmospheric-haze visuals from a previous surface hub.
+  if (activeHub.type === 'orbital') {
+    setHubWeather(0, false);
+    _renderOrbitalHazardsPanel(parent, hubBodyId);
+    return;
+  }
+
+  // Airless surface bodies: render an environmental-hazards panel instead of
+  // weather (radiation, thermal, dust, microgravity).  Also clear any
+  // stale atmospheric-haze visuals from a previous body.
+  if (weather.description === 'No atmosphere') {
+    setHubWeather(0, false);
+    _renderAirlessHazardsPanel(parent, hubBodyId);
+    return;
+  }
 
   const panel: HTMLDivElement = document.createElement('div');
   panel.id = 'weather-panel';
@@ -834,7 +975,7 @@ function _renderWeatherPanel(parent: HTMLElement): void {
   panel.appendChild(info);
 
   // Forecast row (if weather satellites provide data AND Tracking Station tier 2+)
-  const forecast = isWeatherPredictionAvailable(_state) ? getWeatherForecast(_state, 'EARTH', 3) : [];
+  const forecast = isWeatherPredictionAvailable(_state) ? getWeatherForecast(_state, hubBodyId, 3) : [];
   if (forecast.length > 0) {
     const fcSection: HTMLDivElement = document.createElement('div');
     fcSection.className = 'weather-forecast';
@@ -932,9 +1073,22 @@ function _renderBuildings(onNavigate: (destination: string) => void): void {
     // Position: left edge and width as % of viewport width.
     const leftPct: number  = (bld.xCenterPct - bld.widthPct / 2) * 100;
     el.style.left   = `${leftPct.toFixed(4)}%`;
-    el.style.width  = `${(bld.widthPct  * 100).toFixed(4)}%`;
-    // Height extends upward from the ground line.
-    el.style.height = `${(bld.heightPct * 100).toFixed(4)}%`;
+    if (hub.type === 'orbital') {
+      // Orbital modules float mid-screen — match the render/hub.ts
+      // station-module layout (centred at 48% of viewport height,
+      // each module scaled to 70% of the declared heightPct).
+      const ORBITAL_CENTRE_PCT = 48;
+      const heightPct = bld.heightPct * 100 * 0.7;
+      const widthPct  = bld.widthPct  * 100 * 1.05;
+      el.style.width  = `${widthPct.toFixed(4)}%`;
+      el.style.height = `${heightPct.toFixed(4)}%`;
+      el.style.bottom = 'auto';
+      el.style.top    = `${(ORBITAL_CENTRE_PCT - heightPct / 2).toFixed(4)}%`;
+    } else {
+      el.style.width  = `${(bld.widthPct  * 100).toFixed(4)}%`;
+      // Height extends upward from the ground line.
+      el.style.height = `${(bld.heightPct * 100).toFixed(4)}%`;
+    }
 
     // Label
     const label: HTMLSpanElement = document.createElement('span');
@@ -942,7 +1096,9 @@ function _renderBuildings(onNavigate: (destination: string) => void): void {
     label.textContent = bld.label;
     el.appendChild(label);
 
-    // Click handler
+    // Click handler — pass the building's id as-is.  The router aliases
+    // crew-hab → crew-admin screen AFTER verifying crew-hab is built so
+    // the built-check doesn't trip over the Earth-only crew-admin facility.
     _getListeners().add(el, 'click', () => {
       el.blur(); // Clear focus highlight before navigating away
       onNavigate(bld.id);
@@ -1025,11 +1181,30 @@ function _openConstructionPanel(container: HTMLElement): void {
     : 'Build new facilities for your agency';
   content.appendChild(subtitle);
 
+  // Off-world hubs have a restricted facility catalog — only the subset
+  // that makes physical sense there.  Earth HQ shows everything.
+  const activeHub = getActiveHub(_state);
+  const isEarth = activeHub.id === EARTH_HUB_ID;
+  const allowedForHub: ReadonlySet<string> | null = isEarth
+    ? null
+    : new Set(
+        activeHub.type === 'orbital'
+          ? ORBITAL_HUB_FACILITIES
+          : SURFACE_HUB_FACILITIES,
+      );
+
   // ── Facility list ──────────────────────────────────────────────────────
   const list: HTMLUListElement = document.createElement('ul');
   list.className = 'cp-facility-list';
 
   for (const def of FACILITY_DEFINITIONS) {
+    // Skip Earth-only facilities at off-world hubs, and anything not in
+    // the hub-type's allowed list.
+    if (!isEarth) {
+      if ((EARTH_ONLY_FACILITIES as readonly string[]).includes(def.id)) continue;
+      if (allowedForHub && !allowedForHub.has(def.id)) continue;
+    }
+
     const item: HTMLLIElement = document.createElement('li');
     item.className = 'cp-facility-item';
 
@@ -1202,6 +1377,16 @@ function _openConstructionPanel(container: HTMLElement): void {
   closeBtn.textContent = '← Hub';
   _getListeners().add(closeBtn, 'click', () => {
     panel.remove();
+    // Re-mount the hub so newly-built facilities' buildings render.
+    // The construction panel lives on top of the hub overlay, so the hub
+    // itself may be stale (its BUILDINGS render was captured at init time).
+    const cont = _currentContainer;
+    const nav = _currentOnNavigate;
+    const st = _state;
+    if (cont && nav && st) {
+      destroyHubUI();
+      initHubUI(cont, st, nav);
+    }
   });
   content.appendChild(closeBtn);
 

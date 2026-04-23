@@ -115,9 +115,11 @@ export function processLifeSupport(state: GameState): LifeSupportResult {
     }
   }
 
-  // Remove field craft with no crew left.
+  // Remove field craft that are no longer anything the player can control:
+  // crew all dead AND no command-capable modules (probe/command) left.
+  // Probe-bearing craft with empty crew remain as derelict-but-controllable.
   state.fieldCraft = state.fieldCraft.filter((c) => {
-    if (c.crewIds.length === 0) {
+    if (c.crewIds.length === 0 && !c.hasCommandCapability) {
       removedCraftIds.push(c.id);
       return false;
     }
@@ -163,6 +165,11 @@ interface CreateFieldCraftOptions {
   crewIds: string[];
   /** True if Extended Mission Module present. */
   hasExtendedLifeSupport: boolean;
+  /**
+   * True when the craft has at least one intact command module or probe core.
+   * Controls whether the craft persists after all crew die.
+   */
+  hasCommandCapability: boolean;
   /** Current period number. */
   deployedPeriod: number;
   /** Orbital elements, or null if landed. */
@@ -185,6 +192,7 @@ export function createFieldCraft(
     status,
     crewIds,
     hasExtendedLifeSupport: extendedSupport,
+    hasCommandCapability,
     deployedPeriod,
     orbitalElements = null,
     orbitBandId = null,
@@ -200,6 +208,7 @@ export function createFieldCraft(
     crewIds: [...crewIds],
     suppliesRemaining: DEFAULT_LIFE_SUPPORT_PERIODS,
     hasExtendedLifeSupport: extendedSupport,
+    hasCommandCapability,
     deployedPeriod,
     orbitalElements: orbitalElements ? { ...orbitalElements } : null,
     orbitBandId,

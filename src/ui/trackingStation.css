@@ -535,6 +535,31 @@
   margin-top: 8px;
   display: flex;
   justify-content: flex-end;
+  gap: 6px;
+}
+
+/* -- Recover button ------------------------------------------------------ */
+.ts-recover-btn {
+  background: rgba(220, 160, 90, 0.18);
+  border: 1px solid rgba(220, 160, 90, 0.55);
+  color: #f0d0a0;
+  font-family: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+.ts-recover-btn:hover {
+  background: rgba(220, 160, 90, 0.32);
+  color: #ffe8c8;
+}
+.ts-recover-btn:disabled {
+  background: rgba(120, 120, 120, 0.15);
+  border-color: rgba(120, 120, 120, 0.35);
+  color: #888;
+  cursor: not-allowed;
 }
 
 /* Only flatten the selected-row bottom corners when a detail panel follows. */

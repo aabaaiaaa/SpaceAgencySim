@@ -83,6 +83,14 @@ const BUILDINGS: BuildingDef[] = [
     xCenterPct:   0.42,
   },
   {
+    id:           'crew-hab',
+    colorFill:    0x8a6a4a,
+    colorStroke:  0xb89060,
+    widthPct:     0.08,
+    heightPct:    0.18,
+    xCenterPct:   0.42,
+  },
+  {
     id:           'tracking-station',
     colorFill:    0x5a5a8a,
     colorStroke:  0x8080c0,
@@ -110,9 +118,9 @@ const BUILDINGS: BuildingDef[] = [
     id:           'library',
     colorFill:    0x6a6a5a,
     colorStroke:  0xa0a080,
-    widthPct:     0.08,
+    widthPct:     0.07,
     heightPct:    0.16,
-    xCenterPct:   0.88,
+    xCenterPct:   0.86,
   },
   {
     id:           'logistics-center',
@@ -120,7 +128,7 @@ const BUILDINGS: BuildingDef[] = [
     colorStroke:  0x8098b0,
     widthPct:     0.06,
     heightPct:    0.18,
-    xCenterPct:   0.95,
+    xCenterPct:   0.945,
   },
 ];
 
@@ -294,19 +302,112 @@ function _drawScene(): void {
     _hubRoot.addChild(groundLine);
   }
 
-  for (const bld of BUILDINGS) {
-    if (_builtFacilities && !_builtFacilities.has(bld.id)) continue;
+  if (_isOrbitalHub) {
+    // Orbital hub: render buildings as station modules floating mid-screen
+    // with connecting walkways between adjacent modules.
+    const moduleCentreY = Math.round(H * 0.48);
+    const rendered: Array<{ x: number; y: number; w: number; h: number }> = [];
 
-    const bldW = W * bld.widthPct;
-    const bldH = H * bld.heightPct;
-    const bldX = W * bld.xCenterPct - bldW / 2;
-    const bldY = groundY - bldH;
+    for (const bld of BUILDINGS) {
+      if (_builtFacilities && !_builtFacilities.has(bld.id)) continue;
 
-    const g = _pool.acquireGraphics();
-    g.rect(bldX, bldY, bldW, bldH);
-    g.fill({ color: bld.colorFill, alpha: 0.9 });
-    g.stroke({ color: bld.colorStroke, width: 2 });
-    _hubRoot.addChild(g);
+      // Modules look chunkier and more square than surface buildings.
+      const bldW = W * bld.widthPct * 1.05;
+      const bldH = Math.min(H * bld.heightPct * 0.7, bldW * 1.15);
+      const bldX = W * bld.xCenterPct - bldW / 2;
+      const bldY = moduleCentreY - bldH / 2;
+
+      rendered.push({ x: bldX, y: bldY, w: bldW, h: bldH });
+    }
+
+    // Sort left-to-right so walkways connect adjacent modules.
+    rendered.sort((a, b) => a.x - b.x);
+
+    // Draw walkways first (underneath modules).
+    for (let i = 0; i < rendered.length - 1; i++) {
+      const a = rendered[i];
+      const b = rendered[i + 1];
+      const ax = a.x + a.w;
+      const bx = b.x;
+      if (bx <= ax) continue; // overlapping — skip walkway
+      const yMid = (a.y + a.h / 2 + b.y + b.h / 2) / 2;
+      const walkHeight = Math.max(6, Math.min(a.h, b.h) * 0.18);
+
+      // Walkway rectangle (corridor body).
+      const walk = _pool.acquireGraphics();
+      walk.rect(ax, yMid - walkHeight / 2, bx - ax, walkHeight);
+      walk.fill({ color: 0x3a4a5a, alpha: 0.85 });
+      walk.stroke({ color: 0x6080a0, width: 1, alpha: 0.7 });
+      _hubRoot.addChild(walk);
+
+      // Rivets / window strip along the corridor.
+      const windows = _pool.acquireGraphics();
+      const winY = yMid - 1;
+      const winStep = Math.max(6, (bx - ax) / 12);
+      for (let x = ax + winStep / 2; x < bx; x += winStep) {
+        windows.rect(x - 1, winY, 2, 2);
+      }
+      windows.fill({ color: 0xffd480, alpha: 0.9 });
+      _hubRoot.addChild(windows);
+    }
+
+    // Draw modules on top of walkways.
+    for (const r of rendered) {
+      const g = _pool.acquireGraphics();
+      // Main module body — rounded rectangle via rect + inset highlight.
+      g.rect(r.x, r.y, r.w, r.h);
+      g.fill({ color: 0x3f4f62, alpha: 0.95 });
+      g.stroke({ color: 0x94b3d2, width: 2 });
+      _hubRoot.addChild(g);
+
+      // Solar-panel wings on modules with room.
+      if (r.w > 40) {
+        const panelW = Math.max(8, r.w * 0.35);
+        const panelH = Math.max(4, r.h * 0.18);
+        const panelYTop = r.y - panelH - 2;
+        const panelYBot = r.y + r.h + 2;
+        const panelXL = r.x + r.w / 2 - panelW;
+        const panelXR = r.x + r.w / 2;
+        const panels = _pool.acquireGraphics();
+        panels.rect(panelXL, panelYTop, panelW * 2, panelH);
+        panels.rect(panelXL, panelYBot, panelW * 2, panelH);
+        panels.fill({ color: 0x1a3360, alpha: 0.9 });
+        panels.stroke({ color: 0x446088, width: 1 });
+        // Panel grid lines.
+        panels.moveTo(panelXR, panelYTop);
+        panels.lineTo(panelXR, panelYTop + panelH);
+        panels.moveTo(panelXR, panelYBot);
+        panels.lineTo(panelXR, panelYBot + panelH);
+        panels.stroke({ color: 0x264772, width: 1 });
+        _hubRoot.addChild(panels);
+      }
+
+      // Window strip across the module.
+      const winGfx = _pool.acquireGraphics();
+      const rowY = r.y + r.h * 0.4;
+      const winStep = Math.max(5, r.w / 8);
+      for (let x = r.x + winStep / 2; x < r.x + r.w; x += winStep) {
+        winGfx.rect(x - 1.5, rowY - 1.5, 3, 3);
+      }
+      winGfx.fill({ color: 0xffe0a0, alpha: 0.95 });
+      _hubRoot.addChild(winGfx);
+    }
+  } else {
+    // Surface hub: legacy rectangle buildings on the ground line.
+    for (const bld of BUILDINGS) {
+      if (_builtFacilities && !_builtFacilities.has(bld.id)) continue;
+
+      const bldW = W * bld.widthPct;
+      const bldH = H * bld.heightPct;
+      const bldX = W * bld.xCenterPct - bldW / 2;
+      const bldY = groundY - bldH;
+
+      const g = _pool.acquireGraphics();
+      g.rect(bldX, bldY, bldW, bldH);
+      g.fill({ color: bld.colorFill, alpha: 0.9 });
+      g.stroke({ color: bld.colorStroke, width: 2 });
+      _hubRoot.addChild(g);
+    }
   }
 
   if (_weatherVisibility > 0.01) {

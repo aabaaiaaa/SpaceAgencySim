@@ -288,6 +288,7 @@ export async function saveGame(state: GameState, slotIndex: number, saveName: st
     difficultySettings: { ...state.difficultySettings },
     autoSaveEnabled:    state.autoSaveEnabled,
     debugMode:          state.debugMode,
+    infiniteFuel:       state.infiniteFuel,
     showPerfDashboard:  state.showPerfDashboard,
     malfunctionMode:    state.malfunctionMode as MalfunctionModeType,
   }).catch((err: unknown) => {
@@ -432,6 +433,7 @@ export function applyPersistedSettings(state: GameState): void {
   state.difficultySettings = settings.difficultySettings;
   state.autoSaveEnabled    = settings.autoSaveEnabled;
   state.debugMode          = settings.debugMode;
+  state.infiniteFuel       = settings.infiniteFuel;
   state.showPerfDashboard  = settings.showPerfDashboard;
   state.malfunctionMode    = settings.malfunctionMode;
 }

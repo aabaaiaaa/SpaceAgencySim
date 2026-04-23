@@ -565,7 +565,8 @@
     "core/orbit": {
       "sources": [
         "src/core/manoeuvre.ts",
-        "src/core/orbit.ts"
+        "src/core/orbit.ts",
+        "src/core/trajectoryReadout.ts"
       ],
       "unit": [
         "src/tests/bodies.test.ts",
@@ -574,6 +575,7 @@
         "src/tests/mapView.test.ts",
         "src/tests/orbit.test.ts",
         "src/tests/physicsWorkerCommand.test.ts",
+        "src/tests/trajectoryReadout.test.ts",
         "src/tests/ui-mapView.test.ts"
       ],
       "e2e": [
@@ -601,6 +603,24 @@
         "e2e/context-menu.spec.ts",
         "e2e/landing.spec.ts"
       ]
+    },
+    "core/craftRecovery": {
+      "sources": [
+        "src/core/craftRecovery.ts"
+      ],
+      "unit": [
+        "src/tests/craftRecovery.test.ts"
+      ],
+      "e2e": []
+    },
+    "core/debrisPersistence": {
+      "sources": [
+        "src/core/debrisPersistence.ts"
+      ],
+      "unit": [
+        "src/tests/debrisPersistence.test.ts"
+      ],
+      "e2e": []
     },
     "core/partInventory": {
       "sources": [
@@ -1191,6 +1211,7 @@
         "src/ui/flightHud/_state.ts"
       ],
       "unit": [
+        "src/tests/trajectoryReadout.test.ts",
         "src/tests/ui-flightHudState.test.ts",
         "src/tests/ui-timeWarp.test.ts"
       ],
@@ -1356,7 +1377,9 @@
       "sources": [
         "src/ui/trackingStation.ts"
       ],
-      "unit": [],
+      "unit": [
+        "src/tests/craftRecovery.test.ts"
+      ],
       "e2e": [
         "e2e/additional-systems.spec.ts"
       ]

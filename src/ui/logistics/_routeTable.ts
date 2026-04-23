@@ -19,7 +19,14 @@ import {
   triggerRender,
   formatResourceType,
 } from './_state.ts';
-import { renderRouteMap, formatLocation } from './_routeMap.ts';
+import {
+  renderRouteMap,
+  formatLocation,
+  applyMapZoomTransforms,
+  setRouteHover as _setRouteHover,
+  toggleRouteSelection,
+  refreshRouteSelection,
+} from './_routeMap.ts';
 import { renderBuilderPanel } from './_routeBuilder.ts';
 import { getLogisticsListenerTracker } from './_listenerTracker.ts';
 
@@ -47,11 +54,20 @@ export function renderRoutesTab(): void {
   const wrapper = document.createElement('div');
   wrapper.className = 'logistics-routes-content';
 
-  // --- Route map (in scrollable container) ---
+  // --- Route map with zoom controls -------------------------------------
+  const mapShell = document.createElement('div');
+  mapShell.className = 'logistics-route-map-shell';
+
   const mapContainer = document.createElement('div');
   mapContainer.className = 'logistics-route-map-container';
-  mapContainer.appendChild(renderRouteMap());
-  wrapper.appendChild(mapContainer);
+  const svg = renderRouteMap();
+  mapContainer.appendChild(svg);
+  mapShell.appendChild(mapContainer);
+
+  // Zoom / pan controls — vertical strip to the right of the map.
+  mapShell.appendChild(_renderMapZoomControls(svg));
+
+  wrapper.appendChild(mapShell);
 
   // --- Create Route button (always visible below the map) ---
   if (!ls.builderMode) {
@@ -87,6 +103,118 @@ export function renderRoutesTab(): void {
   wrapper.appendChild(_renderProvenLegsSection(provenLegs));
 
   ls.overlay.appendChild(wrapper);
+
+  // Re-apply the persistent selection class (if any) to the freshly-built
+  // rows and map paths so the player's selection survives re-renders.
+  refreshRouteSelection();
+}
+
+// ---------------------------------------------------------------------------
+// Route-map zoom / pan controls
+// ---------------------------------------------------------------------------
+
+const MAP_ZOOM_MIN = 0.4;
+const MAP_ZOOM_MAX = 4;
+const MAP_ZOOM_STEP = 0.1;
+
+/**
+ * Build the vertical zoom+pan control strip that sits alongside the route
+ * map.  Slider is wired directly to the SVG's viewport transform so the
+ * zoom change is smooth — no full re-render per tick.
+ */
+function _renderMapZoomControls(svg: SVGSVGElement): HTMLDivElement {
+  const controls = document.createElement('div');
+  controls.className = 'logistics-map-controls';
+
+  // Apply current zoom/pan to the viewport + text counter-scale to every
+  // fixed-size label.  Called on every zoom control change.
+  const applyTransform = (): void => {
+    applyMapZoomTransforms(svg);
+  };
+
+  const label = document.createElement('span');
+  label.className = 'logistics-map-control-label';
+  label.textContent = 'Zoom';
+  controls.appendChild(label);
+
+  const zoomInBtn = document.createElement('button');
+  zoomInBtn.type = 'button';
+  zoomInBtn.className = 'logistics-map-zoom-btn';
+  zoomInBtn.textContent = '+';
+  zoomInBtn.title = 'Zoom in';
+  _addTracked(zoomInBtn, 'click', () => {
+    const ls = getLogisticsState();
+    ls.routeMapZoom = Math.min(MAP_ZOOM_MAX, ls.routeMapZoom + MAP_ZOOM_STEP);
+    slider.value = String(ls.routeMapZoom);
+    readout.textContent = `${Math.round(ls.routeMapZoom * 100)}%`;
+    applyTransform();
+  });
+  controls.appendChild(zoomInBtn);
+
+  // Vertical slider (rotated via CSS).
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.min = String(MAP_ZOOM_MIN);
+  slider.max = String(MAP_ZOOM_MAX);
+  slider.step = String(MAP_ZOOM_STEP);
+  slider.value = String(getLogisticsState().routeMapZoom);
+  slider.className = 'logistics-map-zoom-slider';
+  slider.setAttribute('aria-label', 'Route map zoom');
+  _addTracked(slider, 'input', () => {
+    const ls = getLogisticsState();
+    ls.routeMapZoom = parseFloat(slider.value);
+    readout.textContent = `${Math.round(ls.routeMapZoom * 100)}%`;
+    applyTransform();
+  });
+  controls.appendChild(slider);
+
+  const zoomOutBtn = document.createElement('button');
+  zoomOutBtn.type = 'button';
+  zoomOutBtn.className = 'logistics-map-zoom-btn';
+  zoomOutBtn.textContent = '−';
+  zoomOutBtn.title = 'Zoom out';
+  _addTracked(zoomOutBtn, 'click', () => {
+    const ls = getLogisticsState();
+    ls.routeMapZoom = Math.max(MAP_ZOOM_MIN, ls.routeMapZoom - MAP_ZOOM_STEP);
+    slider.value = String(ls.routeMapZoom);
+    readout.textContent = `${Math.round(ls.routeMapZoom * 100)}%`;
+    applyTransform();
+  });
+  controls.appendChild(zoomOutBtn);
+
+  const readout = document.createElement('span');
+  readout.className = 'logistics-map-zoom-readout';
+  readout.textContent = `${Math.round(getLogisticsState().routeMapZoom * 100)}%`;
+  controls.appendChild(readout);
+
+  const recenterBtn = document.createElement('button');
+  recenterBtn.type = 'button';
+  recenterBtn.className = 'logistics-map-recenter-btn';
+  recenterBtn.textContent = 'Reset';
+  recenterBtn.title = 'Recenter and reset zoom';
+  _addTracked(recenterBtn, 'click', () => {
+    const ls = getLogisticsState();
+    ls.routeMapZoom = 1;
+    ls.routeMapPanX = 0;
+    ls.routeMapPanY = 0;
+    slider.value = '1';
+    readout.textContent = '100%';
+    applyTransform();
+  });
+  controls.appendChild(recenterBtn);
+
+  // Scroll-wheel zoom over the map itself — more comfortable than the slider.
+  _addTracked(svg, 'wheel', ((e: WheelEvent) => {
+    e.preventDefault();
+    const ls = getLogisticsState();
+    const factor = e.deltaY > 0 ? 1 / 1.1 : 1.1;
+    ls.routeMapZoom = Math.max(MAP_ZOOM_MIN, Math.min(MAP_ZOOM_MAX, ls.routeMapZoom * factor));
+    slider.value = String(ls.routeMapZoom);
+    readout.textContent = `${Math.round(ls.routeMapZoom * 100)}%`;
+    applyTransform();
+  }) as EventListener, { passive: false });
+
+  return controls;
 }
 
 // ---------------------------------------------------------------------------
@@ -115,6 +243,22 @@ function _renderRoutesTable(routes: Route[]): HTMLTableElement {
   for (const route of routes) {
     const tr = document.createElement('tr');
     tr.setAttribute('data-route-id', route.id);
+    tr.style.cursor = 'pointer';
+
+    // Cross-highlight: hovering a row brightens the matching map route,
+    // and hovering the map route brightens the row (wired by _routeMap).
+    const rowRouteId = route.id;
+    _addTracked(tr, 'mouseenter', () => { _setRouteHover(rowRouteId); });
+    _addTracked(tr, 'mouseleave', () => { _setRouteHover(null); });
+
+    // Click toggles persistent selection — highlights on map + row;
+    // clicking the same route again deselects.  Guard against clicks on
+    // the expand-legs button (it has its own handler) by checking target.
+    _addTracked(tr, 'click', (e: Event) => {
+      const t = e.target as HTMLElement;
+      if (t.closest('button') != null) return; // let expand button handle itself
+      toggleRouteSelection(rowRouteId);
+    });
 
     // Name
     const tdName = document.createElement('td');

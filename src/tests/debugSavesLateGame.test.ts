@@ -10,7 +10,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { DEBUG_SAVE_DEFINITIONS } from '../core/debugSaves.ts';
-import { SatelliteType, FieldCraftStatus } from '../core/constants.ts';
+import { SatelliteType, FieldCraftStatus, MiningModuleType, ResourceType } from '../core/constants.ts';
 import { PARTS } from '../data/parts.ts';
 
 const CATEGORY = 'Late Game — Interplanetary';
@@ -151,6 +151,18 @@ describe('Stage D — first-off-world-hub', () => {
     const s = findStage('first-off-world-hub').generate();
     expect(s.satelliteNetwork.satellites.length).toBeGreaterThan(0);
   });
+
+  it('@smoke has a basic Moon mining site with a drill, silo, and generator', () => {
+    const s = findStage('first-off-world-hub').generate();
+    const moonSites = s.miningSites.filter(m => m.bodyId === 'MOON');
+    expect(moonSites.length).toBeGreaterThanOrEqual(1);
+    const site = moonSites[0];
+    const types = new Set(site.modules.map(m => m.type));
+    expect(types.has(MiningModuleType.MINING_DRILL)).toBe(true);
+    expect(types.has(MiningModuleType.STORAGE_SILO)).toBe(true);
+    expect(types.has(MiningModuleType.POWER_GENERATOR)).toBe(true);
+    expect(site.powerGenerated).toBeGreaterThanOrEqual(site.powerRequired);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -186,6 +198,17 @@ describe('Stage E — multi-hub-logistics', () => {
         expect(designIds.has(leg.craftDesignId), `route ${route.id} leg ${leg.id}: missing design ${leg.craftDesignId}`).toBe(true);
       }
     }
+  });
+
+  it('@smoke adds a second Moon mining site with a launch pad and orbital buffer', () => {
+    const s = findStage('multi-hub-logistics').generate();
+    const moonSites = s.miningSites.filter(m => m.bodyId === 'MOON');
+    expect(moonSites.length).toBeGreaterThanOrEqual(2);
+    const withPad = moonSites.find(site =>
+      site.modules.some(m => m.type === MiningModuleType.SURFACE_LAUNCH_PAD),
+    );
+    expect(withPad, 'expected a Moon site with a SURFACE_LAUNCH_PAD module').toBeDefined();
+    expect(Object.keys(withPad!.orbitalBuffer).length).toBeGreaterThan(0);
   });
 });
 
@@ -231,6 +254,21 @@ describe('Stage F — interplanetary-empire', () => {
     const s = findStage('interplanetary-empire').generate();
     expect(s.fieldCraft.some(fc => fc.status === FieldCraftStatus.LANDED)).toBe(true);
     expect(s.fieldCraft.some(fc => fc.status === FieldCraftStatus.IN_ORBIT)).toBe(true);
+  });
+
+  it('@smoke mining sites span Moon and Mars with gas, refinery, and prefilled storage', () => {
+    const s = findStage('interplanetary-empire').generate();
+    const bodies = new Set(s.miningSites.map(m => m.bodyId));
+    expect(bodies.has('MOON')).toBe(true);
+    expect(bodies.has('MARS')).toBe(true);
+
+    const marsSite = s.miningSites.find(m => m.bodyId === 'MARS');
+    expect(marsSite).toBeDefined();
+    const marsTypes = new Set(marsSite!.modules.map(m => m.type));
+    expect(marsTypes.has(MiningModuleType.GAS_COLLECTOR)).toBe(true);
+    expect(marsTypes.has(MiningModuleType.REFINERY)).toBe(true);
+    // CO₂ pre-stocked in the pressure vessel (aggregated into site.storage).
+    expect(marsSite!.storage[ResourceType.CO2]).toBeGreaterThan(0);
   });
 });
 

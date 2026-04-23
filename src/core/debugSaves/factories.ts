@@ -19,6 +19,7 @@ import type {
   FacilityState,
   FieldCraft,
   GameState,
+  MiningSite,
   OrbitalElements,
   OrbitalObject,
   Route,
@@ -28,8 +29,9 @@ import type {
   SatelliteRecord,
 } from '../gameState.ts';
 import type { ConstructionProject, Hub, ResourceRequirement } from '../hubTypes.ts';
-import type { SatelliteType } from '../constants.ts';
+import type { MiningModuleType, SatelliteType } from '../constants.ts';
 import type { ResourceType } from '../constants.ts';
+import { createMiningSite, addModuleToSite, toggleConnection, recomputeSiteStorage } from '../mining.ts';
 
 // ---------------------------------------------------------------------------
 // Orbital element presets by altitude band
@@ -285,6 +287,8 @@ export interface MakeFieldCraftOpts {
   bandId?: string;
   suppliesRemaining?: number;
   hasExtendedLifeSupport?: boolean;
+  /** Defaults to true — debug craft are assumed to have intact command capability. */
+  hasCommandCapability?: boolean;
   /** RocketDesign id — enables the Tracking Station Take-Control flow. */
   rocketDesignId?: string;
 }
@@ -301,11 +305,82 @@ export function makeFieldCraft(opts: MakeFieldCraftOpts): FieldCraft {
     crewIds: opts.crewIds,
     suppliesRemaining: opts.suppliesRemaining ?? 30,
     hasExtendedLifeSupport: opts.hasExtendedLifeSupport ?? false,
+    hasCommandCapability: opts.hasCommandCapability ?? true,
     deployedPeriod: opts.deployedPeriod,
     orbitalElements: elements,
     orbitBandId: bandId,
     ...(opts.rocketDesignId ? { rocketDesignId: opts.rocketDesignId } : {}),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Mining-site helper
+// ---------------------------------------------------------------------------
+
+export interface MiningModuleSetup {
+  /** Local label used to reference this module from `connections`. */
+  tag: string;
+  partId: string;
+  type: MiningModuleType;
+  powerDraw: number;
+  /** Provide for POWER_GENERATOR modules so site.powerGenerated is updated. */
+  powerOutput?: number;
+  /** Optional refinery recipe id for REFINERY modules. */
+  recipeId?: string;
+  /** Optional pre-filled storage contents (storage modules only). */
+  storedKg?: Partial<Record<ResourceType, number>>;
+}
+
+export interface MiningSiteSetup {
+  name: string;
+  bodyId: string;
+  coordinates: { x: number; y: number };
+  controlUnitPartId?: string;
+  modules: MiningModuleSetup[];
+  /** Bidirectional connections referencing module tags. */
+  connections: Array<[string, string]>;
+  orbitalBuffer?: Partial<Record<ResourceType, number>>;
+}
+
+/**
+ * Build a mining site with its modules, pipe connections, prefilled
+ * storage, and orbital buffer in one declarative call — saves repeating
+ * the create + addModule + toggle dance for every debug-save site.
+ */
+export function addMiningSiteToState(state: GameState, setup: MiningSiteSetup): MiningSite {
+  const site = createMiningSite(state, {
+    name: setup.name,
+    bodyId: setup.bodyId,
+    coordinates: setup.coordinates,
+    controlUnitPartId: setup.controlUnitPartId ?? 'base-control-unit-mk1',
+  });
+
+  const tagToModuleId = new Map<string, string>();
+  for (const m of setup.modules) {
+    const created = addModuleToSite(state, site, {
+      partId: m.partId,
+      type: m.type,
+      powerDraw: m.powerDraw,
+      powerOutput: m.powerOutput,
+    });
+    tagToModuleId.set(m.tag, created.id);
+
+    if (m.recipeId) created.recipeId = m.recipeId;
+    if (m.storedKg) created.stored = { ...m.storedKg };
+  }
+
+  for (const [a, b] of setup.connections) {
+    const idA = tagToModuleId.get(a);
+    const idB = tagToModuleId.get(b);
+    if (idA && idB) toggleConnection(site, idA, idB);
+  }
+
+  if (setup.orbitalBuffer) {
+    site.orbitalBuffer = { ...setup.orbitalBuffer };
+  }
+
+  recomputeSiteStorage(site);
+  return site;
 }
 
 // ---------------------------------------------------------------------------
@@ -348,6 +423,9 @@ export function wealthyLateGameBase(): GameState {
     'satellite-mk1','satellite-comm','satellite-gps','satellite-relay','satellite-science','satellite-weather',
     'science-module-mk1','thermometer-mk1','sample-return-container','surface-instrument-package',
     'solar-panel-small','solar-panel-large','battery-small','battery-large','mission-module-extended',
+    'base-control-unit-mk1','mining-drill-mk1','gas-collector-mk1','fluid-extractor-mk1',
+    'refinery-mk1','storage-silo-mk1','storage-silo-mk2','pressure-vessel-mk1','pressure-vessel-mk2',
+    'fluid-tank-mk1','fluid-tank-mk2','surface-launch-pad-mk1','power-generator-solar-mk1',
   ];
 
   s.crew = [

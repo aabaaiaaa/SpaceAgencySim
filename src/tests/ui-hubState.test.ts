@@ -61,6 +61,7 @@ function mkSummary(overrides: Partial<FlightReturnSummary> = {}): FlightReturnSu
     sampleScienceEarned:   0,
     newAchievements:       [],
     deployedFieldCraft:    null,
+    deployedDebrisCraft:   [],
     lifeSupportWarnings:   [],
     lifeSupportDeaths:     [],
     challengeResult:       { completed: false },

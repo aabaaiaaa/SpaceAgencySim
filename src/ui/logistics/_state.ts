@@ -28,6 +28,14 @@ export interface LogisticsState {
   builderLegs: string[];           // proven leg IDs
   builderCurrentBodyId: string | null;
   builderOriginHubId: string | null;
+
+  // Route-map view transform (persists across re-renders within a session).
+  routeMapZoom: number;   // multiplier, 1 = fit, clamped to [0.4, 4]
+  routeMapPanX: number;   // viewBox-space pan offset applied before zoom
+  routeMapPanY: number;
+
+  /** Persistent click-selected route — highlighted on both map + list. */
+  selectedRouteId: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -50,6 +58,12 @@ function _createDefaultState(): LogisticsState {
     builderLegs: [],
     builderCurrentBodyId: null,
     builderOriginHubId: null,
+
+    routeMapZoom: 1,
+    routeMapPanX: 0,
+    routeMapPanY: 0,
+
+    selectedRouteId: null,
   };
 }
 

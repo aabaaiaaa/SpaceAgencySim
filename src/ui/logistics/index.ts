@@ -48,10 +48,27 @@ function _addTracked(
 // ---------------------------------------------------------------------------
 
 /**
- * Open the Logistics Center panel.
+ * Back callback, stored at module scope so re-renders can re-attach it to
+ * the freshly-created back button each time (previously the override was
+ * bound only to the first render, so clicking a tab → back would fail to
+ * re-init the hub).
  */
-export function openLogisticsPanel(state: GameState, parentEl: HTMLElement): void {
+let _onBack: (() => void) | null = null;
+
+/**
+ * Open the Logistics Center panel.
+ *
+ * `onBack` is invoked when the ← Hub button is clicked (through any render
+ * cycle).  It's the caller's responsibility to close the panel and restore
+ * the hub UI; typically it wraps `closeLogisticsPanel()` + hub re-init.
+ */
+export function openLogisticsPanel(
+  state: GameState,
+  parentEl: HTMLElement,
+  onBack?: () => void,
+): void {
   initLogisticsListenerTracker();
+  _onBack = onBack ?? null;
 
   const overlay = document.createElement('div');
   overlay.id = 'logistics-overlay';
@@ -87,6 +104,7 @@ export function closeLogisticsPanel(): void {
   });
   resetBuilderState();
   destroyLogisticsListenerTracker();
+  _onBack = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -107,7 +125,11 @@ function _render(): void {
   backBtn.className = 'btn-ghost';
   backBtn.textContent = '\u2190 Hub';
   _addTracked(backBtn, 'click', () => {
-    closeLogisticsPanel();
+    // Prefer the caller-provided onBack (handles hub re-mount); fall back
+    // to a plain close if the panel was opened without one.
+    const cb = _onBack;
+    if (cb) cb();
+    else closeLogisticsPanel();
   });
   header.appendChild(backBtn);
 

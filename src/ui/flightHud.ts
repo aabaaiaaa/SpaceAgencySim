@@ -16,7 +16,9 @@
  *     - Vertical speed (m/s, signed positive = ascending)
  *     - Horizontal speed (m/s, unsigned magnitude)
  *     - Current stage (N / total)
- *     - Apoapsis estimate (ballistic peak; ignores ongoing thrust/drag)
+ *     - Trajectory block: ballistic apoapsis (1D coasting peak) alongside
+ *       orbital apoapsis/periapsis (Keplerian), plus a target horizontal
+ *       velocity caption so the player can aim for a stable orbit.
  *
  *   TOP RIGHT
  *     - Mission objectives from the accepted mission, each with a completion
@@ -56,9 +58,9 @@ import {
   setFlightHudState,
   resetFlightHudState,
   formatAltitude,
-  estimateApoapsis,
   buildFuelTankList,
 } from './flightHud/_state.ts';
+import { computeTrajectoryReadout } from '../core/trajectoryReadout.ts';
 import type { PhysicsState } from '../core/physics.ts';
 import type { RocketAssembly, StagingConfig } from '../core/rocketbuilder.ts';
 import type { FlightState, GameState } from '../core/gameState.ts';
@@ -111,7 +113,11 @@ let _elTWR: HTMLElement | null = null;            // left-panel TWR value
 let _elAlt: HTMLElement | null = null;            // left-panel altitude (id: hud-alt)
 let _elVelY: HTMLElement | null = null;           // left-panel vertical speed (id: hud-vely)
 let _elVelX: HTMLElement | null = null;           // left-panel horizontal speed (id: hud-velx)
-let _elApo: HTMLElement | null = null;            // left-panel apoapsis (id: hud-apo)
+let _elBallApo: HTMLElement | null = null;        // trajectory block: ballistic apoapsis (id: hud-ball-apo)
+let _elOrbApo:  HTMLElement | null = null;        // trajectory block: orbital apoapsis (id: hud-orb-apo)
+let _elOrbPeri: HTMLElement | null = null;        // trajectory block: orbital periapsis (id: hud-orb-peri)
+let _elTrajTarget: HTMLElement | null = null;     // trajectory block: target horizontal velocity caption (id: hud-traj-target)
+let _elTrajBlock:  HTMLElement | null = null;     // trajectory block container (for state class)
 let _elStagingList: HTMLElement | null = null;    // left-panel staging container
 let _elFuelList: HTMLElement | null = null;       // left-panel fuel list
 let _elObjList: HTMLElement | null = null;        // objectives panel (top-right, unchanged)
@@ -247,7 +253,11 @@ export function destroyFlightHud(): void {
   _elAlt           = null;
   _elVelY          = null;
   _elVelX          = null;
-  _elApo           = null;
+  _elBallApo       = null;
+  _elOrbApo        = null;
+  _elOrbPeri       = null;
+  _elTrajTarget    = null;
+  _elTrajBlock     = null;
   _elStagingList   = null;
   _elFuelList      = null;
   _elCrewList      = null;
@@ -362,18 +372,82 @@ function _buildLeftPanel(): void {
   velXRow.appendChild(_elVelX);
   statusSec.appendChild(velXRow);
 
-  const apoRow = document.createElement('div');
-  apoRow.className = 'flight-lp-twr-row';
-  const apoLbl = document.createElement('div');
-  apoLbl.className = 'flight-lp-lbl';
-  apoLbl.textContent = 'Apo';
-  _elApo = document.createElement('div');
-  _elApo.id = 'hud-apo';
-  _elApo.className = 'flight-lp-val';
-  _elApo.textContent = '\u2014';
-  apoRow.appendChild(apoLbl);
-  apoRow.appendChild(_elApo);
-  statusSec.appendChild(apoRow);
+  // Trajectory block: ballistic + orbital side-by-side, with target caption.
+  _elTrajBlock = document.createElement('div');
+  _elTrajBlock.className = 'flight-lp-traj';
+
+  const trajHeader = document.createElement('div');
+  trajHeader.className = 'flight-lp-traj-header';
+  const trajBallHdr = document.createElement('span');
+  trajBallHdr.className = 'flight-lp-traj-hdr flight-lp-traj-hdr-ballistic';
+  trajBallHdr.textContent = 'Ballistic';
+  const trajOrbHdr = document.createElement('span');
+  trajOrbHdr.className = 'flight-lp-traj-hdr flight-lp-traj-hdr-orbital';
+  trajOrbHdr.textContent = 'Orbital';
+  trajHeader.appendChild(trajBallHdr);
+  trajHeader.appendChild(trajOrbHdr);
+  _elTrajBlock.appendChild(trajHeader);
+
+  const trajGrid = document.createElement('div');
+  trajGrid.className = 'flight-lp-traj-grid';
+
+  // Left column: ballistic apo only.
+  const ballCol = document.createElement('div');
+  ballCol.className = 'flight-lp-traj-col flight-lp-traj-ballistic';
+  const ballApoRow = document.createElement('div');
+  ballApoRow.className = 'flight-lp-traj-row';
+  const ballApoLbl = document.createElement('span');
+  ballApoLbl.className = 'flight-lp-traj-lbl';
+  ballApoLbl.textContent = 'Apo';
+  _elBallApo = document.createElement('span');
+  _elBallApo.id = 'hud-ball-apo';
+  _elBallApo.className = 'flight-lp-traj-val';
+  _elBallApo.textContent = '\u2014';
+  ballApoRow.appendChild(ballApoLbl);
+  ballApoRow.appendChild(_elBallApo);
+  ballCol.appendChild(ballApoRow);
+
+  // Right column: orbital apo + peri.
+  const orbCol = document.createElement('div');
+  orbCol.className = 'flight-lp-traj-col flight-lp-traj-orbital';
+  const orbApoRow = document.createElement('div');
+  orbApoRow.className = 'flight-lp-traj-row';
+  const orbApoLbl = document.createElement('span');
+  orbApoLbl.className = 'flight-lp-traj-lbl';
+  orbApoLbl.textContent = 'Apo';
+  _elOrbApo = document.createElement('span');
+  _elOrbApo.id = 'hud-orb-apo';
+  _elOrbApo.className = 'flight-lp-traj-val';
+  _elOrbApo.textContent = '\u2014';
+  orbApoRow.appendChild(orbApoLbl);
+  orbApoRow.appendChild(_elOrbApo);
+  orbCol.appendChild(orbApoRow);
+
+  const orbPeriRow = document.createElement('div');
+  orbPeriRow.className = 'flight-lp-traj-row';
+  const orbPeriLbl = document.createElement('span');
+  orbPeriLbl.className = 'flight-lp-traj-lbl';
+  orbPeriLbl.textContent = 'Peri';
+  _elOrbPeri = document.createElement('span');
+  _elOrbPeri.id = 'hud-orb-peri';
+  _elOrbPeri.className = 'flight-lp-traj-val';
+  _elOrbPeri.textContent = '\u2014';
+  orbPeriRow.appendChild(orbPeriLbl);
+  orbPeriRow.appendChild(_elOrbPeri);
+  orbCol.appendChild(orbPeriRow);
+
+  trajGrid.appendChild(ballCol);
+  trajGrid.appendChild(orbCol);
+  _elTrajBlock.appendChild(trajGrid);
+
+  // Caption: target horizontal velocity for orbit at this body/altitude.
+  _elTrajTarget = document.createElement('div');
+  _elTrajTarget.id = 'hud-traj-target';
+  _elTrajTarget.className = 'flight-lp-traj-target';
+  _elTrajTarget.textContent = '';
+  _elTrajBlock.appendChild(_elTrajTarget);
+
+  statusSec.appendChild(_elTrajBlock);
 
   const biomeRow = document.createElement('div');
   biomeRow.className = 'flight-lp-twr-row';
@@ -997,6 +1071,20 @@ function _showErrorBanner(): void {
 }
 
 // ---------------------------------------------------------------------------
+// Private — altitude formatting (km when >= 1 km, m otherwise, signed)
+// ---------------------------------------------------------------------------
+
+function _formatAltitudeValue(metres: number): string {
+  const abs = Math.abs(metres);
+  if (abs >= 1000) {
+    const km = metres / 1000;
+    const rounded = km.toFixed(1);
+    return `${rounded} km`;
+  }
+  return `${Math.round(metres)} m`;
+}
+
+// ---------------------------------------------------------------------------
 // Private — comms link label
 // ---------------------------------------------------------------------------
 
@@ -1084,16 +1172,47 @@ function _updateLeftPanel(): void {
     const vx = _ps!.velX ?? 0;
     _elVelX.textContent = `${vx >= 0 ? '+' : ''}${vx.toFixed(1)} m/s`;
   }
-  if (_elApo) {
-    const alt = Math.max(0, _ps!.posY ?? 0);
-    const vy  = _ps!.velY ?? 0;
-    const apo = estimateApoapsis(alt, vy);
-    if (apo > alt + 10) {
-      _elApo.textContent = apo >= 1000
-        ? `${(apo / 1000).toFixed(1)} km`
-        : `${Math.round(apo)} m`;
+  if (_elTrajBlock && _elBallApo && _elOrbApo && _elOrbPeri && _elTrajTarget) {
+    const bodyId = _flightState?.bodyId || 'EARTH';
+    const posX = _ps!.posX ?? 0;
+    const posY = _ps!.posY ?? 0;
+    const velX = _ps!.velX ?? 0;
+    const velY = _ps!.velY ?? 0;
+    const readout = computeTrajectoryReadout(posX, posY, velX, velY, bodyId);
+
+    _elTrajBlock.dataset.state = readout.state;
+
+    // Ballistic apo: show value when meaningfully above current altitude,
+    // else em-dash. Keeps the "will I fall back?" signal legible.
+    const curAlt = Math.max(0, posY);
+    if (readout.ballisticApo > curAlt + 10) {
+      _elBallApo.textContent = _formatAltitudeValue(readout.ballisticApo);
     } else {
-      _elApo.textContent = '\u2014';
+      _elBallApo.textContent = '\u2014';
+    }
+
+    // Orbital apo/peri: show actual numbers when available.
+    if (readout.orbitalApo !== null) {
+      _elOrbApo.textContent = _formatAltitudeValue(readout.orbitalApo);
+    } else {
+      _elOrbApo.textContent = readout.state === 'escape' ? 'ESCAPE' : '\u2014';
+    }
+    if (readout.orbitalPeri !== null) {
+      _elOrbPeri.textContent = _formatAltitudeValue(readout.orbitalPeri);
+    } else {
+      _elOrbPeri.textContent = '\u2014';
+    }
+
+    // Target caption: show the altitude-adaptive circular velocity we're aiming for.
+    // Hide once we're actually in orbit \u2014 the peri readout alone is enough then.
+    if (readout.state === 'orbit') {
+      _elTrajTarget.textContent = '';
+    } else {
+      const vStr = `${Math.round(readout.targetHorizVelocity).toLocaleString('en-US')} m/s`;
+      const aStr = readout.targetAltitude >= 1000
+        ? `${Math.round(readout.targetAltitude / 1000)} km`
+        : `${Math.round(readout.targetAltitude)} m`;
+      _elTrajTarget.textContent = `Target horiz: ${vStr} @ ${aStr}`;
     }
   }
   if (_elBiome) {

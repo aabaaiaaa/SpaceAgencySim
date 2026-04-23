@@ -48,8 +48,9 @@ import {
 } from '../render/map.ts';
 import { CELESTIAL_BODIES, ALL_BODY_IDS } from '../data/bodies.ts';
 import { canResumeCraft, prepareCraftResume, ResumeUnavailableError } from '../core/fieldCraftResume.ts';
+import { canRecoverFieldCraft, recoverFieldCraft, RecoveryUnavailableError } from '../core/craftRecovery.ts';
 import { startFlightScene } from './flightController.ts';
-import { handleFlightEndReturnToHub } from './index.ts';
+import { returnToHubFromFlight } from './index.ts';
 import { createListenerTracker, type ListenerTracker } from './listenerTracker.ts';
 import './trackingStation.css';
 
@@ -93,6 +94,14 @@ const OBJ_TYPE_LABELS: Record<string, string> = {
   [OrbitalObjectType.STATION]:   'Station',
   FIELD_CRAFT:                   'Crewed Vessel',
 };
+
+/** Return the display label for a tracked item, distinguishing probe vs crewed field craft. */
+function _trackedItemLabel(item: TrackedItem): string {
+  if (item.fieldCraft) {
+    return item.fieldCraft.crewIds.length === 0 ? 'Probe' : 'Crewed Vessel';
+  }
+  return OBJ_TYPE_LABELS[item.type] || item.type;
+}
 
 /**
  * Type strings that can _possibly_ be resumed given a linked design.
@@ -689,7 +698,7 @@ function _renderObjectList(tier: number): HTMLDivElement {
 
     const type = document.createElement('span');
     type.className = 'obj-type';
-    type.textContent = OBJ_TYPE_LABELS[item.type] || item.type;
+    type.textContent = _trackedItemLabel(item);
     row.appendChild(type);
 
     const body = document.createElement('span');
@@ -752,23 +761,26 @@ function _renderSelectionDetail(item: TrackedItem): HTMLDivElement {
       const names = fc.crewIds.map((id) => _state!.crew.find((c) => c.id === id)?.name ?? '???').join(', ');
       crewEl.textContent = `Crew: ${names}`;
     } else {
-      crewEl.textContent = `Crew: ${crewCount}`;
+      crewEl.textContent = 'Uncrewed probe';
     }
     info.appendChild(crewEl);
 
-    const supplyEl = document.createElement('div');
-    if (fc.hasExtendedLifeSupport) {
-      supplyEl.textContent = 'Supplies: Unlimited';
-      supplyEl.classList.add('ts-supply-infinite');
-    } else {
-      supplyEl.textContent = `Supplies: ${fc.suppliesRemaining}/${DEFAULT_LIFE_SUPPORT_PERIODS}`;
-      if (fc.suppliesRemaining <= 0) {
-        supplyEl.classList.add('ts-supply-critical');
-      } else if (fc.suppliesRemaining <= LIFE_SUPPORT_WARNING_THRESHOLD) {
-        supplyEl.classList.add('ts-supply-warning');
+    // Life support only applies to crewed vessels — hide the supply row for probes.
+    if (crewCount > 0) {
+      const supplyEl = document.createElement('div');
+      if (fc.hasExtendedLifeSupport) {
+        supplyEl.textContent = 'Supplies: Unlimited';
+        supplyEl.classList.add('ts-supply-infinite');
+      } else {
+        supplyEl.textContent = `Supplies: ${fc.suppliesRemaining}/${DEFAULT_LIFE_SUPPORT_PERIODS}`;
+        if (fc.suppliesRemaining <= 0) {
+          supplyEl.classList.add('ts-supply-critical');
+        } else if (fc.suppliesRemaining <= LIFE_SUPPORT_WARNING_THRESHOLD) {
+          supplyEl.classList.add('ts-supply-warning');
+        }
       }
+      info.appendChild(supplyEl);
     }
-    info.appendChild(supplyEl);
 
     detail.appendChild(info);
   }
@@ -795,10 +807,50 @@ function _renderSelectionDetail(item: TrackedItem): HTMLDivElement {
     }
     actions.appendChild(takeBtn);
 
+    // Recover button — only for FieldCraft (the persistence concept this operates on).
+    // Enabled when an online hub of the appropriate kind is at the craft's body.
+    if (item.fieldCraft && _state) {
+      const eligibility = canRecoverFieldCraft(_state, item.fieldCraft);
+      const recoverBtn = document.createElement('button');
+      recoverBtn.type = 'button';
+      recoverBtn.className = 'ts-recover-btn';
+      recoverBtn.textContent = 'Recover';
+      recoverBtn.setAttribute('data-no-map-pan', 'true');
+      if (!eligibility.allowed) {
+        recoverBtn.disabled = true;
+        recoverBtn.title = item.fieldCraft.status === 'LANDED'
+          ? `No online surface hub on ${item.fieldCraft.bodyId} to dispatch a recovery team`
+          : `No online orbital hub around ${item.fieldCraft.bodyId} to intercept the craft`;
+      } else {
+        _listeners?.add(recoverBtn, 'click', (e) => {
+          e.stopPropagation();
+          _handleRecoverCraft(item.id);
+        });
+      }
+      actions.appendChild(recoverBtn);
+    }
+
     detail.appendChild(actions);
   }
 
   return detail;
+}
+
+/** Recover the field craft, then refresh the sidebar. */
+function _handleRecoverCraft(craftId: string): void {
+  if (!_state) return;
+  try {
+    recoverFieldCraft(_state, craftId);
+    setMapTarget(null);
+    _refreshMapSidebar();
+  } catch (err) {
+    if (err instanceof RecoveryUnavailableError) {
+      // Eligibility was checked before enabling the button; this path should
+      // only trip if state changed between render and click. Fail silently.
+      return;
+    }
+    throw err;
+  }
 }
 
 /**
@@ -939,7 +991,9 @@ function _startTakeControl(craftId: string): void {
     prep.stagingConfig,
     prep.flightState,
     (_finalState, returnResults) => {
-      handleFlightEndReturnToHub(container as HTMLElement, state, returnResults);
+      // returnToHubFromFlight: mounts the hub PIXI scene, re-inits hub UI,
+      // refreshes the top bar, and shows the flight-results overlay.
+      returnToHubFromFlight(container as HTMLElement, state, returnResults);
     },
     prep.initialState,
   );

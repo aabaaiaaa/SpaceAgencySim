@@ -69,6 +69,23 @@
   flex-wrap: wrap;
 }
 
+/* -- Nested sub-option (e.g. Infinite Fuel under Debug Mode) -- */
+.settings-subgroup {
+  margin: 14px 0 0 18px;
+  padding: 10px 12px;
+  border-left: 2px solid var(--color-border-default);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+.settings-subgroup .settings-group-label {
+  font-size: 0.85rem;
+}
+
+.settings-subgroup .settings-group-hint {
+  margin-bottom: 8px;
+}
+
 .settings-option-btn {
   padding: var(--btn-padding-lg);
   background: var(--color-surface-hover);

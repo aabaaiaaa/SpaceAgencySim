@@ -252,7 +252,9 @@ function doLaunch(crewIds: string[]): void {
   });
   S.gameState.rockets.push(launchDesign);
 
-  // Detect orbital hub for launch type.
+  // Resolve launch context from the active hub (body, surface vs orbital).
+  // The VAB doesn't pin to Earth — a craft built at a Mun base launches from
+  // the Mun, an orbital-hub launch starts in orbit at that hub's altitude.
   const activeHub = getActiveHub(S.gameState);
   const isOrbitalLaunch = activeHub.type === 'orbital';
 
@@ -262,11 +264,9 @@ function doLaunch(crewIds: string[]): void {
     crewIds,
     fuelRemaining:   totalFuel,
     deltaVRemaining: 0,
-    ...(isOrbitalLaunch ? {
-      launchType: 'orbital' as const,
-      launchHubId: activeHub.id,
-      bodyId: activeHub.bodyId as CelestialBody,
-    } : {}),
+    bodyId:          activeHub.bodyId as CelestialBody,
+    launchType:      isOrbitalLaunch ? 'orbital' : 'surface',
+    launchHubId:     activeHub.id,
   });
 
   // For orbital launches, set the altitude from the hub so physics can

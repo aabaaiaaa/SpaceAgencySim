@@ -126,6 +126,28 @@ export interface PhysicsSnapshot {
   thrustAligned: boolean;
   /** Malfunction mode for the physics worker (mirrors gameState.malfunctionMode). */
   malfunctionMode?: string;
+  /** Debug flag: when true, fuel tanks never drain (mirrors gameState.infiniteFuel). */
+  infiniteFuel?: boolean;
+
+  // ───────────────────────────────────────────────────────────────────────
+  // ⚠️  SERIALISE CONTRACT — READ BEFORE ADDING A FIELD
+  //
+  // PhysicsSnapshot crosses the main↔worker boundary and is built by TWO
+  // separate serialisers plus consumed by one deserialiser:
+  //
+  //   • src/ui/flightController/_workerBridge.ts::_serialisePhysicsState
+  //       main → worker (init + resync)
+  //   • src/core/physicsWorker.ts::serialisePhysicsState
+  //       worker → main (every tick)
+  //   • src/core/physicsWorker.ts::deserialisePhysicsState
+  //       shared rebuild
+  //
+  // Adding a field here without updating ALL THREE results in a silent
+  // drift bug (feature works in unit tests, does nothing at runtime —
+  // c.f. the infiniteFuel regression).  Prefer adding a round-trip test
+  // in src/tests/ that mirrors: set ps state → bridge serialise →
+  // worker deserialise → tick → assert.
+  // ───────────────────────────────────────────────────────────────────────
 }
 
 /**

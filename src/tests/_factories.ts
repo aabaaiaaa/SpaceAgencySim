@@ -213,6 +213,7 @@ export function makeGameState(overrides: Partial<GameState> = {}): GameState {
     malfunctionMode: MalfunctionMode.NORMAL,
     autoSaveEnabled: true,
     debugMode: false,
+    infiniteFuel: false,
     showPerfDashboard: false,
     miningSites: [],
     provenLegs: [],

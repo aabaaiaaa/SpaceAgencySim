@@ -12,6 +12,7 @@
 import {
   FacilityId,
   MissionState,
+  MiningModuleType,
   SatelliteType,
   FieldCraftStatus,
   ResourceType,
@@ -28,6 +29,7 @@ import {
   makeRouteLeg,
   makeRoute,
   makeFieldCraft,
+  addMiningSiteToState,
   wealthyLateGameBase,
 } from './factories.ts';
 
@@ -253,6 +255,24 @@ function stageD(): GameState {
     }),
   );
 
+  // Basic regolith mine near Selene Base — exercises the logistics mining
+  // tab with a small, healthy-power single-resource setup.
+  addMiningSiteToState(s, {
+    name: 'Selene Mine Alpha',
+    bodyId: 'MOON',
+    coordinates: { x: 400, y: 0 },
+    modules: [
+      { tag: 'gen',   partId: 'power-generator-solar-mk1', type: MiningModuleType.POWER_GENERATOR, powerDraw: 0,  powerOutput: 100 },
+      { tag: 'drill', partId: 'mining-drill-mk1',          type: MiningModuleType.MINING_DRILL,    powerDraw: 25 },
+      { tag: 'silo',  partId: 'storage-silo-mk1',          type: MiningModuleType.STORAGE_SILO,    powerDraw: 2,
+        storedKg: { [ResourceType.REGOLITH]: 850 } },
+    ],
+    connections: [
+      ['gen', 'drill'],
+      ['drill', 'silo'],
+    ],
+  });
+
   return s;
 }
 
@@ -322,6 +342,37 @@ function stageE(): GameState {
   );
 
   s.hubs[0].facilities[FacilityId.SATELLITE_OPS] = { built: true, tier: 3 };
+
+  // Helium-3 + regolith site with a surface launch pad — exercises gas
+  // extraction, refinery recipe selection, and the orbital-buffer render path.
+  addMiningSiteToState(s, {
+    name: 'Selene Gas Works',
+    bodyId: 'MOON',
+    coordinates: { x: -600, y: 300 },
+    modules: [
+      { tag: 'gen1', partId: 'power-generator-solar-mk1', type: MiningModuleType.POWER_GENERATOR, powerDraw: 0,  powerOutput: 100 },
+      { tag: 'gen2', partId: 'power-generator-solar-mk1', type: MiningModuleType.POWER_GENERATOR, powerDraw: 0,  powerOutput: 100 },
+      { tag: 'drill', partId: 'mining-drill-mk1',         type: MiningModuleType.MINING_DRILL,    powerDraw: 25 },
+      { tag: 'gas',  partId: 'gas-collector-mk1',         type: MiningModuleType.GAS_COLLECTOR,   powerDraw: 20 },
+      { tag: 'silo', partId: 'storage-silo-mk2',          type: MiningModuleType.STORAGE_SILO,    powerDraw: 3,
+        storedKg: { [ResourceType.REGOLITH]: 1800 } },
+      { tag: 'vessel', partId: 'pressure-vessel-mk1',     type: MiningModuleType.PRESSURE_VESSEL, powerDraw: 5,
+        storedKg: { [ResourceType.HELIUM_3]: 240 } },
+      { tag: 'pad',  partId: 'surface-launch-pad-mk1',    type: MiningModuleType.SURFACE_LAUNCH_PAD, powerDraw: 50 },
+    ],
+    connections: [
+      ['gen1', 'drill'],
+      ['gen2', 'gas'],
+      ['drill', 'silo'],
+      ['gas', 'vessel'],
+      ['silo', 'pad'],
+      ['vessel', 'pad'],
+    ],
+    orbitalBuffer: {
+      [ResourceType.REGOLITH]: 600,
+      [ResourceType.HELIUM_3]: 80,
+    },
+  });
 
   return s;
 }
@@ -448,6 +499,36 @@ function stageF(): GameState {
     makeFieldCraft({ id: 'fc-deimos-lander',  name: 'Voltaire',  bodyId: 'DEIMOS',  status: FieldCraftStatus.LANDED,   deployedPeriod: 190, crewIds: [] }),
     makeFieldCraft({ id: 'fc-mars-surface',   name: 'Olympus I', bodyId: 'MARS',    status: FieldCraftStatus.LANDED,   deployedPeriod: 180, crewIds: ['crew-d-005'] }),
   );
+
+  // Mars mine near Olympus Base — exercises the multi-body sidebar (Moon
+  // sites from D/E plus Mars here) and a refinery with a Sabatier recipe
+  // running off CO₂ + water ice.
+  addMiningSiteToState(s, {
+    name: 'Olympus Mine',
+    bodyId: 'MARS',
+    coordinates: { x: 2100, y: 0 },
+    modules: [
+      { tag: 'gen1', partId: 'power-generator-solar-mk1', type: MiningModuleType.POWER_GENERATOR, powerDraw: 0,  powerOutput: 100 },
+      { tag: 'gen2', partId: 'power-generator-solar-mk1', type: MiningModuleType.POWER_GENERATOR, powerDraw: 0,  powerOutput: 100 },
+      { tag: 'drill', partId: 'mining-drill-mk1',         type: MiningModuleType.MINING_DRILL,    powerDraw: 25 },
+      { tag: 'gas',  partId: 'gas-collector-mk1',         type: MiningModuleType.GAS_COLLECTOR,   powerDraw: 20 },
+      { tag: 'refinery', partId: 'refinery-mk1',          type: MiningModuleType.REFINERY,        powerDraw: 40 },
+      { tag: 'silo', partId: 'storage-silo-mk2',          type: MiningModuleType.STORAGE_SILO,    powerDraw: 3,
+        storedKg: { [ResourceType.REGOLITH]: 3200, [ResourceType.WATER_ICE]: 450 } },
+      { tag: 'vessel', partId: 'pressure-vessel-mk2',     type: MiningModuleType.PRESSURE_VESSEL, powerDraw: 8,
+        storedKg: { [ResourceType.CO2]: 1100, [ResourceType.OXYGEN]: 140 } },
+      { tag: 'fluid', partId: 'fluid-tank-mk1',           type: MiningModuleType.FLUID_TANK,      powerDraw: 8 },
+    ],
+    connections: [
+      ['gen1', 'drill'],
+      ['gen2', 'gas'],
+      ['drill', 'silo'],
+      ['gas', 'vessel'],
+      ['silo', 'refinery'],
+      ['vessel', 'refinery'],
+      ['refinery', 'fluid'],
+    ],
+  });
 
   return s;
 }

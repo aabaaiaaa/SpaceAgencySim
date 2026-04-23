@@ -1224,3 +1224,27 @@
   color: #c0a040;
   font-size: 7px;
 }
+
+/* ── Max build height marker (tier cap) ─────────────────────────────── */
+.vab-tick-max-height-label {
+  color: #ff6060;
+  font-weight: 700;
+  font-size: 8px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.vab-tick-max-height-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: repeating-linear-gradient(
+    to right,
+    rgba(255, 96, 96, 0.75) 0,
+    rgba(255, 96, 96, 0.75) 4px,
+    transparent 4px,
+    transparent 8px
+  );
+  top: 0;
+}

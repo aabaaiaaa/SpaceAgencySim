@@ -67,6 +67,7 @@ function addFieldCraft(state: GameState, overrides: Partial<FieldCraft> = {}): F
     crewIds: overrides.crewIds ?? [],
     suppliesRemaining: overrides.suppliesRemaining ?? DEFAULT_LIFE_SUPPORT_PERIODS,
     hasExtendedLifeSupport: overrides.hasExtendedLifeSupport ?? false,
+    hasCommandCapability: overrides.hasCommandCapability ?? true,
     deployedPeriod: overrides.deployedPeriod ?? 0,
     orbitalElements: overrides.orbitalElements ?? null,
     orbitBandId: overrides.orbitBandId ?? null,
@@ -163,18 +164,37 @@ describe('processLifeSupport()', () => {
     expect(state.crew.find((a) => a.id === id2)!.status).toBe(AstronautStatus.KIA);
   });
 
-  it('removes field craft with no surviving crew', () => {
+  it('removes field craft when crew die and no command capability remains', () => {
     const crewId = addCrew(state);
     addFieldCraft(state, {
       id: 'fc-doomed',
       crewIds: [crewId],
       suppliesRemaining: 1,
+      hasCommandCapability: false,
     });
 
     const result = processLifeSupport(state);
 
     expect(state.fieldCraft).toHaveLength(0);
     expect(result.removedCraftIds).toContain('fc-doomed');
+  });
+
+  it('retains field craft as a derelict probe when crew die but command capability remains', () => {
+    const crewId = addCrew(state);
+    addFieldCraft(state, {
+      id: 'fc-derelict',
+      crewIds: [crewId],
+      suppliesRemaining: 1,
+      hasCommandCapability: true,
+    });
+
+    const result = processLifeSupport(state);
+
+    // Crew died, craft still retained because it has a command module / probe.
+    expect(state.fieldCraft).toHaveLength(1);
+    expect(state.fieldCraft[0].crewIds).toHaveLength(0);
+    expect(result.removedCraftIds).not.toContain('fc-derelict');
+    expect(result.deaths).toHaveLength(1);
   });
 
   it('handles empty fieldCraft array gracefully', () => {
@@ -192,16 +212,24 @@ describe('processLifeSupport()', () => {
     expect(Array.isArray(state.fieldCraft)).toBe(true);
   });
 
-  it('skips supply tick for field craft with no crew and removes them', () => {
+  it('removes empty-crew field craft only when command capability is absent', () => {
     addFieldCraft(state, {
+      id: 'fc-dead',
       crewIds: [],
       suppliesRemaining: 3,
+      hasCommandCapability: false,
+    });
+    addFieldCraft(state, {
+      id: 'fc-probe',
+      crewIds: [],
+      suppliesRemaining: 3,
+      hasCommandCapability: true,
     });
 
     const result = processLifeSupport(state);
 
-    // Craft with no crew gets cleaned up (removed from array).
-    expect(state.fieldCraft).toHaveLength(0);
+    // Probe survives, dead craft removed; no deaths either way.
+    expect(state.fieldCraft.map((c) => c.id)).toEqual(['fc-probe']);
     expect(result.deaths).toHaveLength(0);
   });
 
@@ -244,6 +272,7 @@ describe('createFieldCraft()', () => {
       status: FieldCraftStatus.IN_ORBIT,
       crewIds: ['crew-1'],
       hasExtendedLifeSupport: false,
+      hasCommandCapability: true,
       deployedPeriod: 5,
     });
 
@@ -264,6 +293,7 @@ describe('createFieldCraft()', () => {
       status: FieldCraftStatus.IN_ORBIT,
       crewIds: ['crew-1', 'crew-2'],
       hasExtendedLifeSupport: true,
+      hasCommandCapability: true,
       deployedPeriod: 10,
       orbitalElements: { semiMajorAxis: 6571000, eccentricity: 0, argPeriapsis: 0, meanAnomalyAtEpoch: 0, epoch: 0 },
       orbitBandId: 'LEO',
@@ -282,6 +312,7 @@ describe('createFieldCraft()', () => {
       status: FieldCraftStatus.LANDED,
       crewIds,
       hasExtendedLifeSupport: false,
+      hasCommandCapability: true,
       deployedPeriod: 0,
     });
 
@@ -385,11 +416,12 @@ describe('advancePeriod() life support integration', () => {
     expect(summary.lifeSupportDeaths[0].crewName).toBe('Doomed');
   });
 
-  it('counts down supplies over multiple periods', () => {
+  it('counts down supplies over multiple periods and removes craft when crew die with no capability', () => {
     const crewId = addCrew(state);
     addFieldCraft(state, {
       crewIds: [crewId],
       suppliesRemaining: 3,
+      hasCommandCapability: false,
     });
 
     advancePeriod(state); // 3 → 2
@@ -399,7 +431,7 @@ describe('advancePeriod() life support integration', () => {
     expect(state.fieldCraft[0].suppliesRemaining).toBe(1);
 
     const summary: PeriodSummary = advancePeriod(state); // 1 → 0 (death)
-    expect(state.fieldCraft).toHaveLength(0); // Removed — crew dead.
+    expect(state.fieldCraft).toHaveLength(0); // Removed — crew dead, no capability to retain.
     expect(summary.lifeSupportDeaths).toHaveLength(1);
   });
 

@@ -198,9 +198,29 @@ function _buildOrbitSection(): HTMLDivElement {
     <p>To enter orbit around Earth, you need:</p>
     <ul>
       <li>Altitude above <strong>80 km</strong> (above the atmosphere)</li>
-      <li>Horizontal velocity of approximately <strong>7,800 m/s</strong></li>
+      <li>Horizontal velocity of approximately <strong>7,800 m/s</strong> —
+          the HUD's &quot;Target horiz&quot; caption shows the exact figure for
+          your current altitude and body.</li>
     </ul>
     <p>Tip: After clearing the atmosphere, tilt your rocket sideways and burn horizontally.</p>
+
+    <h3>Reading the Trajectory Block</h3>
+    <p>The HUD's trajectory block shows two sets of numbers side-by-side so you
+       can aim for orbit without opening the map:</p>
+    <ul>
+      <li><strong>Ballistic — Apo</strong>: where you would coast to with engines cut,
+          based on vertical speed alone. Useful during the vertical ascent
+          (&quot;am I getting high enough?&quot;).</li>
+      <li><strong>Orbital — Apo / Peri</strong>: the actual highest and lowest points
+          of your current trajectory as a closed orbit. While you are suborbital
+          the <strong>Peri</strong> reads below the surface (shown in orange) —
+          circularising means burning horizontally until Peri rises above the
+          atmosphere.</li>
+      <li><strong>Target horiz</strong> caption: the horizontal velocity needed for
+          a circular orbit at your current altitude (or the minimum orbit altitude
+          if you are still low). Scales per body — Earth, Moon, Mars all differ.
+          Hides once you are in a stable orbit.</li>
+    </ul>
 
     <h3>Map View</h3>
     <p>Press <kbd>M</kbd> to open the orbital map. This shows your orbit path,

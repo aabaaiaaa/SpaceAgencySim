@@ -56,6 +56,14 @@ export interface FuelSystemState {
   activeParts: Set<string>;
   fuelStore: Map<string, number>;
   throttle: number;
+  /**
+   * Optional reference to the game state.  Used by the infinite-fuel debug
+   * flag; when `_gameState.infiniteFuel` is true, tank drain is skipped so
+   * engines fire forever.  PhysicsState already carries this reference for
+   * the malfunction system; debris states may leave it undefined (drain
+   * normally).
+   */
+  _gameState?: { infiniteFuel?: boolean } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -245,6 +253,7 @@ export function tickFuelSystem(
   density: number,
 ): void {
   const toRemove: string[] = [];
+  const infiniteFuel: boolean = !!ps._gameState?.infiniteFuel;
 
   for (const engineId of ps.firingEngines) {
 
@@ -273,10 +282,11 @@ export function tickFuelSystem(
 
       const flowRate  = computeEngineFlowRate(def, 1.0, density);
       const remaining = Math.max(0, fuelLeft - flowRate * dt);
-      ps.fuelStore.set(engineId, remaining);
-
-      if (remaining <= 0) {
-        toRemove.push(engineId);
+      if (!infiniteFuel) {
+        ps.fuelStore.set(engineId, remaining);
+        if (remaining <= 0) {
+          toRemove.push(engineId);
+        }
       }
 
     } else {
@@ -310,9 +320,11 @@ export function tickFuelSystem(
       // Drain proportionally so all connected tanks reach empty together.
       // drainFraction is the fraction to remove from each tank's current load.
       const drainFraction = Math.min(1, totalConsumed / totalAvail);
-      for (const tankId of availTanks) {
-        const current = ps.fuelStore.get(tankId) ?? 0;
-        ps.fuelStore.set(tankId, Math.max(0, current * (1 - drainFraction)));
+      if (!infiniteFuel) {
+        for (const tankId of availTanks) {
+          const current = ps.fuelStore.get(tankId) ?? 0;
+          ps.fuelStore.set(tankId, Math.max(0, current * (1 - drainFraction)));
+        }
       }
     }
   }

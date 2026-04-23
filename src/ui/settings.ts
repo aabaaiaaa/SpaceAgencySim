@@ -45,6 +45,7 @@ function persistCurrentSettings(state: GameState): void {
     difficultySettings: { ...getDifficultySettings(state) },
     autoSaveEnabled:    state.autoSaveEnabled,
     debugMode:          state.debugMode,
+    infiniteFuel:       state.infiniteFuel,
     showPerfDashboard:  state.showPerfDashboard,
     malfunctionMode:    state.malfunctionMode as MalfunctionModeType,
   };
@@ -314,18 +315,92 @@ export function openSettingsPanel(
       persistCurrentSettings(state);
       onBtn.classList.add('active');
       offBtn.classList.remove('active');
+      // Re-open the panel so the Infinite Fuel toggle (gated on debug
+      // mode) appears immediately — no need to close/reopen Settings.
+      closePanel();
+      openSettingsPanel(container, state, options);
     });
 
     tracker.add(offBtn, 'click', () => {
       state.debugMode = false;
+      // Clear any debug-only flags so they never leak into normal play —
+      // if we didn't, a player who left Infinite Fuel on and then turned
+      // Debug Mode off would be stuck with infinite fuel and no way to
+      // disable it (its toggle disappears from this panel).
+      if (state.infiniteFuel) state.infiniteFuel = false;
       persistCurrentSettings(state);
       offBtn.classList.add('active');
       onBtn.classList.remove('active');
+      // Re-open the panel so the (now-hidden) Infinite Fuel group goes
+      // away and the rest of the UI reflects the new state.
+      closePanel();
+      openSettingsPanel(container, state, options);
     });
 
     optionsRow.appendChild(onBtn);
     optionsRow.appendChild(offBtn);
     group.appendChild(optionsRow);
+
+    // -- Infinite Fuel (debug-only, nested inside Debug Mode) --
+    // Only surfaced when Debug Mode is on so casual players don't accidentally
+    // enable it.  The flag skips fuel drain in tickFuelSystem — engines fire
+    // forever — useful for manual flight-testing.  Rendered as an indented
+    // sub-option so it reads as a child of Debug Mode.
+    if (state.debugMode) {
+      const subgroup: HTMLDivElement = document.createElement('div');
+      subgroup.className = 'settings-subgroup';
+
+      const subLabelEl: HTMLParagraphElement = document.createElement('p');
+      subLabelEl.className = 'settings-group-label';
+      subLabelEl.textContent = 'Infinite Fuel';
+      subgroup.appendChild(subLabelEl);
+
+      const subHintEl: HTMLParagraphElement = document.createElement('p');
+      subHintEl.className = 'settings-group-hint';
+      subHintEl.textContent = 'Fuel tanks never drain while this is on. Handy for manual flight testing; not for normal play.';
+      subgroup.appendChild(subHintEl);
+
+      const subOptionsRow: HTMLDivElement = document.createElement('div');
+      subOptionsRow.className = 'settings-options';
+
+      const fuelOnBtn: HTMLButtonElement = document.createElement('button');
+      fuelOnBtn.className = 'settings-option-btn';
+      fuelOnBtn.textContent = 'On';
+      fuelOnBtn.setAttribute('data-setting', 'infiniteFuel');
+      fuelOnBtn.setAttribute('data-value', 'on');
+
+      const fuelOffBtn: HTMLButtonElement = document.createElement('button');
+      fuelOffBtn.className = 'settings-option-btn';
+      fuelOffBtn.textContent = 'Off';
+      fuelOffBtn.setAttribute('data-setting', 'infiniteFuel');
+      fuelOffBtn.setAttribute('data-value', 'off');
+
+      if (state.infiniteFuel) {
+        fuelOnBtn.classList.add('active');
+      } else {
+        fuelOffBtn.classList.add('active');
+      }
+
+      tracker.add(fuelOnBtn, 'click', () => {
+        state.infiniteFuel = true;
+        persistCurrentSettings(state);
+        fuelOnBtn.classList.add('active');
+        fuelOffBtn.classList.remove('active');
+      });
+
+      tracker.add(fuelOffBtn, 'click', () => {
+        state.infiniteFuel = false;
+        persistCurrentSettings(state);
+        fuelOffBtn.classList.add('active');
+        fuelOnBtn.classList.remove('active');
+      });
+
+      subOptionsRow.appendChild(fuelOnBtn);
+      subOptionsRow.appendChild(fuelOffBtn);
+      subgroup.appendChild(subOptionsRow);
+      group.appendChild(subgroup);
+    }
+
     content.appendChild(group);
   }
 

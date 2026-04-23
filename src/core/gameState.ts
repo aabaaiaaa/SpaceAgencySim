@@ -568,8 +568,11 @@ export interface SandboxSettings {
 }
 
 /**
- * A crewed vessel left in the field (orbit or landed on a non-Earth body).
- * Crew aboard consume life support supplies each period.
+ * A persisted player vessel left in the field (orbit or landed on a non-home
+ * body). May be crewed, uncrewed (probe), or transition from crewed → uncrewed
+ * if crew die or disembark. Life-support tracking applies only while crew
+ * are aboard; probes with command capability persist indefinitely without
+ * consuming supplies.
  */
 export interface FieldCraft {
   /** Unique identifier. */
@@ -580,12 +583,18 @@ export interface FieldCraft {
   bodyId: string;
   /** FieldCraftStatus value ('IN_ORBIT' or 'LANDED'). */
   status: FieldCraftStatus;
-  /** IDs of crew members aboard. */
+  /** IDs of crew members aboard (empty for pure probes). */
   crewIds: string[];
   /** Periods of life support remaining. */
   suppliesRemaining: number;
   /** True if Extended Mission Module is present (infinite supplies). */
   hasExtendedLifeSupport: boolean;
+  /**
+   * True when the craft carried at least one intact command module or probe
+   * core at persistence time. When true the craft is not auto-removed if all
+   * crew die — it remains as a derelict-but-controllable probe.
+   */
+  hasCommandCapability: boolean;
   /** Period when the craft was left in the field. */
   deployedPeriod: number;
   /** Orbital elements if in orbit, null if landed. */
@@ -865,6 +874,11 @@ export interface GameState {
   autoSaveEnabled: boolean;
   /** Whether debug mode is enabled (debug saves, FPS monitor, etc.). Default: off. */
   debugMode: boolean;
+  /**
+   * Debug-only: when true, fuel tanks never drain — engines fire forever.
+   * Exposed in Settings only while `debugMode` is on.  Default: off.
+   */
+  infiniteFuel: boolean;
   /** Whether the performance dashboard overlay is visible. Default: off. */
   showPerfDashboard: boolean;
   /** Active mining sites deployed on celestial bodies. */
@@ -1040,6 +1054,9 @@ export function createGameState(): GameState {
 
     // Debug mode — disabled by default.
     debugMode: false,
+
+    // Infinite fuel (debug) — disabled by default.
+    infiniteFuel: false,
 
     // Performance dashboard — disabled by default.
     showPerfDashboard: false,

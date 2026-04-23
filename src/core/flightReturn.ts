@@ -36,6 +36,7 @@ import {
 import { processSampleReturns } from './surfaceOps.ts';
 import { checkAchievements } from './achievements.ts';
 import { createFieldCraft, hasExtendedLifeSupport } from './lifeSupport.ts';
+import { persistControllableDebris } from './debrisPersistence.ts';
 import { FieldCraftStatus } from './constants.ts';
 import { processChallengeCompletion } from './challenges.ts';
 import type { GameState, FlightState, FlightResult, FlightEvent, InventoryPart, Contract, FieldCraft, MissionInstance } from './gameState.ts';
@@ -83,6 +84,8 @@ export interface FlightReturnSummary {
   sampleScienceEarned: number;
   newAchievements: Array<{ id: string; title: string; cashReward: number; repReward: number }>;
   deployedFieldCraft: FieldCraft | null;
+  /** Any stages detached mid-flight that persist as their own FieldCraft. */
+  deployedDebrisCraft: FieldCraft[];
   lifeSupportWarnings: Array<{ craftId: string; craftName: string; suppliesRemaining: number; crewIds: string[] }>;
   lifeSupportDeaths: Array<{ craftId: string; craftName: string; crewId: string; crewName: string }>;
   challengeResult: {
@@ -212,12 +215,16 @@ export function processFlightReturn(state: GameState, flightState: FlightState, 
   const sampleResult = isLanded ? processSampleReturns(state, landingBodyId) : { samplesReturned: 0, scienceEarned: 0 };
 
   // -- 6e3. Field craft --
+  // Any player craft with intact command capability (command module or probe
+  // core) persists when the flight ends in orbit or landed on a non-home body.
+  // Crew may be present or empty — empty is valid for probes.
   let deployedFieldCraft: FieldCraft | null = null;
   {
     const crewIds = Array.isArray(flightState?.crewIds) ? flightState.crewIds : [];
     const wasInOrbit = !!(flightState?.inOrbit);
     const landedOnNonEarth = isLanded && landingBodyId !== 'EARTH';
-    if (crewIds.length > 0 && (wasInOrbit || landedOnNonEarth)) {
+    const hasCommandCapability = _hasIntactCommandCapability(ps, assembly);
+    if (hasCommandCapability && (wasInOrbit || landedOnNonEarth)) {
       const ejectedIds = ps?.ejectedCrewIds ?? new Set<string>();
       const isCrashed = !!(ps && ps.crashed);
       const survivingIds = crewIds.filter((id: string) => {
@@ -225,16 +232,36 @@ export function processFlightReturn(state: GameState, flightState: FlightState, 
         const astro = (state.crew ?? []).find((a) => a.id === id);
         return astro && astro.status !== AstronautStatus.KIA;
       });
-      if (survivingIds.length > 0) {
-        if (!Array.isArray(state.fieldCraft)) state.fieldCraft = [];
-        const rocketDesign = state.rockets?.find((r) => r.id === flightState.rocketId);
-        const craftName = rocketDesign?.name ?? `Craft-${(flightState.rocketId ?? '').slice(0, 6)}`;
-        const fieldStatus = wasInOrbit ? FieldCraftStatus.IN_ORBIT : FieldCraftStatus.LANDED;
-        deployedFieldCraft = createFieldCraft(state, { name: craftName, bodyId: landingBodyId, status: fieldStatus, crewIds: survivingIds, hasExtendedLifeSupport: hasExtendedLifeSupport(assembly, ps), deployedPeriod: state.currentPeriod, orbitalElements: flightState?.orbitalElements ?? null, orbitBandId: flightState?.orbitBandId ?? null, rocketDesignId: flightState?.rocketId });
-        state.fieldCraft.push(deployedFieldCraft);
-      }
+      if (!Array.isArray(state.fieldCraft)) state.fieldCraft = [];
+      const rocketDesign = state.rockets?.find((r) => r.id === flightState.rocketId);
+      const craftName = rocketDesign?.name ?? `Craft-${(flightState.rocketId ?? '').slice(0, 6)}`;
+      const fieldStatus = wasInOrbit ? FieldCraftStatus.IN_ORBIT : FieldCraftStatus.LANDED;
+      deployedFieldCraft = createFieldCraft(state, {
+        name: craftName,
+        bodyId: landingBodyId,
+        status: fieldStatus,
+        crewIds: survivingIds,
+        hasExtendedLifeSupport: hasExtendedLifeSupport(assembly, ps),
+        hasCommandCapability,
+        deployedPeriod: state.currentPeriod,
+        orbitalElements: flightState?.orbitalElements ?? null,
+        orbitBandId: flightState?.orbitBandId ?? null,
+        rocketDesignId: flightState?.rocketId,
+      });
+      state.fieldCraft.push(deployedFieldCraft);
     }
   }
+
+  // -- 6e5. Controllable debris --
+  // Any decoupled stage that still has an intact command module or probe
+  // core and ended the flight in stable orbit / safely landed on a non-home
+  // body becomes its own persisted FieldCraft.
+  const deployedDebrisCraft: FieldCraft[] = ps
+    ? persistControllableDebris(state, ps.debris ?? [], assembly!, {
+        bodyId: flightState?.bodyId ?? 'EARTH',
+        rocketId: flightState?.rocketId,
+      })
+    : [];
 
   // -- 6f. Flight time --
   state.flightTimeSeconds = (state.flightTimeSeconds ?? 0) + (flightState?.timeElapsed ?? 0);
@@ -277,7 +304,7 @@ export function processFlightReturn(state: GameState, flightState: FlightState, 
     bankrupt: periodSummary.bankrupt, deployedSatellites, crewXPGains, crewInjuries, recoveredParts,
     reputationChange: (state.reputation ?? 50) - repBefore, reputationAfter: state.reputation ?? 50,
     samplesReturned: sampleResult.samplesReturned, sampleScienceEarned: sampleResult.scienceEarned,
-    newAchievements, deployedFieldCraft,
+    newAchievements, deployedFieldCraft, deployedDebrisCraft,
     lifeSupportWarnings: periodSummary.lifeSupportWarnings ?? [],
     lifeSupportDeaths: periodSummary.lifeSupportDeaths ?? [],
     challengeResult,
@@ -298,6 +325,22 @@ function _allCommandModulesDestroyed(ps: PhysicsState | null, assembly: RocketAs
     if (ps.activeParts.has(instanceId)) return false;
   }
   return hadCommandModule;
+}
+
+/**
+ * True when the craft retains at least one intact command module or probe
+ * core, i.e. something the player can still issue commands to. Used to decide
+ * whether a craft persists as a field craft after flight return.
+ */
+function _hasIntactCommandCapability(ps: PhysicsState | null, assembly: RocketAssembly | null): boolean {
+  if (!assembly || !ps) return false;
+  for (const [instanceId, placed] of assembly.parts) {
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    if (def.type !== PartType.COMMAND_MODULE && def.type !== PartType.COMPUTER_MODULE) continue;
+    if (ps.activeParts.has(instanceId)) return true;
+  }
+  return false;
 }
 
 function _determineOutcome(ps: PhysicsState | null, missionsCompleted: boolean): FlightOutcome {

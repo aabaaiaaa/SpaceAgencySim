@@ -845,3 +845,122 @@ describe('getConnectedTanks() — parts with missing data', () => {
     expect(tanks).not.toContain(tankId);
   });
 });
+
+// ---------------------------------------------------------------------------
+// tickFuelSystem() — infinite-fuel debug flag
+// ---------------------------------------------------------------------------
+
+describe('tickFuelSystem() — infiniteFuel debug flag @smoke', () => {
+  it('liquid tanks do NOT drain when _gameState.infiniteFuel is true', () => {
+    const { assembly, tankId, engineId } = makeSimpleRocket();
+    const ps = makePS(assembly);
+    ps._gameState = { infiniteFuel: true } as never;
+    ps.firingEngines.add(engineId);
+
+    const before = ps.fuelStore.get(tankId)!;
+    for (let i = 0; i < 300; i++) {
+      tickFuelSystem(ps, assembly, 1 / 60, SEA_LEVEL_DENSITY);
+    }
+    expect(ps.fuelStore.get(tankId)).toBe(before);
+    expect(ps.firingEngines.has(engineId)).toBe(true);
+  });
+
+  it('SRBs do NOT deplete their integral fuel when infiniteFuel is on', () => {
+    // Build a tiny SRB-only assembly.
+    const assembly = createRocketAssembly();
+    const probeId = addPartToAssembly(assembly, 'probe-core-mk1', 0, 60);
+    const srbId = addPartToAssembly(assembly, 'srb-small', 0, 0);
+    connectParts(assembly, probeId, 1, srbId, 0);
+
+    const staging = createStagingConfig();
+    syncStagingWithAssembly(assembly, staging);
+    const flightState = createFlightState({ missionId: '', rocketId: 'r', crewIds: [] });
+    const ps = createPhysicsState(assembly, flightState);
+    ps.activeParts = new Set(assembly.parts.keys());
+    ps._gameState = { infiniteFuel: true } as never;
+    ps.firingEngines.add(srbId);
+
+    const before = ps.fuelStore.get(srbId) ?? 0;
+    if (before <= 0) return; // SRB not available in this build — skip rather than fail.
+    for (let i = 0; i < 600; i++) {
+      tickFuelSystem(ps, assembly, 1 / 60, SEA_LEVEL_DENSITY);
+    }
+    expect(ps.fuelStore.get(srbId)).toBe(before);
+  });
+
+  it('normal drain still occurs when infiniteFuel is off / undefined', () => {
+    const { assembly, tankId, engineId } = makeSimpleRocket();
+    const ps = makePS(assembly);
+    // _gameState intentionally undefined.
+    ps.firingEngines.add(engineId);
+
+    const before = ps.fuelStore.get(tankId)!;
+    tickFuelSystem(ps, assembly, 1 / 60, SEA_LEVEL_DENSITY);
+    expect(ps.fuelStore.get(tankId)).toBeLessThan(before);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Regression: the infiniteFuel flag survives the main→worker serialise step.
+//
+// Two serialisers exist:
+//   - src/ui/flightController/_workerBridge.ts::_serialisePhysicsState
+//     (main → worker, used on init + resync)
+//   - src/core/physicsWorker.ts::serialisePhysicsState
+//     (worker → main, used to report ticks back)
+//
+// The worker runs tickFuelSystem inside itself using the state it received
+// from the MAIN thread — so if the main-thread serialiser omits
+// infiniteFuel, the worker never sees the flag and drains fuel normally.
+//
+// These tests exercise the full round-trip: game-state flag → main-thread
+// serialise → worker deserialise → tickFuelSystem → no drain.
+// ---------------------------------------------------------------------------
+describe('tickFuelSystem() — infiniteFuel survives worker serialise @smoke', () => {
+  it('main-thread serialiser includes infiniteFuel so the worker honours it', async () => {
+    const { serialisePhysicsStateForWorker } = await import('../ui/flightController/_workerBridge.ts');
+    const { deserialisePhysicsState } = await import('../core/physicsWorker.ts');
+
+    const { assembly, tankId, engineId } = makeSimpleRocket();
+    const ps = makePS(assembly);
+    // Mirror src/ui/flightController/_init.ts: ps._gameState is assigned
+    // the actual top-level GameState.  Only the infiniteFuel field is
+    // read by tickFuelSystem, so a structurally-minimal stand-in is fine.
+    ps._gameState = { infiniteFuel: true } as never;
+    ps.firingEngines.add(engineId);
+
+    const snap = serialisePhysicsStateForWorker(ps);
+    // The snapshot must carry the flag — without this the worker can't
+    // know the player flipped the debug toggle.
+    expect(snap.infiniteFuel).toBe(true);
+
+    // Deserialise into a worker-side ps and run the fuel system — it
+    // should see infiniteFuel=true and skip the drain.
+    const workerPs = deserialisePhysicsState(snap);
+    workerPs.firingEngines.add(engineId);
+    const tankBefore = workerPs.fuelStore.get(tankId)!;
+    for (let i = 0; i < 300; i++) {
+      tickFuelSystem(workerPs, assembly, 1 / 60, SEA_LEVEL_DENSITY);
+    }
+    expect(workerPs.fuelStore.get(tankId)).toBe(tankBefore);
+  });
+
+  it('serialiser with infiniteFuel=false lets the worker drain normally', async () => {
+    const { serialisePhysicsStateForWorker } = await import('../ui/flightController/_workerBridge.ts');
+    const { deserialisePhysicsState } = await import('../core/physicsWorker.ts');
+
+    const { assembly, tankId, engineId } = makeSimpleRocket();
+    const ps = makePS(assembly);
+    ps._gameState = { infiniteFuel: false } as never;
+    ps.firingEngines.add(engineId);
+
+    const snap = serialisePhysicsStateForWorker(ps);
+    expect(snap.infiniteFuel).toBe(false);
+
+    const workerPs = deserialisePhysicsState(snap);
+    workerPs.firingEngines.add(engineId);
+    const tankBefore = workerPs.fuelStore.get(tankId)!;
+    tickFuelSystem(workerPs, assembly, 1 / 60, SEA_LEVEL_DENSITY);
+    expect(workerPs.fuelStore.get(tankId)).toBeLessThan(tankBefore);
+  });
+});

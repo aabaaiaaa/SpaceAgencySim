@@ -319,6 +319,17 @@ function _handleMessage(msg: WorkerMessage): void {
 // Serialisation helpers — main-thread state → structured-clone-safe
 // ---------------------------------------------------------------------------
 
+// ⚠️  SERIALISE CONTRACT — main → worker
+// Paired with src/core/physicsWorker.ts::serialisePhysicsState (worker →
+// main) and deserialisePhysicsState (shared rebuild).  When you add a
+// PhysicsSnapshot field you MUST update every site — silent drift here
+// surfaces as "feature doesn't work at runtime" bugs (infiniteFuel was
+// the last one).  See PhysicsSnapshot in physicsWorkerProtocol.ts for
+// the full list, and fuelsystem.test.ts "infiniteFuel survives worker
+// serialise" for the round-trip test pattern.
+//
+// Exported for unit tests (see fuelsystem.test.ts) so the main-thread
+// serialise path can be verified without spinning up a real Worker.
 function _serialisePhysicsState(ps: PhysicsState): PhysicsSnapshot {
   return {
     posX: ps.posX,
@@ -387,6 +398,11 @@ function _serialisePhysicsState(ps: PhysicsState): PhysicsSnapshot {
     capturedBody: ps.capturedBody,
     thrustAligned: ps.thrustAligned,
     malfunctionMode: ps.malfunctionMode,
+    // Forward the infinite-fuel debug flag.  The worker's tickFuelSystem
+    // reads ps._gameState?.infiniteFuel to decide whether to drain tanks,
+    // so we must thread it through every main→worker snapshot (init +
+    // every resync); otherwise the toggle appears to do nothing.
+    infiniteFuel: !!ps._gameState?.infiniteFuel,
   };
 }
 
@@ -441,3 +457,11 @@ function _serialiseStagingConfig(sc: StagingConfig): SerialisedStagingConfig {
     currentStageIdx: sc.currentStageIdx,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Exported for unit tests — the serialiser used by the main thread to seed
+// + resync the physics worker.  Must forward every runtime flag the worker
+// relies on (currently: infiniteFuel).
+// ---------------------------------------------------------------------------
+
+export { _serialisePhysicsState as serialisePhysicsStateForWorker };

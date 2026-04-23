@@ -119,6 +119,92 @@
   font-size: 9px;
 }
 
+/* ─── Trajectory block (ballistic + orbital side-by-side) ─────────────────── */
+
+.flight-lp-traj {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 2px;
+  padding: 3px 4px;
+  border: 1px solid #254025;
+  border-radius: 3px;
+  background: rgba(0, 16, 0, 0.35);
+}
+
+.flight-lp-traj-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.flight-lp-traj-hdr {
+  font-size: 8px;
+  color: #507860;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  text-align: left;
+}
+
+.flight-lp-traj-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+}
+
+.flight-lp-traj-col {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.flight-lp-traj-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.flight-lp-traj-lbl {
+  font-size: 8px;
+  color: #507860;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.flight-lp-traj-val {
+  font-size: 11px;
+  color: #a0d8b0;
+  font-variant-numeric: tabular-nums;
+}
+
+.flight-lp-traj-target {
+  font-size: 9px;
+  color: #80b090;
+  font-style: italic;
+  text-align: center;
+  min-height: 11px;
+}
+
+/* State-driven colouring via [data-state] on the trajectory block. */
+.flight-lp-traj[data-state="suborbital"] #hud-orb-peri {
+  color: #ff9848;
+}
+
+.flight-lp-traj[data-state="orbit"] #hud-orb-apo,
+.flight-lp-traj[data-state="orbit"] #hud-orb-peri {
+  color: #80ffa8;
+}
+
+.flight-lp-traj[data-state="escape"] #hud-orb-apo {
+  color: #ff80ff;
+  font-style: italic;
+}
+
+.flight-lp-traj[data-state="landed"] #hud-orb-apo,
+.flight-lp-traj[data-state="landed"] #hud-orb-peri {
+  color: #506858;
+}
+
 .flight-lp-btn-row {
   display: flex;
   gap: 4px;

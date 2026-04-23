@@ -148,6 +148,14 @@ export const FACILITY_DEFINITIONS: readonly FacilityDefinition[] = Object.freeze
     scienceCost: 15,
     starter:     false,
   }),
+  Object.freeze({
+    id:          FacilityId.CREW_HAB,
+    name:        'Crew Habitation',
+    description: 'Life-support habitat that houses crew and tourists at an off-world hub. Required for crewed off-world operations.',
+    cost:        0, // Off-world cost is resource-based, see OFFWORLD_FACILITY_COSTS.
+    scienceCost: 0,
+    starter:     false,
+  }),
 ]);
 
 // ---------------------------------------------------------------------------

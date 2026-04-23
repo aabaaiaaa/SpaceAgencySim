@@ -8,11 +8,35 @@ import {
   VAB_PIXELS_PER_METRE,
   vabGetCamera,
 } from '../../render/vab.ts';
+import { VAB_MAX_HEIGHT, FacilityId } from '../../core/constants.ts';
+import { getFacilityTier } from '../../core/construction.ts';
 import { getVabState } from './_state.ts';
+
+/**
+ * Find the lowest world-Y across all placed parts (pixel units).
+ * Returns null when no parts are placed.
+ */
+function _getRocketBottomWorldY(): number | null {
+  const S = getVabState();
+  if (!S.assembly || S.assembly.parts.size === 0) return null;
+  let minY = Infinity;
+  for (const placed of S.assembly.parts.values()) {
+    const def = getPartById(placed.partId);
+    if (!def) continue;
+    const bottom = placed.y - def.height / 2;
+    if (bottom < minY) minY = bottom;
+  }
+  return isFinite(minY) ? minY : null;
+}
 
 /**
  * Regenerate the scale-bar tick marks to match the current camera state.
  * This is called on init, on window resize, and whenever the camera moves.
+ *
+ * The "0m" reference tracks the rocket's lowest point when any parts are
+ * placed — so the max-height marker always represents room *above the
+ * current craft* rather than above an arbitrary world origin.  With no
+ * parts, 0m is the world origin (launch pad line).
  */
 export function drawScaleTicks(): void {
   const S = getVabState();
@@ -22,8 +46,10 @@ export function drawScaleTicks(): void {
   const pxPerMetre = VAB_PIXELS_PER_METRE * zoom;
   const h = S.buildAreaHeight;
 
-  const scaleBarTop    = S.scaleTicks.getBoundingClientRect().top;
-  const adjustedCamY   = VAB_TOOLBAR_HEIGHT + camY - scaleBarTop;
+  const scaleBarTop  = S.scaleTicks.getBoundingClientRect().top;
+  const anchorWorldY = _getRocketBottomWorldY() ?? 0;
+  // Screen Y of the 0m anchor (either rocket bottom or world origin).
+  const adjustedCamY = VAB_TOOLBAR_HEIGHT + camY - scaleBarTop - anchorWorldY * zoom;
 
   // Choose a readable tick interval (in metres) based on current zoom.
   let tickM = 1;
@@ -74,8 +100,43 @@ export function drawScaleTicks(): void {
 
   S.scaleTicks.innerHTML = frags.join('');
 
+  // Draw the VAB's maximum-height marker (tier-gated).
+  _drawMaxHeightMarker(adjustedCamY, pxPerMetre, h);
+
   // Draw rocket extent markers.
   updateScaleBarExtents();
+}
+
+/**
+ * Draw a horizontal "max build height" guide line on the scale bar so the
+ * player can see at a glance how tall the current VAB tier allows.  No
+ * marker is drawn when the tier is unlimited (Infinity).
+ */
+function _drawMaxHeightMarker(adjustedCamY: number, pxPerMetre: number, h: number): void {
+  const S = getVabState();
+  if (!S.scaleTicks || !S.gameState) return;
+
+  const vabTier = getFacilityTier(S.gameState, FacilityId.VAB);
+  const maxWorldPx = VAB_MAX_HEIGHT[vabTier] ?? VAB_MAX_HEIGHT[1];
+  if (!isFinite(maxWorldPx)) return; // Tier 3: unlimited — no line to draw.
+
+  // Convert: VAB_MAX_HEIGHT is in world pixels; world coords use
+  // VAB_PIXELS_PER_METRE (20 px = 1 m).
+  const maxMetres = maxWorldPx / VAB_PIXELS_PER_METRE;
+
+  // World-Y of the cap (relative to launch pad at Y=0, positive = up).
+  // pxPerMetre already includes the current zoom, so metres * pxPerMetre
+  // gives the screen-space offset from the 0m baseline.
+  const barY = adjustedCamY - maxMetres * pxPerMetre;
+  if (barY < 0 || barY > h) return; // Off-screen at current scroll.
+
+  const el = document.createElement('div');
+  el.className = 'vab-tick vab-tick-max-height';
+  el.style.top = `${barY.toFixed(1)}px`;
+  el.innerHTML =
+    `<span class="vab-tick-label vab-tick-max-height-label">Max ${maxMetres}m</span>` +
+    `<span class="vab-tick-max-height-line"></span>`;
+  S.scaleTicks.appendChild(el);
 }
 
 /**
@@ -94,9 +155,6 @@ export function updateScaleBarExtents(): void {
   const { zoom, y: camY } = vabGetCamera();
   const h = S.buildAreaHeight;
 
-  const scaleBarTop  = S.scaleTicks.getBoundingClientRect().top;
-  const adjustedCamY = VAB_TOOLBAR_HEIGHT + camY - scaleBarTop;
-
   // Find the world-Y extent of all placed parts.
   let maxWorldY = -Infinity;
   let minWorldY = Infinity;
@@ -112,8 +170,14 @@ export function updateScaleBarExtents(): void {
 
   if (!isFinite(maxWorldY) || !isFinite(minWorldY)) return;
 
-  const topBarY    = adjustedCamY - maxWorldY * zoom;
-  const bottomBarY = adjustedCamY - minWorldY * zoom;
+  // Anchor adjustedCamY to the rocket's bottom (the 0m reference) so the
+  // Top / Bot markers align with the re-anchored tick grid.
+  const scaleBarTop  = S.scaleTicks.getBoundingClientRect().top;
+  const adjustedCamY = VAB_TOOLBAR_HEIGHT + camY - scaleBarTop - minWorldY * zoom;
+
+  const rocketHeightPx = (maxWorldY - minWorldY) * zoom;
+  const topBarY    = adjustedCamY - rocketHeightPx;
+  const bottomBarY = adjustedCamY;
   const midBarY    = (topBarY + bottomBarY) / 2;
   const heightM    = (maxWorldY - minWorldY) / VAB_PIXELS_PER_METRE;
 

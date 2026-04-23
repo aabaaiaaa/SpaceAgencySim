@@ -112,6 +112,8 @@ export interface PersistedSettings {
   autoSaveEnabled: boolean;
   /** Debug mode — enables debug saves, FPS overlay, etc. */
   debugMode: boolean;
+  /** Debug-only: when true, engines never deplete fuel tanks. */
+  infiniteFuel: boolean;
   /** Whether the real-time performance dashboard overlay is visible. */
   showPerfDashboard: boolean;
   /** Malfunction mode override ('normal', 'off', 'forced'). */
@@ -158,6 +160,7 @@ function defaultSettings(): PersistedSettings {
     difficultySettings: { ...DEFAULT_DIFFICULTY_SETTINGS },
     autoSaveEnabled: true,
     debugMode: false,
+    infiniteFuel: false,
     showPerfDashboard: false,
     malfunctionMode: MalfunctionMode.NORMAL,
     fpsMonitorPosition: null,
@@ -327,6 +330,10 @@ function mergeWithDefaults(stored: Partial<PersistedSettings>): PersistedSetting
       typeof stored.debugMode === 'boolean'
         ? stored.debugMode
         : defaults.debugMode,
+    infiniteFuel:
+      typeof stored.infiniteFuel === 'boolean'
+        ? stored.infiniteFuel
+        : defaults.infiniteFuel,
     showPerfDashboard:
       typeof stored.showPerfDashboard === 'boolean'
         ? stored.showPerfDashboard

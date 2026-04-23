@@ -15,6 +15,7 @@ import { DEBUG_SAVE_DEFINITIONS } from '../core/debugSaves.ts';
 import type { DebugSaveDefinition } from '../core/debugSaves.ts';
 import { getUnlockedMissions, reconcileParts } from '../core/missions.ts';
 import { refreshTopBar } from './topbar.ts';
+import { destroyHubUI, initHubUI } from './hub.ts';
 import { createListenerTracker } from './listenerTracker.ts';
 import './debugSaves.css';
 import type { GameState } from '../core/gameState.ts';
@@ -182,6 +183,34 @@ function _backfillTakeControlLinks(s: GameState): void {
   }
 }
 
+/**
+ * After replacing the live state with a debug snapshot, the currently-mounted
+ * hub UI (buildings, switcher dropdown, PIXI scene) is stale.  Destroy and
+ * re-initialise the hub so everything reflects the new state: the correct
+ * buildings for the new active hub, the switcher dropdown visibility per
+ * the new hub count, and the correct body visuals.
+ *
+ * The navigation callback is re-derived from the existing index router; we
+ * look it up dynamically to avoid a circular import.
+ */
+function _reinitHubAfterDebugLoad(state: GameState): void {
+  if (typeof window === 'undefined') return;
+  const uiOverlay = document.getElementById('ui-overlay');
+  if (!uiOverlay) return;
+  // Only re-init if the hub is the active screen — otherwise let the
+  // current screen (VAB, flight, etc.) handle its own state change.
+  const hubOverlay = document.getElementById('hub-overlay');
+  if (!hubOverlay) return;
+
+  // Dynamic import keeps index.ts out of our static dep graph.
+  void import('./index.ts').then((indexMod) => {
+    destroyHubUI();
+    initHubUI(uiOverlay, state, (destination: string) => {
+      void indexMod.handleNavigation(uiOverlay, state, destination);
+    });
+  });
+}
+
 function _loadDebugState(liveState: GameState, def: DebugSaveDefinition, feedbackEl: FeedbackElement): void {
   const snapshot = def.generate();
 
@@ -207,6 +236,12 @@ function _loadDebugState(liveState: GameState, def: DebugSaveDefinition, feedbac
 
   // Refresh the top bar to show new money/agency name.
   refreshTopBar();
+
+  // Re-render the hub UI so stale buildings, the hub-switcher dropdown
+  // visibility, and background visuals all reflect the new state.  The
+  // debug panel opens from the hub, so we can assume the hub overlay is
+  // the active screen.
+  _reinitHubAfterDebugLoad(liveState);
 
   // Show confirmation.
   feedbackEl.textContent = `Loaded: ${def.name}`;

@@ -539,17 +539,45 @@ function _bodyDisplayName(bodyId: string): string {
 
 /**
  * Check whether the map view is available.
- * Requires the Tracking Station facility to be built.
+ *
+ * Available when ANY online hub in the network has a Tracking Station.  A
+ * Moon-base-launched craft can use Earth HQ's tracking station via comms
+ * relay; conversely, an Earth-based craft with no tracking station but a
+ * remote hub that has one still has access.
  */
 export function isMapViewAvailable(state: GameState): boolean {
-  return hasFacility(state, FacilityId.TRACKING_STATION);
+  return getBestTrackingStationTier(state) > 0;
 }
 
 /**
- * Get the current Tracking Station tier (0 if not built).
+ * Get the highest Tracking Station tier across all online hubs in the
+ * network.  Returns 0 if no hub has a Tracking Station (or no hub is
+ * online).  Used to gate map features so a linked tracking station
+ * anywhere in the network grants access regardless of launch site.
+ */
+export function getBestTrackingStationTier(state: GameState): number {
+  const hubs = state?.hubs ?? [];
+  let best = 0;
+  for (const hub of hubs) {
+    if (!hub || hub.online === false) continue;
+    const tier = hub.facilities?.[FacilityId.TRACKING_STATION]?.tier ?? 0;
+    const built = !!hub.facilities?.[FacilityId.TRACKING_STATION]?.built;
+    if (built && tier > best) best = tier;
+  }
+  // Fallback: the legacy active-hub-only check, in case the hubs array is
+  // absent (older fixtures / tests) but construction data still populated.
+  if (best === 0 && hasFacility(state, FacilityId.TRACKING_STATION)) {
+    best = getFacilityTier(state, FacilityId.TRACKING_STATION);
+  }
+  return best;
+}
+
+/**
+ * Get the highest Tracking Station tier across the network (0 if none).
+ * Kept for back-compat; equivalent to {@link getBestTrackingStationTier}.
  */
 export function getTrackingStationTier(state: GameState): number {
-  return getFacilityTier(state, FacilityId.TRACKING_STATION);
+  return getBestTrackingStationTier(state);
 }
 
 /**

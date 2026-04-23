@@ -106,14 +106,21 @@ export function renderRouteMap(): SVGSVGElement {
   const svg = document.createElementNS(svgNS, 'svg');
   svg.setAttribute('class', 'logistics-route-map');
 
-  // Dynamic viewBox based on computed layout width
+  // Dynamic viewBox based on computed layout width.  The SVG fills the
+  // parent container (width: 100%) so the schematic scales to whatever
+  // space the logistics tab has.  Zoom + pan are applied via a group
+  // transform so the viewBox stays constant — simpler hit-testing and
+  // predictable pan bounds.
   const computedWidth = Math.max(getSchematicWidth(layout), 800);
-  const svgHeight = 220;
+  const svgHeight = 480;
   svg.setAttribute('viewBox', `0 0 ${computedWidth} ${svgHeight}`);
-  svg.setAttribute('width', `${computedWidth}px`);
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  svg.setAttribute('width', '100%');
   svg.setAttribute('height', `${svgHeight}px`);
+  svg.style.touchAction = 'none';
 
-  // Determine which bodies to show
+  // Determine which bodies to show (needed BEFORE the viewport transform
+  // because the content-centre calculation depends on visible nodes).
   const visibleBodies = new Set<string>();
   visibleBodies.add('EARTH'); // always shown
 
@@ -129,14 +136,122 @@ export function renderRouteMap(): SVGSVGElement {
     }
   }
 
-  // Render visible bodies
+  // Compute the visible-content bounding box so we can centre it inside
+  // the viewBox — the schematic layout anchors bodies along the left
+  // edge, which leaves empty space on the right and makes zoom appear to
+  // fly content off-screen.  We translate the content centroid to the
+  // viewBox centre, and zoom is anchored on that centroid.
+  let minX = Infinity, maxX = -Infinity;
+  let minY = Infinity, maxY = -Infinity;
+  for (const [bodyId, node] of layout) {
+    if (node.type === 'surfaceHub' || node.type === 'orbitalHub') {
+      if (!node.parentId || !visibleBodies.has(node.parentId)) continue;
+    } else if (!visibleBodies.has(bodyId)) {
+      continue;
+    }
+    minX = Math.min(minX, node.x - node.radius);
+    maxX = Math.max(maxX, node.x + node.radius);
+    minY = Math.min(minY, node.y - node.radius);
+    maxY = Math.max(maxY, node.y + node.radius);
+  }
+  if (!isFinite(minX)) {
+    // No visible nodes — fall back to viewBox centre.
+    minX = 0; maxX = computedWidth; minY = 0; maxY = svgHeight;
+  }
+  const contentCx = (minX + maxX) / 2;
+  const contentCy = (minY + maxY) / 2;
+
+  // Transform group — all content goes inside `viewport` so we can
+  // translate + scale without redrawing.
+  const zoom = ls.routeMapZoom;
+  const panX = ls.routeMapPanX;
+  const panY = ls.routeMapPanY;
+  const cx = computedWidth / 2;
+  const cy = svgHeight / 2;
+  // Centre content + zoom around the content centroid:
+  //   translate(viewBoxCentre + pan)  →  place centroid at viewBox centre
+  //   scale(zoom)                     →  zoom around that centroid
+  //   translate(-contentCentre)       →  source offset so content arrives centred
+  const viewport = document.createElementNS(svgNS, 'g');
+  viewport.setAttribute(
+    'transform',
+    `translate(${cx + panX}, ${cy + panY}) scale(${zoom}) translate(${-contentCx}, ${-contentCy})`,
+  );
+  // Stash the content centre so applyMapZoomTransforms() can re-apply the
+  // same centred transform on zoom / pan changes without re-rendering.
+  svg.setAttribute('data-content-cx', String(contentCx));
+  svg.setAttribute('data-content-cy', String(contentCy));
+  svg.appendChild(viewport);
+
+  // Drag-to-pan: track pointer on the SVG, translate in viewBox units
+  // (SVG auto-scales screen → viewBox via preserveAspectRatio).
+  let dragging = false;
+  let dragStartX = 0;
+  let dragStartY = 0;
+  let dragPanX0 = 0;
+  let dragPanY0 = 0;
+  _addTracked(svg, 'pointerdown', ((e: PointerEvent) => {
+    // Only start a pan on empty-background clicks — clicking a body /
+    // hub / leg path should still fire their own click handlers.
+    const t = e.target as SVGElement;
+    if (t !== svg && t !== viewport) return;
+    dragging = true;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    const cur = getLogisticsState();
+    dragPanX0 = cur.routeMapPanX;
+    dragPanY0 = cur.routeMapPanY;
+    (svg as unknown as { setPointerCapture: (id: number) => void }).setPointerCapture(e.pointerId);
+    svg.style.cursor = 'grabbing';
+  }) as EventListener);
+  _addTracked(svg, 'pointermove', ((e: PointerEvent) => {
+    if (!dragging) return;
+    const rect = svg.getBoundingClientRect();
+    const scaleScreenToViewbox = computedWidth / rect.width;
+    const dx = (e.clientX - dragStartX) * scaleScreenToViewbox;
+    const dy = (e.clientY - dragStartY) * scaleScreenToViewbox;
+    const cur = getLogisticsState();
+    cur.routeMapPanX = dragPanX0 + dx;
+    cur.routeMapPanY = dragPanY0 + dy;
+    // Apply without a full re-render for smoothness.
+    const z = cur.routeMapZoom;
+    viewport.setAttribute(
+      'transform',
+      `translate(${cx + cur.routeMapPanX}, ${cy + cur.routeMapPanY}) scale(${z}) translate(${-contentCx}, ${-contentCy})`,
+    );
+  }) as EventListener);
+  const endDrag = (e: PointerEvent): void => {
+    if (!dragging) return;
+    dragging = false;
+    try {
+      (svg as unknown as { releasePointerCapture: (id: number) => void }).releasePointerCapture(e.pointerId);
+    } catch { /* ignore */ }
+    svg.style.cursor = 'grab';
+  };
+  _addTracked(svg, 'pointerup', endDrag as EventListener);
+  _addTracked(svg, 'pointercancel', endDrag as EventListener);
+  svg.style.cursor = 'grab';
+
+  // Render visible bodies.  Each body is wrapped in a group that carries
+  // a `translate + scale(1/zoom)` transform so the CIRCLE stays at a
+  // constant screen size while the viewport's `scale(zoom)` spreads its
+  // POSITION across the map.  `data-mx/data-my` hold the unscaled centre
+  // so applyMapZoomTransforms() can re-compute the counter-scale on zoom
+  // changes without a full re-render.
   for (const [bodyId, node] of layout) {
     if (!visibleBodies.has(bodyId)) continue;
 
-    // Circle
+    const bodyGroup = document.createElementNS(svgNS, 'g');
+    bodyGroup.setAttribute('data-mx', String(node.x));
+    bodyGroup.setAttribute('data-my', String(node.y));
+    bodyGroup.setAttribute('transform', `translate(${node.x}, ${node.y}) scale(${1 / zoom})`);
+    bodyGroup.setAttribute('class', 'map-node-fixed');
+
+    // Circle drawn in LOCAL coords (centre at 0,0) so the group's
+    // transform fully places and sizes it.
     const circle = document.createElementNS(svgNS, 'circle');
-    circle.setAttribute('cx', String(node.x));
-    circle.setAttribute('cy', String(node.y));
+    circle.setAttribute('cx', '0');
+    circle.setAttribute('cy', '0');
     circle.setAttribute('r', String(node.radius));
     circle.setAttribute('class', `body-node body-${bodyId.toLowerCase()}`);
     circle.setAttribute('fill', getBodyColorHex(bodyId));
@@ -188,18 +303,27 @@ export function renderRouteMap(): SVGSVGElement {
       }) as EventListener);
     }
 
-    svg.appendChild(circle);
+    bodyGroup.appendChild(circle);
+    viewport.appendChild(bodyGroup);
 
-    // Label below
+    // Label below the body.
+    // Text position stored as data-mx/data-my; the transform is what
+    // actually places it.  The transform includes a counter-scale so the
+    // label stays at a constant screen size regardless of zoom.  The
+    // counter-scale is re-applied by _applyMapZoomTransforms() whenever
+    // zoom changes.
     const label = document.createElementNS(svgNS, 'text');
-    label.setAttribute('x', String(node.x));
-    label.setAttribute('y', String(node.y + node.radius + 16));
+    const lx = node.x;
+    const ly = node.y + node.radius + 16;
+    label.setAttribute('data-mx', String(lx));
+    label.setAttribute('data-my', String(ly));
+    label.setAttribute('transform', `translate(${lx}, ${ly}) scale(${1 / zoom})`);
     label.setAttribute('text-anchor', 'middle');
-    label.setAttribute('class', 'body-label');
+    label.setAttribute('class', 'body-label map-label-fixed');
     label.setAttribute('fill', '#ccc');
     label.setAttribute('font-size', '11');
     label.textContent = node.label;
-    svg.appendChild(label);
+    viewport.appendChild(label);
   }
 
   // --- Hub nodes ---
@@ -228,18 +352,33 @@ export function renderRouteMap(): SVGSVGElement {
       line.setAttribute('y2', String(node.y));
       line.setAttribute('stroke', bodyColor);
       line.setAttribute('stroke-width', '1');
+      line.setAttribute('vector-effect', 'non-scaling-stroke');
       line.setAttribute('opacity', '0.6');
       if (node.type === 'orbitalHub') {
         line.setAttribute('stroke-dasharray', '3,2');
       }
-      svg.appendChild(line);
+      viewport.appendChild(line);
     }
 
-    // Hub icon
+    // Hub icon — same counter-scale wrapper pattern as body circles so
+    // the icon stays constant size while its position rides the viewport
+    // zoom.  Local coords inside the group are centred at (0, 0); the
+    // group's transform does both the positioning and the 1/zoom scale.
+    const hubGroup = document.createElementNS(svgNS, 'g');
+    hubGroup.setAttribute('data-mx', String(node.x));
+    hubGroup.setAttribute('data-my', String(node.y));
+    const orbitalRotate = node.type === 'orbitalHub' ? ' rotate(45)' : '';
+    hubGroup.setAttribute(
+      'transform',
+      `translate(${node.x}, ${node.y}) scale(${1 / zoom})${orbitalRotate}`,
+    );
+    hubGroup.setAttribute('class', 'map-node-fixed');
+    if (node.type === 'orbitalHub') hubGroup.setAttribute('data-orbital', '1');
+
     if (node.type === 'surfaceHub') {
       const rect = document.createElementNS(svgNS, 'rect');
-      rect.setAttribute('x', String(node.x - 3));
-      rect.setAttribute('y', String(node.y - 3));
+      rect.setAttribute('x', '-3');
+      rect.setAttribute('y', '-3');
       rect.setAttribute('width', '6');
       rect.setAttribute('height', '6');
       rect.setAttribute('fill', bodyColor);
@@ -269,18 +408,19 @@ export function renderRouteMap(): SVGSVGElement {
         }) as EventListener);
       }
 
-      svg.appendChild(rect);
+      hubGroup.appendChild(rect);
+      viewport.appendChild(hubGroup);
     } else {
-      // orbitalHub — diamond shape (rotated square)
+      // orbitalHub — diamond shape (rotated square).  The outer group
+      // already includes a rotate(45) so the inner rect is axis-aligned.
       const rect = document.createElementNS(svgNS, 'rect');
-      rect.setAttribute('x', String(node.x - 4));
-      rect.setAttribute('y', String(node.y - 4));
+      rect.setAttribute('x', '-4');
+      rect.setAttribute('y', '-4');
       rect.setAttribute('width', '8');
       rect.setAttribute('height', '8');
       rect.setAttribute('fill', bodyColor);
       rect.setAttribute('stroke', bodyColor);
       rect.setAttribute('stroke-width', '1');
-      rect.setAttribute('transform', `rotate(45, ${node.x}, ${node.y})`);
       rect.setAttribute('opacity', opacity);
       if (dashArray !== 'none') rect.setAttribute('stroke-dasharray', dashArray);
       rect.style.cursor = 'pointer';
@@ -305,19 +445,24 @@ export function renderRouteMap(): SVGSVGElement {
         }) as EventListener);
       }
 
-      svg.appendChild(rect);
+      hubGroup.appendChild(rect);
+      viewport.appendChild(hubGroup);
     }
 
-    // Hub name label
+    // Hub name label — counter-scaled so it stays readable at any zoom.
     const hubLabel = document.createElementNS(svgNS, 'text');
-    hubLabel.setAttribute('x', String(node.x));
-    hubLabel.setAttribute('y', String(node.y + (node.type === 'surfaceHub' ? 14 : 16)));
+    const hx = node.x;
+    const hy = node.y + (node.type === 'surfaceHub' ? 14 : 16);
+    hubLabel.setAttribute('data-mx', String(hx));
+    hubLabel.setAttribute('data-my', String(hy));
+    hubLabel.setAttribute('transform', `translate(${hx}, ${hy}) scale(${1 / zoom})`);
     hubLabel.setAttribute('text-anchor', 'middle');
+    hubLabel.setAttribute('class', 'map-label-fixed');
     hubLabel.setAttribute('fill', '#aaa');
     hubLabel.setAttribute('font-size', '8');
     hubLabel.setAttribute('opacity', opacity);
     hubLabel.textContent = node.label;
-    svg.appendChild(hubLabel);
+    viewport.appendChild(hubLabel);
   }
 
   // --- Proven leg Bezier curves ---
@@ -331,6 +476,7 @@ export function renderRouteMap(): SVGSVGElement {
       const path = document.createElementNS(svgNS, 'path');
       path.setAttribute('d', bezierPath(originPos.x, originPos.y, destPos.x, destPos.y, provenIndex));
       path.setAttribute('fill', 'none');
+      path.setAttribute('vector-effect', 'non-scaling-stroke');
       path.setAttribute('id', `route-leg-proven-${provenIndex}`);
       path.setAttribute('class', 'proven-leg-line');
 
@@ -374,7 +520,7 @@ export function renderRouteMap(): SVGSVGElement {
       titleEl.textContent = `Craft: ${leg.craftDesignId}\nCapacity: ${leg.cargoCapacityKg} kg\nCost/Run: $${leg.costPerRun.toLocaleString()}`;
       path.appendChild(titleEl);
 
-      svg.appendChild(path);
+      viewport.appendChild(path);
       provenIndex++;
     }
 
@@ -391,7 +537,9 @@ export function renderRouteMap(): SVGSVGElement {
         const path = document.createElementNS(svgNS, 'path');
         path.setAttribute('d', bezierPath(originPos.x, originPos.y, destPos.x, destPos.y, activeLegCounter));
         path.setAttribute('fill', 'none');
+        path.setAttribute('vector-effect', 'non-scaling-stroke');
         path.setAttribute('id', `route-leg-active-${routeIndex}-${legIndex}`);
+        path.setAttribute('data-route-id', route.id);
         path.setAttribute('stroke-width', '2.5');
         path.setAttribute('class', `route-line route-${route.status}`);
         path.style.cursor = 'pointer';
@@ -404,20 +552,26 @@ export function renderRouteMap(): SVGSVGElement {
           path.setAttribute('opacity', '0.4');
         }
 
-        // Click to highlight route in table
+        // Cross-highlight: hovering a map path brightens every other leg
+        // of the same route and the matching table row.
         const routeId = route.id;
+        _addTracked(path, 'pointerenter', () => { setRouteHover(routeId); });
+        _addTracked(path, 'pointerleave', () => { setRouteHover(null); });
+
+        // Click toggles the persistent selection.  Clicking a different
+        // route switches to it; clicking the same route clears.  When
+        // selecting, scroll the table row into view for convenience.
         _addTracked(path, 'click', () => {
-          const overlay = getLogisticsState().overlay;
-          const tableRow = overlay?.querySelector(`tr[data-route-id="${routeId}"]`);
-          if (tableRow) {
-            // Remove existing highlights
-            overlay?.querySelectorAll('tr.route-highlighted').forEach((el) => el.classList.remove('route-highlighted'));
-            tableRow.classList.add('route-highlighted');
-            tableRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          const wasSelected = getLogisticsState().selectedRouteId === routeId;
+          toggleRouteSelection(routeId);
+          if (!wasSelected) {
+            const overlay = getLogisticsState().overlay;
+            const tableRow = overlay?.querySelector(`tr[data-route-id="${CSS.escape(routeId)}"]`);
+            tableRow?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
           }
         });
 
-        svg.appendChild(path);
+        viewport.appendChild(path);
 
         // Animated flow dots on active routes
         if (route.status === 'active') {
@@ -428,7 +582,7 @@ export function renderRouteMap(): SVGSVGElement {
             dot.setAttribute('fill', '#64B4FF');
             dot.setAttribute('class', 'flow-dot');
             dot.setAttribute('style', `offset-path: path('${pathD}'); animation-delay: ${dotIdx}s;`);
-            svg.appendChild(dot);
+            viewport.appendChild(dot);
           }
         }
 
@@ -573,3 +727,132 @@ function _showHubPopover(
  * Public helper to show a hub popover. Exported for use by _routeBuilder.ts.
  */
 export { _showHubPopover as showHubPopover };
+
+// ---------------------------------------------------------------------------
+// Route cross-highlight (hover)
+// ---------------------------------------------------------------------------
+
+/**
+ * Apply or clear the hover-highlight on both the map leg paths and the
+ * matching table row.  `null` clears any existing hover state.
+ *
+ * Uses the `.route-hover` class — distinct from the persistent
+ * `.route-highlighted` click-state used by click-on-path so the two
+ * behaviours don't fight.
+ */
+export function setRouteHover(routeId: string | null): void {
+  const overlay = getLogisticsState().overlay;
+  if (!overlay) return;
+
+  // Clear previous hover on both map paths and the table.
+  overlay.querySelectorAll('.route-hover').forEach((el) => {
+    el.classList.remove('route-hover');
+  });
+
+  if (!routeId) return;
+
+  const selector = `[data-route-id="${CSS.escape(routeId)}"]`;
+  overlay.querySelectorAll(selector).forEach((el) => {
+    el.classList.add('route-hover');
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Route click-selection (persistent toggle)
+// ---------------------------------------------------------------------------
+
+/**
+ * Apply the `.route-highlighted` selection class to every element —
+ * both map leg paths and table rows — matching the current
+ * `state.selectedRouteId`.  Called after every render so selection
+ * survives re-renders (tab switches, route-table updates, etc.).
+ */
+function _applySelectionClass(): void {
+  const overlay = getLogisticsState().overlay;
+  if (!overlay) return;
+  const id = getLogisticsState().selectedRouteId;
+
+  overlay.querySelectorAll('.route-highlighted').forEach((el) => {
+    el.classList.remove('route-highlighted');
+  });
+
+  if (!id) return;
+  const selector = `[data-route-id="${CSS.escape(id)}"]`;
+  overlay.querySelectorAll(selector).forEach((el) => {
+    el.classList.add('route-highlighted');
+  });
+}
+
+/**
+ * Toggle persistent selection on a route.  Clicking the same route again
+ * clears the selection (second click === deselect).  Both map leg paths
+ * and the matching table row receive/lose the `.route-highlighted` class.
+ */
+export function toggleRouteSelection(routeId: string): void {
+  const ls = getLogisticsState();
+  ls.selectedRouteId = ls.selectedRouteId === routeId ? null : routeId;
+  _applySelectionClass();
+}
+
+/**
+ * Re-apply selection highlights to the currently rendered elements.
+ * Called by the routes-tab renderer after building fresh DOM so the
+ * persistent selection survives a re-render.
+ */
+export function refreshRouteSelection(): void {
+  _applySelectionClass();
+}
+
+/**
+ * Re-apply the zoom/pan transforms to the map SVG without a full re-render.
+ *
+ * Bodies, hub icons, and leg paths ride the viewport's `scale(zoom)` so they
+ * zoom normally — positions spread out, detail becomes visible.  Text
+ * labels carry a counter-scale `scale(1/zoom)` on their own transform so
+ * they stay at a constant screen size regardless of zoom.  This helper
+ * updates those per-label transforms, and the viewport's global transform,
+ * in place.
+ */
+export function applyMapZoomTransforms(svg: SVGSVGElement): void {
+  const ls = getLogisticsState();
+  const viewport = svg.firstElementChild as SVGGElement | null;
+  if (!viewport) return;
+
+  const viewBox = svg.getAttribute('viewBox')?.split(' ') ?? ['0', '0', '800', '480'];
+  const w = parseFloat(viewBox[2]);
+  const h = parseFloat(viewBox[3]);
+  const cx = w / 2;
+  const cy = h / 2;
+  const z = ls.routeMapZoom;
+
+  // Content centre is stashed on the svg at render time.  Fall back to
+  // viewBox centre if for some reason the data-attrs are missing.
+  const contentCx = parseFloat(svg.getAttribute('data-content-cx') ?? String(cx));
+  const contentCy = parseFloat(svg.getAttribute('data-content-cy') ?? String(cy));
+
+  viewport.setAttribute(
+    'transform',
+    `translate(${cx + ls.routeMapPanX}, ${cy + ls.routeMapPanY}) scale(${z}) translate(${-contentCx}, ${-contentCy})`,
+  );
+
+  // Counter-scale every fixed-size label so text stays one screen size.
+  const labels = viewport.querySelectorAll('text.map-label-fixed');
+  for (const node of labels) {
+    const el = node as SVGTextElement;
+    const mx = parseFloat(el.getAttribute('data-mx') ?? '0');
+    const my = parseFloat(el.getAttribute('data-my') ?? '0');
+    el.setAttribute('transform', `translate(${mx}, ${my}) scale(${1 / z})`);
+  }
+
+  // Counter-scale body-circle and hub-icon groups too, so their visual
+  // size stays constant while their centre position rides the viewport
+  // zoom.  Orbital-hub groups additionally keep their 45° rotation.
+  const fixedNodes = viewport.querySelectorAll('g.map-node-fixed');
+  for (const node of fixedNodes) {
+    const el = node as SVGGElement;
+    const mx = parseFloat(el.getAttribute('data-mx') ?? '0');
+    const my = parseFloat(el.getAttribute('data-my') ?? '0');
+    const rot = el.getAttribute('data-orbital') === '1' ? ' rotate(45)' : '';
+    el.setAttribute('transform', `translate(${mx}, ${my}) scale(${1 / z})${rot}`);
+  }
+}
