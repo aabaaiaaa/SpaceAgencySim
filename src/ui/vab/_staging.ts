@@ -18,6 +18,7 @@ import { computeStageDeltaV } from '../../core/stagingCalc.ts';
 import { getVabState } from './_state.ts';
 import { snapshotStaging, recordStagingChange } from './_undoActions.ts';
 import { getVabListenerTracker } from './_listenerTracker.ts';
+import { setHoveredPart } from './_canvasInteraction.ts';
 
 /**
  * Register a DOM listener through the VAB tracker so it is cleaned up when
@@ -319,6 +320,17 @@ export function renderStagingPanel(): void {
 export function setupStagingDnD(panelBody: HTMLElement): void {
   const S = getVabState();
 
+  _addTracked(panelBody, 'mouseover', ((e: MouseEvent) => {
+    const chip = (e.target as Element | null)?.closest?.('.vab-stage-chip') as HTMLElement | null;
+    if (!chip) return;
+    const instanceId = chip.dataset.instanceId ?? '';
+    if (instanceId) setHoveredPart(instanceId);
+  }) as EventListener);
+
+  _addTracked(panelBody, 'mouseleave', (() => {
+    setHoveredPart(null);
+  }) as EventListener);
+
   _addTracked(panelBody, 'dragstart', ((e: DragEvent) => {
     const handle = (e.target as Element)?.closest?.('.vab-stage-drag-handle') as HTMLElement | null;
     if (handle) {
@@ -345,6 +357,7 @@ export function setupStagingDnD(panelBody: HTMLElement): void {
     const stageEl = (e.target as Element)?.closest?.('.vab-staging-stage');
     if (stageEl) stageEl.classList.remove('dragging');
     panelBody.querySelectorAll('.drag-over').forEach((el) => el.classList.remove('drag-over'));
+    setHoveredPart(null);
   }) as EventListener);
 
   _addTracked(panelBody, 'dragover', ((e: DragEvent) => {

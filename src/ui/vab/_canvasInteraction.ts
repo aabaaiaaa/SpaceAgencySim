@@ -187,6 +187,14 @@ export function setSelectedPart(instanceId: string | null): void {
  * Reposition the selection highlight div over the selected part.
  */
 function updateSelectionHighlight(placed: PlacedPart, def: PartDef, highlight: HTMLElement): void {
+  positionHighlightOverPart(placed, def, highlight);
+}
+
+/**
+ * Position an absolutely-positioned DOM element over a placed part so it
+ * aligns with the part's canvas-space rectangle at the current camera zoom.
+ */
+function positionHighlightOverPart(placed: PlacedPart, def: PartDef, highlight: HTMLElement): void {
   const { zoom, x: camX, y: camY } = vabGetCamera();
 
   const S = getVabState();
@@ -203,6 +211,33 @@ function updateSelectionHighlight(placed: PlacedPart, def: PartDef, highlight: H
   highlight.style.top    = `${(sy - h / 2).toFixed(1)}px`;
   highlight.style.width  = `${w.toFixed(1)}px`;
   highlight.style.height = `${h.toFixed(1)}px`;
+}
+
+/**
+ * Show a transient hover highlight over the placed part with the given
+ * instanceId, or clear it when null is passed. Unlike setSelectedPart this
+ * only affects the visual overlay — it does not mutate state, animate legs,
+ * or open the detail panel.
+ */
+export function setHoveredPart(instanceId: string | null): void {
+  const highlight = document.getElementById('vab-hover-highlight');
+  if (!highlight) return;
+
+  const S = getVabState();
+  if (!instanceId || !S.assembly) {
+    highlight.setAttribute('hidden', '');
+    return;
+  }
+
+  const placed = S.assembly.parts.get(instanceId);
+  const def    = placed ? getPartById(placed.partId) : null;
+  if (!placed || !def) {
+    highlight.setAttribute('hidden', '');
+    return;
+  }
+
+  positionHighlightOverPart(placed, def, highlight);
+  highlight.removeAttribute('hidden');
 }
 
 // ---------------------------------------------------------------------------

@@ -538,6 +538,16 @@
 }
 #vab-selection-highlight[hidden] { display: none; }
 
+#vab-hover-highlight {
+  position: absolute;
+  pointer-events: none;
+  border: 2px dashed #ffb040;
+  box-shadow: 0 0 6px rgba(255,176,64,0.35);
+  border-radius: 1px;
+  z-index: 29;
+}
+#vab-hover-highlight[hidden] { display: none; }
+
 /* ── Off-screen part indicator arrows ────────────────────────────────── */
 .vab-offscreen-indicator {
   position: absolute;

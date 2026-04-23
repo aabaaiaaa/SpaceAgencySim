@@ -264,6 +264,7 @@ export function initVabUI(
       <!-- Build canvas (transparent — PixiJS renders grid beneath) -->
       <div id="vab-canvas-area">
         <div id="vab-selection-highlight" hidden></div>
+        <div id="vab-hover-highlight" hidden></div>
       </div>
 
       <!-- Parts panel (right) -->
