@@ -138,6 +138,7 @@ let _elTargetTwrVal: HTMLElement | null = null;       // Target TWR value text
 
 // Control mode indicator elements:
 let _elControlMode: HTMLElement | null = null;    // control mode badge (shows ORBIT / DOCKING / RCS)
+let _elControlModeHint: HTMLElement | null = null; // hint below badge (e.g. "Press V to dock")
 let _elBandWarning: HTMLElement | null = null;    // altitude band limit warning text
 let _elBiome: HTMLElement | null = null;          // biome name in status section
 let _elCrewList: HTMLElement | null = null;       // left-panel crew list
@@ -885,6 +886,11 @@ function _buildControlModeIndicator(): void {
   _elControlMode.textContent = 'Orbit';
   _hud!.appendChild(_elControlMode);
 
+  _elControlModeHint = document.createElement('div');
+  _elControlModeHint.id = 'hud-control-mode-hint';
+  _elControlModeHint.textContent = 'Press V to dock';
+  _hud!.appendChild(_elControlModeHint);
+
   _elBandWarning = document.createElement('div');
   _elBandWarning.id = 'hud-band-warning';
   _elBandWarning.className = 'hidden';
@@ -908,6 +914,11 @@ function _updateControlModeIndicator(): void {
   // Only show the indicator during ORBIT (and its sub-modes).
   const inOrbitPhase = _flightState.phase === 'ORBIT' || _flightState.phase === 'MANOEUVRE';
   _elControlMode.style.display = inOrbitPhase ? '' : 'none';
+
+  // Show the "Press V to dock" hint only in NORMAL mode inside ORBIT.
+  if (_elControlModeHint) {
+    _elControlModeHint.style.display = inOrbitPhase && mode === ControlMode.NORMAL ? '' : 'none';
+  }
 
   // Band warning (only in docking/RCS mode).
   if (_elBandWarning) {

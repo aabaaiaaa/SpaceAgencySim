@@ -141,4 +141,12 @@ export function fireNextStage(
 
   const newDebris: DebrisState[] = activateCurrentStage(ps, assembly, stagingConfig, flightState);
   ps.debris.push(...newDebris);
+
+  // If staging produced debris (decouple/release) and we're in stable-orbit
+  // analytical propagation, the separation impulse just applied to ps.velX/velY
+  // would be clobbered by the next tick reading stale orbitalElements. Drop
+  // them so tickOrbitPhase recomputes from the post-impulse velocity.
+  if (newDebris.length > 0 && flightState.orbitalElements) {
+    flightState.orbitalElements = null;
+  }
 }

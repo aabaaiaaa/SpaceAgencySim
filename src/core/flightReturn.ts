@@ -39,8 +39,9 @@ import { createFieldCraft, hasExtendedLifeSupport } from './lifeSupport.ts';
 import { persistControllableDebris } from './debrisPersistence.ts';
 import { FieldCraftStatus } from './constants.ts';
 import { processChallengeCompletion } from './challenges.ts';
-import type { GameState, FlightState, FlightResult, FlightEvent, InventoryPart, Contract, FieldCraft, MissionInstance } from './gameState.ts';
+import type { GameState, FlightState, FlightResult, FlightEvent, InventoryPart, Contract, FieldCraft, MissionInstance, PersistedCraftState } from './gameState.ts';
 import type { PhysicsState, RocketAssembly } from './physics.ts';
+import type { StagingConfig } from './rocketbuilder.ts';
 import type { CompleteMissionResult } from './missions.ts';
 import type { RecoverPartsResult } from './partInventory.ts';
 import type { PeriodSummary } from './period.ts';
@@ -98,7 +99,51 @@ export interface FlightReturnSummary {
 // Public API
 // ---------------------------------------------------------------------------
 
-export function processFlightReturn(state: GameState, flightState: FlightState, ps: PhysicsState | null, assembly: RocketAssembly | null): FlightReturnSummary {
+/**
+ * Capture the mutable runtime state of the craft so a future Take-Control
+ * resume can restart from the same point: remaining fuel, currently-firing
+ * engines, attached parts, and unfired stages. Already-fired stages are
+ * dropped — the user explicitly called out that old stages aren't useful.
+ */
+function _captureCraftState(
+  ps: PhysicsState | null,
+  stagingConfig: StagingConfig | null | undefined,
+): PersistedCraftState | undefined {
+  if (!ps) return undefined;
+
+  const activeParts: Set<string> = ps.activeParts ?? new Set();
+  const firingEngines: Set<string> = ps.firingEngines ?? new Set();
+
+  const activePartIds = Array.from(activeParts);
+  const firingEngineIds = Array.from(firingEngines);
+
+  const fuelStore: Record<string, number> = {};
+  if (ps.fuelStore) {
+    for (const [id, kg] of ps.fuelStore) {
+      if (kg > 0 && activeParts.has(id)) fuelStore[id] = kg;
+    }
+  }
+
+  let remainingStages: string[][] | undefined;
+  let unstagedParts: string[] | undefined;
+  if (stagingConfig) {
+    const fromIdx = Math.max(0, stagingConfig.currentStageIdx);
+    remainingStages = stagingConfig.stages.slice(fromIdx).map((s) =>
+      s.instanceIds.filter((id) => activeParts.has(id)),
+    );
+    unstagedParts = stagingConfig.unstaged.filter((id) => activeParts.has(id));
+  }
+
+  return { activePartIds, firingEngineIds, fuelStore, remainingStages, unstagedParts };
+}
+
+export function processFlightReturn(
+  state: GameState,
+  flightState: FlightState,
+  ps: PhysicsState | null,
+  assembly: RocketAssembly | null,
+  stagingConfig?: StagingConfig | null,
+): FlightReturnSummary {
   if (!Array.isArray(state.crew)) state.crew = [];
   if (!state.missions) state.missions = { available: [], accepted: [], completed: [] };
   if (!Array.isArray(state.missions.accepted)) state.missions.accepted = [];
@@ -247,6 +292,7 @@ export function processFlightReturn(state: GameState, flightState: FlightState, 
         orbitalElements: flightState?.orbitalElements ?? null,
         orbitBandId: flightState?.orbitBandId ?? null,
         rocketDesignId: flightState?.rocketId,
+        craftState: _captureCraftState(ps, stagingConfig),
       });
       state.fieldCraft.push(deployedFieldCraft);
     }

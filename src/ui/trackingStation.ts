@@ -995,7 +995,7 @@ function _startTakeControl(craftId: string): void {
       // refreshes the top bar, and shows the flight-results overlay.
       returnToHubFromFlight(container as HTMLElement, state, returnResults);
     },
-    prep.initialState,
+    { ...prep.initialState, craftState: prep.craftState },
   );
 }
 

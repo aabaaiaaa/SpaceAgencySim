@@ -56,7 +56,6 @@ describe('FCState', () => {
       expect(s.summaryShown).toBe(false);
       expect(s.mapActive).toBe(false);
       expect(s.mapThrusting).toBe(false);
-      expect(s.normalOrbitThrusting).toBe(false);
       expect(s.deorbitWarningActive).toBe(false);
       expect(s.workerReady).toBe(false);
     });
@@ -78,8 +77,6 @@ describe('FCState', () => {
       const s = getFCState();
       expect(s.mapHeldKeys).toBeInstanceOf(Set);
       expect(s.mapHeldKeys.size).toBe(0);
-      expect(s.normalOrbitHeldKeys).toBeInstanceOf(Set);
-      expect(s.normalOrbitHeldKeys.size).toBe(0);
     });
   });
 

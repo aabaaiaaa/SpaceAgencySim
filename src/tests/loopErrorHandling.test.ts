@@ -51,9 +51,6 @@ vi.mock('../ui/flightController/_mapView.js', () => ({
   applyMapThrust: vi.fn(),
   updateMapHud: vi.fn(),
 }));
-vi.mock('../ui/flightController/_orbitRcs.js', () => ({
-  applyNormalOrbitRcs: vi.fn(),
-}));
 vi.mock('../ui/flightController/_flightPhase.js', () => ({
   evaluateFlightPhase: vi.fn(),
 }));

@@ -31,7 +31,7 @@ export function _integrate(
 ): void {
   const bodyId: string | undefined = flightState?.bodyId;
 
-  if (tickOrbitPhase(ps, FIXED_DT, { flightState })) return;
+  if (tickOrbitPhase(ps, FIXED_DT, { flightState, assembly })) return;
   if (tickTransferPhase(ps, FIXED_DT, { flightState, assembly })) return;
   if (tickCapturePhase(ps, FIXED_DT, { flightState, assembly, bodyId })) return;
 

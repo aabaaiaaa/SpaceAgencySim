@@ -12,6 +12,7 @@ import { FlightPhase } from '../../constants.ts';
 import { tickFuelSystem } from '../../fuelsystem.ts';
 import { computeThrust, type ThrustResult } from '../thrust.ts';
 import { _computeTotalMass, _computeAsteroidTorque } from '../../physics.ts';
+import { applySteering } from '../steering.ts';
 
 import type { FlightState } from '../../gameState.ts';
 import type { PhysicsState, RocketAssembly } from '../../physics.ts';
@@ -58,5 +59,10 @@ export function tickTransferPhase(
 
   ps.posX += ps.velX * dt;
   ps.posY += ps.velY * dt;
+
+  // Player-steering angle update, symmetric with orbitPhase — deep space is
+  // vacuum so no aero damping contributes, but A/D input still rotates.
+  applySteering(ps, assembly, 0, dt, flightState?.bodyId, flightState, 0);
+
   return true;
 }

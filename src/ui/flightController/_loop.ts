@@ -27,7 +27,6 @@ import { beginFrame as perfBeginFrame, endFrame as perfEndFrame } from '../../co
 import { logger } from '../../core/logger.ts';
 import { checkTimeWarpResets, applyTimeWarp } from './_timeWarp.ts';
 import { applyMapThrust, updateMapHud } from './_mapView.ts';
-import { applyNormalOrbitRcs } from './_orbitRcs.ts';
 import { evaluateFlightPhase, showPhaseNotification } from './_flightPhase.ts';
 import { tickDockingSystem, updateDockingHud } from './_docking.ts';
 import { checkHubDocking } from './_hubDocking.ts';
@@ -355,11 +354,6 @@ export function loop(timestamp: number): void {
       applyMapThrust();
     }
 
-    // Apply orbital-relative thrust from WASD in NORMAL orbit mode (flight view).
-    if (!(flightState.commsState?.controlLocked)) {
-      applyNormalOrbitRcs();
-    }
-
     // ---- Physics tick (Web Worker) ----
     if (isWorkerReady()) {
       // Send throttle to worker only when the main thread changed it
@@ -371,9 +365,9 @@ export function loop(timestamp: number): void {
       }
 
       // Sync angle to worker only when orbital thrust overrides the normal
-      // rotation (map thrust or orbit RCS compute orbital-relative angles).
+      // rotation (map thrust computes an orbital-relative angle).
       // During normal flight, the worker handles A/D key rotation internally.
-      if (s.mapThrusting || s.normalOrbitThrusting) {
+      if (s.mapThrusting) {
         sendAngle(ps.angle);
       }
 

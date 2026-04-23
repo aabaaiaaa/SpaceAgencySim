@@ -254,17 +254,6 @@ export function onKeyDown(e: KeyboardEvent): void {
     e.preventDefault();
   }
 
-  // In NORMAL orbit mode (not docking/RCS), WASD applies orbital-relative thrust.
-  // Skip when landed — W/S should control throttle, not orbital thrust.
-  if (!s.mapActive && !ps.landed && ps.controlMode === ControlMode.NORMAL &&
-      (flightState.phase === FlightPhase.ORBIT || flightState.phase === FlightPhase.MANOEUVRE)) {
-    const lower = e.key.toLowerCase();
-    if (lower === 'w' || lower === 's' || lower === 'a' || lower === 'd') {
-      s.normalOrbitHeldKeys.add(lower);
-      return;
-    }
-  }
-
   // Manual rotation breaks asteroid thrust alignment (TASK-027).
   if ((e.key === 'a' || e.key === 'd' || e.key === 'A' || e.key === 'D' ||
        e.key === 'ArrowLeft' || e.key === 'ArrowRight') &&
@@ -296,12 +285,6 @@ export function onKeyUp(e: KeyboardEvent): void {
   if (s.mapActive) {
     const lower = e.key.toLowerCase();
     s.mapHeldKeys.delete(lower);
-  }
-
-  // Release normal-orbit WASD keys.
-  {
-    const lower = e.key.toLowerCase();
-    s.normalOrbitHeldKeys.delete(lower);
   }
 
   workerKeyUp(e.key);

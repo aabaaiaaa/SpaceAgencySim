@@ -14,6 +14,8 @@ import { initFlightHud, destroyFlightHud, showLaunchTip } from '../flightHud.ts'
 import { initFlightContextMenu, destroyFlightContextMenu } from '../flightContextMenu.ts';
 import { setTopBarFlightItems, clearTopBarFlightItems, clearTopBarHubItems, setTopBarDropdownToggleCallback, setCurrentScreen } from '../topbar.ts';
 import { setMalfunctionMode, getMalfunctionMode } from '../../core/malfunction.ts';
+import { getMalfunctionMultiplier } from '../../core/settings.ts';
+import { MalfunctionMode } from '../../core/constants.ts';
 import { addTransferObject as addTransferObjectFn, getProximityObjects as getProximityObjectsFn } from '../../core/transferObjects.ts';
 import type { TransferObject as TransferObjectArg } from '../../core/transferObjects.ts';
 import { createDockingState } from '../../core/docking.ts';
@@ -125,6 +127,12 @@ export interface FlightSceneInitialOverrides {
   velX?: number;
   velY?: number;
   angle?: number;
+  /**
+   * Persisted craft state captured at the end of a prior flight. When
+   * present, restores remaining stages, active parts, fuel, and firing
+   * engines so a resumed craft doesn't start with a pristine design.
+   */
+  craftState?: import('../../core/gameState.ts').PersistedCraftState;
 }
 
 export async function startFlightScene(
@@ -199,10 +207,51 @@ export async function startFlightScene(
     if (typeof initialOverrides.velX === 'number') ps.velX = initialOverrides.velX;
     if (typeof initialOverrides.velY === 'number') ps.velY = initialOverrides.velY;
     if (typeof initialOverrides.angle === 'number') ps.angle = initialOverrides.angle;
-    // When resuming mid-flight the rocket is already fully staged up — collapse
-    // staging so no parts are gated off from the fuel network.
-    if (flightState.inOrbit) {
+
+    const cs = initialOverrides.craftState;
+    if (cs) {
+      // Restore the craft's runtime state from the prior flight so resuming
+      // is continuous — remaining stages, fuel, currently-firing engines.
+      if (cs.activePartIds) {
+        ps.activeParts.clear();
+        for (const id of cs.activePartIds) {
+          if (s.assembly!.parts.has(id)) ps.activeParts.add(id);
+        }
+      }
+      if (cs.firingEngineIds) {
+        ps.firingEngines.clear();
+        for (const id of cs.firingEngineIds) {
+          if (ps.activeParts.has(id)) ps.firingEngines.add(id);
+        }
+      }
+      if (cs.fuelStore) {
+        ps.fuelStore.clear();
+        for (const [id, kg] of Object.entries(cs.fuelStore)) {
+          if (ps.activeParts.has(id)) ps.fuelStore.set(id, kg);
+        }
+      }
+      if (cs.remainingStages) {
+        stagingConfig.stages = cs.remainingStages.map((ids) => ({
+          instanceIds: ids.filter((id) => ps.activeParts.has(id)),
+        }));
+        stagingConfig.currentStageIdx = 0;
+      }
+      if (cs.unstagedParts) {
+        stagingConfig.unstaged = cs.unstagedParts.filter((id) => ps.activeParts.has(id));
+      }
+      // Keep the restart snapshot in sync so "Restart from Launch" respects
+      // the resumed staging rather than the pristine design.
+      s.originalStagingConfig = {
+        stages:          stagingConfig.stages.map((st) => ({ instanceIds: [...st.instanceIds] })),
+        unstaged:        [...stagingConfig.unstaged],
+        currentStageIdx: 0,
+      };
+    } else if (flightState.inOrbit) {
+      // Legacy resume path with no captured state — collapse staging so no
+      // parts are gated off from the fuel network.
       stagingConfig.currentStageIdx = Math.max(0, stagingConfig.stages.length - 1);
+    }
+    if (flightState.inOrbit) {
       ps.grounded = false;
       ps.landed = false;
     }
@@ -214,6 +263,14 @@ export async function startFlightScene(
   // can look up crew engineering skills during reliability checks.
   ps._gameState = s.state;
   ps.malfunctionMode = s.state?.malfunctionMode;
+
+  // The full game state isn't serialisable across the worker boundary, so
+  // the worker's checkMalfunctions call receives gameState=undefined and the
+  // difficulty-based frequency multiplier (including OFF) is bypassed there.
+  // Propagate the OFF case via ps.malfunctionMode which IS sent to the worker.
+  if (s.state && getMalfunctionMultiplier(s.state) <= 0) {
+    ps.malfunctionMode = MalfunctionMode.OFF;
+  }
 
   // Apply weather effects (temperature -> ISP, wind, visibility -> fog/haze).
   if (s.state.weather?.current) {
@@ -335,8 +392,6 @@ export async function startFlightScene(
   s.mapHeldKeys  = new Set();
   s.mapThrusting = false;
   s.mapHud       = null;
-  s.normalOrbitHeldKeys  = new Set();
-  s.normalOrbitThrusting = false;
   initMapRenderer();
 
   // Initialise the docking system state on the flight state.

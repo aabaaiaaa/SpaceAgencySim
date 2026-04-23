@@ -75,10 +75,6 @@ export interface FCState {
   mapHeldKeys: Set<string>;
   /** True while the craft is thrusting due to map-view orbital controls. */
   mapThrusting: boolean;
-  /** Set of orbital-relative thrust keys held in NORMAL orbit mode. */
-  normalOrbitHeldKeys: Set<string>;
-  /** True while the craft is thrusting due to normal-orbit WASD controls. */
-  normalOrbitThrusting: boolean;
   /** The map-view HUD overlay. */
   mapHud: HTMLElement | null;
 
@@ -146,8 +142,6 @@ function _createDefaultState(): FCState {
     mapActive: false,
     mapHeldKeys: new Set(),
     mapThrusting: false,
-    normalOrbitHeldKeys: new Set(),
-    normalOrbitThrusting: false,
     mapHud: null,
 
     // Docking state

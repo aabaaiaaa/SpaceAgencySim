@@ -533,7 +533,7 @@ export function handleAbortReturnToAgency(): void {
 
   let returnResults: ReturnType<typeof processFlightReturn> | null = null;
   if (state && flightState) {
-    returnResults = processFlightReturn(state, flightState, ps, assembly);
+    returnResults = processFlightReturn(state, flightState, ps, assembly, s.stagingConfig);
   }
 
   refreshTopBar();

@@ -552,6 +552,9 @@ export function hitTestFlightPart(screenX: number, screenY: number, ps: Readonly
   const h = window.innerHeight;
 
   const { sx, sy } = worldToScreen(ps.posX, ps.posY, w, h);
+  // Renderer uses this same scale for rocketContainer.scale — hit test must
+  // match or clicks drift from parts as the player zooms in/out.
+  const scale = ppm() * SCALE_M_PER_PX;
 
   const com       = computeCoM(ps.fuelStore, assembly, ps.activeParts, ps.posX, ps.posY);
   const comLocalX =  (com.x - ps.posX) / SCALE_M_PER_PX;
@@ -579,7 +582,7 @@ export function hitTestFlightPart(screenX: number, screenY: number, ps: Readonly
     pivotY     = -ps.tippingContactY;
     const cosA = Math.cos(ps.angle);
     const sinA = Math.sin(ps.angle);
-    containerX = sx + ps.tippingContactX * cosA + ps.tippingContactY * sinA;
+    containerX = sx + (ps.tippingContactX * cosA + ps.tippingContactY * sinA) * scale;
     let maxDrop = 0;
     for (const instanceId of ps.activeParts) {
       const placed = assembly.parts.get(instanceId);
@@ -605,16 +608,18 @@ export function hitTestFlightPart(screenX: number, screenY: number, ps: Readonly
         if (drop > maxDrop) maxDrop = drop;
       }
     }
-    containerY = sy - maxDrop;
+    containerY = sy - maxDrop * scale;
   } else {
     pivotX     = comLocalX;
     pivotY     = comLocalY;
-    containerX = sx + comLocalX;
-    containerY = sy + lowestPartBottomPx + comLocalY;
+    containerX = sx + comLocalX * scale;
+    containerY = sy + (lowestPartBottomPx + comLocalY) * scale;
   }
 
-  const dx = screenX - containerX;
-  const dy = screenY - containerY;
+  // Click delta is in screen pixels; divide by the renderer scale to move
+  // into VAB-pixel space (which is what the hit grid and pivots use).
+  const dx = (screenX - containerX) / scale;
+  const dy = (screenY - containerY) / scale;
 
   const cosNeg = Math.cos(-ps.angle);
   const sinNeg = Math.sin(-ps.angle);

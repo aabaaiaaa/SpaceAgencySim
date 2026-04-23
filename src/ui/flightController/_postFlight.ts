@@ -597,7 +597,7 @@ export function showPostFlightSummary(
       if (recoveryHubId) {
         flightState.recoveryHubId = recoveryHubId;
       }
-      returnResults = processFlightReturn(state, flightState, ps, assembly);
+      returnResults = processFlightReturn(state, flightState, ps, assembly, getFCState().stagingConfig);
     }
 
     // Show unlock notification modal for any parts unlocked by completed missions.

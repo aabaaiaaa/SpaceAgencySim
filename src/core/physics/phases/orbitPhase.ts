@@ -21,12 +21,14 @@ import {
   computeOrbitalElements,
   orbitalStateToCartesian,
 } from '../../orbit.ts';
+import { applySteering } from '../steering.ts';
 
 import type { FlightState } from '../../gameState.ts';
-import type { PhysicsState } from '../../physics.ts';
+import type { PhysicsState, RocketAssembly } from '../../physics.ts';
 
 export interface OrbitPhaseContext {
   flightState: FlightState;
+  assembly: RocketAssembly;
 }
 
 /**
@@ -41,10 +43,10 @@ export interface OrbitPhaseContext {
  */
 export function tickOrbitPhase(
   ps: PhysicsState,
-  _dt: number,
+  dt: number,
   ctx: OrbitPhaseContext,
 ): boolean {
-  const { flightState } = ctx;
+  const { flightState, assembly } = ctx;
   const bodyId: string | undefined = flightState?.bodyId;
 
   const isDockingOrRcs =
@@ -84,6 +86,13 @@ export function tickOrbitPhase(
     ps.posY = state.posY;
     ps.velX = state.velX;
     ps.velY = state.velY;
+
+    // Analytical propagation doesn't run the Newtonian integrator, but the
+    // player still needs to be able to rotate the craft with A/D. Apply the
+    // same steering step so angle / angularVelocity stay live in orbit.
+    const altitude = Math.max(0, ps.posY);
+    applySteering(ps, assembly, altitude, dt, bodyId, flightState, 0);
+
     return true;
   }
 

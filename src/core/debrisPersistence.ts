@@ -59,6 +59,16 @@ export function persistControllableDebris(
     const design = _createSyntheticDesign(state, frag, assembly, flightState.rocketId);
     state.rockets.push(design);
 
+    const fragFuel: Record<string, number> = {};
+    for (const [id, kg] of frag.fuelStore) {
+      if (kg > 0 && frag.activeParts.has(id)) fragFuel[id] = kg;
+    }
+    const fragActive = Array.from(frag.activeParts);
+    const fragFiring = Array.from(frag.firingEngines).filter((id) => frag.activeParts.has(id));
+    // Synthetic design has one stage containing all debris parts — preserve
+    // it as the "next" stage so the player can still stage/activate things.
+    const fragRemainingStages: string[][] = [fragActive];
+
     const fc = createFieldCraft(state, {
       name: design.name,
       bodyId,
@@ -70,6 +80,13 @@ export function persistControllableDebris(
       orbitalElements: status.orbitalElements,
       orbitBandId: null,
       rocketDesignId: design.id,
+      craftState: {
+        activePartIds: fragActive,
+        firingEngineIds: fragFiring,
+        fuelStore: fragFuel,
+        remainingStages: fragRemainingStages,
+        unstagedParts: [],
+      },
     });
     state.fieldCraft.push(fc);
     created.push(fc);

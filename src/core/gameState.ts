@@ -406,6 +406,8 @@ export interface OrbitalObject {
    * Optional — older saves and non-player objects won't have it.
    */
   rocketDesignId?: string;
+  /** Persisted craft state captured when the flight ended; used by Take-Control. */
+  craftState?: PersistedCraftState;
 }
 
 /** State of a single built facility. */
@@ -574,6 +576,28 @@ export interface SandboxSettings {
  * are aboard; probes with command capability persist indefinitely without
  * consuming supplies.
  */
+/**
+ * Snapshot of craft state captured when a flight ends in orbit or on a non-home
+ * body. Used by the Take-Control flow so resuming a craft preserves fuel,
+ * active engines, and unfired stages instead of rebuilding from the pristine
+ * design. All fields are optional so older saves keep working.
+ */
+export interface PersistedCraftState {
+  /** Instance IDs of parts still physically attached to the craft. */
+  activePartIds?: string[];
+  /** Instance IDs of engines that were firing at persistence time. */
+  firingEngineIds?: string[];
+  /** Fuel remaining per tank / SRB instance ID, in kg. */
+  fuelStore?: Record<string, number>;
+  /**
+   * Remaining stages (each an array of instance IDs), ordered first-to-fire.
+   * Fired stages are omitted — only the next stage and beyond are kept.
+   */
+  remainingStages?: string[][];
+  /** Unstaged instance IDs (activatable parts not in any stage). */
+  unstagedParts?: string[];
+}
+
 export interface FieldCraft {
   /** Unique identifier. */
   id: string;
@@ -607,6 +631,8 @@ export interface FieldCraft {
    * saves written before this field existed won't have it.
    */
   rocketDesignId?: string;
+  /** Persisted craft state captured when the flight ended; used by Take-Control. */
+  craftState?: PersistedCraftState;
 }
 
 /** A single recovered part sitting in the player's inventory. */

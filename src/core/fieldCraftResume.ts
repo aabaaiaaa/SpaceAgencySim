@@ -11,7 +11,7 @@
  * @module core/fieldCraftResume
  */
 
-import type { GameState, FieldCraft, FlightState, OrbitalElements, OrbitalObject, RocketDesign } from './gameState.ts';
+import type { GameState, FieldCraft, FlightState, OrbitalElements, OrbitalObject, RocketDesign, PersistedCraftState } from './gameState.ts';
 import type { RocketAssembly, StagingConfig } from './rocketbuilder.ts';
 import { createFlightState } from './gameState.ts';
 import { designToAssembly, designToStagingConfig } from './rocketbuilder.ts';
@@ -43,6 +43,8 @@ export interface ResumePreparedFlight {
   sourceId: string;
   /** The design used to rebuild the assembly. */
   design: RocketDesign;
+  /** Persisted runtime state captured at the end of the prior flight. */
+  craftState?: PersistedCraftState;
 }
 
 export type ResumeFailureReason =
@@ -142,6 +144,7 @@ export function prepareCraftResume(state: GameState, craftId: string): ResumePre
   let crewIds: string[];
   let orbitBandId: string | null;
   let displayName: string;
+  let craftState: PersistedCraftState | undefined;
 
   if (hit.source === 'fieldCraft') {
     const fc = hit.fieldCraft!;
@@ -152,6 +155,7 @@ export function prepareCraftResume(state: GameState, craftId: string): ResumePre
     crewIds = fc.crewIds ?? [];
     orbitBandId = fc.orbitBandId ?? null;
     displayName = fc.name;
+    craftState = fc.craftState;
   } else {
     const oo = hit.orbitalObject!;
     if (!RESUMABLE_ORBITAL_TYPES.has(oo.type)) {
@@ -164,6 +168,7 @@ export function prepareCraftResume(state: GameState, craftId: string): ResumePre
     crewIds = [];
     orbitBandId = null;
     displayName = oo.name;
+    craftState = oo.craftState;
   }
 
   if (!designId) {
@@ -206,6 +211,7 @@ export function prepareCraftResume(state: GameState, craftId: string): ResumePre
     source: hit.source,
     sourceId: craftId,
     design,
+    craftState,
   };
 }
 
